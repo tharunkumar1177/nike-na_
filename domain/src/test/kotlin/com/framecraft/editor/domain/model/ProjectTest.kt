@@ -17,18 +17,17 @@ class ProjectTest {
     private fun video(
         id: String,
         durationMicros: Long,
-    ) =
-        MediaAsset(
-            id = id,
-            uri = "content://media/$id",
-            kind = MediaKind.VIDEO,
-            durationMicros = durationMicros,
-            width = 1920,
-            height = 1080,
-            rotationDegrees = 0,
-            hasAudio = true,
-            fingerprint = SourceFingerprint(sizeBytes = 1_000L, lastModifiedMillis = null),
-        )
+    ) = MediaAsset(
+        id = id,
+        uri = "content://media/$id",
+        kind = MediaKind.VIDEO,
+        durationMicros = durationMicros,
+        width = 1920,
+        height = 1080,
+        rotationDegrees = 0,
+        hasAudio = true,
+        fingerprint = SourceFingerprint(sizeBytes = 1_000L, lastModifiedMillis = null),
+    )
 
     /** Returns an image asset. */
     private fun image(id: String) =

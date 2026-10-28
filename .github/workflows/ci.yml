@@ -29,10 +29,10 @@ jobs:
           gradle-version: '9.8.2'
 
       - name: Kotlin lint (ktlint)
-        run: gradle lintKotlin --stacktrace
+        run: gradle lintKotlin --continue --stacktrace
 
       - name: Static analysis (detekt)
-        run: gradle detekt --stacktrace
+        run: gradle detekt --continue --stacktrace
 
       - name: Android Lint
         run: gradle :app:lintDebug --stacktrace
