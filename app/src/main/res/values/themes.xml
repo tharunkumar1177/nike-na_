@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Framecraft window theme; Compose draws all content, so this only sets the pre-draw window colors. -->
+<resources>
+  <style name="Theme.Framecraft" parent="android:Theme.Material.NoActionBar">
+    <item name="android:windowBackground">@color/window_background</item>
+  </style>
+</resources>

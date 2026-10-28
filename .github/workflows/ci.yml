@@ -1,0 +1,60 @@
+# Framecraft CI: the only build authority. Lints, analyzes, tests, and assembles on every push and pull request.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '9.8.2'
+
+      - name: Kotlin lint (ktlint)
+        run: gradle lintKotlin --stacktrace
+
+      - name: Static analysis (detekt)
+        run: gradle detekt --stacktrace
+
+      - name: Android Lint
+        run: gradle :app:lintDebug --stacktrace
+
+      - name: Unit tests
+        run: gradle :domain:test :app:testDebugUnitTest --stacktrace
+
+      - name: Assemble debug APK
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports
+          path: |
+            **/build/reports/
+          if-no-files-found: ignore

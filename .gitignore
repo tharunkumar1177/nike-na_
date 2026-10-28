@@ -1,0 +1,16 @@
+# Ignore rules for the Framecraft Android project: build outputs, IDE state, and local machine files.
+.gradle/
+build/
+/app/build/
+local.properties
+*.iml
+.idea/
+.kotlin/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.keystore
+*.jks
+.DS_Store
