@@ -45,14 +45,13 @@ class PlaybackPlannerTest {
     private fun project(
         magnetic: Boolean,
         vararg clips: Clip,
-    ) =
-        Project(
-            id = "p",
-            name = "P",
-            frameRate = FrameRate.FPS_30,
-            assets = listOf(video, image),
-            tracks = listOf(Track("t", TrackKind.VIDEO, magnetic, clips.toList())),
-        )
+    ) = Project(
+        id = "p",
+        name = "P",
+        frameRate = FrameRate.FPS_30,
+        assets = listOf(video, image),
+        tracks = listOf(Track("t", TrackKind.VIDEO, magnetic, clips.toList())),
+    )
 
     /** Back-to-back clips map to media segments with source trim and full source duration. */
     @Test
@@ -78,7 +77,8 @@ class PlaybackPlannerTest {
             PlaybackPlanner.plan(
                 project(false, Clip("a", "v", 1_000_000, 0, 1_000_000), Clip("b", "v", 4_000_000, 0, 1_000_000)),
             )
-        val durations = plan.sequences.single().segments.map { it.durationMicros to (it is PlanSegment.Gap) }
+        val segments = plan.sequences.single().segments
+        val durations = segments.map { it.durationMicros to (it is PlanSegment.Gap) }
         assertEquals(
             listOf(1_000_000L to true, 1_000_000L to false, 2_000_000L to true, 1_000_000L to false),
             durations,

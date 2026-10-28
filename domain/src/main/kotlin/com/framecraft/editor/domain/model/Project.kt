@@ -23,7 +23,7 @@ data class Project(
         require(id.isNotBlank()) { "Project id must not be blank" }
         val clipIds = tracks.flatMap { track -> track.clips.map { it.id } }
         val allIds = listOf(id) + assets.map { it.id } + tracks.map { it.id } + clipIds
-        val duplicates = allIds.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+        val duplicates = allIds.groupBy { it }.filterValues { it.size > 1 }.keys
         require(duplicates.isEmpty()) { "Duplicate ids in project $id: $duplicates" }
         val assetsById = assets.associateBy { it.id }
         tracks.flatMap { it.clips }.forEach { clip ->

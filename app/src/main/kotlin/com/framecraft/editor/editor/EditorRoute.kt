@@ -53,7 +53,7 @@ private fun ReadyEditor(
     val preview = viewModel.preview ?: return
     val previewState by preview.state.collectAsStateWithLifecycle()
     val project = state.project
-    val firstClip = project.tracks.firstOrNull()?.clips?.firstOrNull()
+    val firstClip = project.tracks.flatMap { it.clips }.firstOrNull()
     val aspectRatio = firstClip?.let { project.assetOf(it).displayAspectRatio } ?: DEFAULT_ASPECT_RATIO
     EditorScreen(
         projectName = project.name,
