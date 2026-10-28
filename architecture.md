@@ -1,0 +1,140 @@
+# System Architecture
+
+## Purpose and authority
+
+This document governs the shared technical contracts of a native Android video editor whose goal is to match or exceed CapCut mobile while being more intuitive. Every contract here applies to two or more responsibilities; responsibility-local rules live in [the blueprint manifest](blueprints/README.md).
+
+Authority order: inspected code and tests override this prose for current behavior; this document overrides blueprints for shared rules. Every contract below is **intended** (status `Planned`) until a slice verifies it in CI.
+
+## Product principles
+
+These shape every design decision and come from research into CapCut's most common failures.
+
+- **Sync never breaks silently.** Trimming, splitting, or moving a clip keeps the clips anchored to it in sync.
+- **Nothing is lost.** Autosave and undo history survive app close, process death, and crashes.
+- **Precision on a phone.** Frame-step nudges, zoom-to-playhead, haptic snap, and a global snap toggle. No hidden gesture zones.
+- **Local-first and private.** Core editing, export, and on-device AI work offline. No mandatory account or cloud upload.
+- **Honest pricing.** No feature is revealed as paid only at export time. (Currently fully free; see [Product decisions](#product-decisions).)
+
+## System boundaries
+
+In scope: an Android app (phones first, tablets supported) that imports local media, edits a multi-track timeline, previews in real time, and exports MP4 files.
+
+External actors: the Android media store (source media), the device codecs (via AndroidX Media3), and the Android share sheet (exported files).
+
+Out of scope until explicitly planned: cloud sync, accounts, online asset libraries, templates marketplace, desktop/web clients.
+
+## Stack and versions
+
+Versions are declared in `gradle/libs.versions.toml` and resolved in CI; the table lists the governing ones.
+
+| Concern | Choice |
+|---|---|
+| Language | Kotlin 2.4.21 (AGP built-in Kotlin) |
+| Build | Android Gradle Plugin 9.5.0, Gradle 9.8.2 run directly in CI on JDK 21 (no committed wrapper) |
+| UI | Jetpack Compose, BOM 2026.09.00 |
+| Media engine | AndroidX Media3 1.11.1 (Transformer, Composition, CompositionPlayer) |
+| Dependency injection | Manual app container (Hilt deferred until the graph needs it) |
+| Serialization | kotlinx.serialization (JSON) |
+| Unit tests | JUnit 5 for pure Kotlin modules; Robolectric 4.17 with JUnit 4 for Android JVM tests |
+| Static analysis | ktlint (kotlinter 5.7.0), detekt 2.0.0-alpha.6, Android Lint |
+| SDK levels | minSdk 29, targetSdk 37 |
+
+Rejected: Flutter and React Native (frame-accurate scrubbing and multi-track rendering need native media access); an FFmpeg-centric engine (`ffmpeg-kit` was retired in 2025; only community forks remain); Room for project storage (see [Project persistence and recovery](#project-persistence-and-recovery)).
+
+## Module structure and dependency direction
+
+Dependencies point inward toward `:domain`. `:domain` has zero Android dependencies.
+
+| Module | Owns | May depend on |
+|---|---|---|
+| `:domain` | Project model, time math, anchoring and ripple rules, edit commands | Kotlin stdlib, kotlinx.serialization |
+| `:engine:media3` | Translating a project snapshot into a Media3 `Composition`; preview player; export | `:domain`, Media3 |
+| `:data:project` | Project document files, command journal, autosave, recovery | `:domain` |
+| `:feature:*` | Compose screens and ViewModels (for example `:feature:timeline`, `:feature:import`) | `:domain`, engine and data interfaces |
+| `:app` | Application, Hilt graph, navigation, foreground services | All modules |
+
+Feature modules never import Media3 types directly; they talk to engine interfaces.
+
+## Shared contracts
+
+### Time representation
+
+- All timeline and media times are `Long` **microseconds**. No floating-point time is stored or used in edit math.
+- Conversions to frames use the project frame rate and round toward the nearest frame boundary at the UI edge only.
+- A clip's timeline extent is `[startMicros, startMicros + durationMicros)`, half-open.
+- Source trim is `trimStartMicros` into the source media; `durationMicros` is the timeline duration after speed is applied.
+
+### Identity and ownership
+
+- `Project`, `Track`, and `Clip` have stable string IDs (UUID v4) assigned at creation and never reused.
+- A project owns its tracks; a track owns its clips. A clip belongs to exactly one track.
+- Source media is referenced by content URI plus a fingerprint (size, duration, last-modified) so a missing source can be detected and relinked.
+
+### Project document model
+
+- A project is one immutable aggregate snapshot: `Project → Track[] → Clip[]`, plus project settings (aspect ratio, frame rate, canvas background).
+- There is **no privileged main track**. Any track may set `magnetic = true`, which closes gaps when clips are removed or trimmed on that track.
+- Gaps are **implicit**: a gap is any timeline span with no clip on a track. The domain never stores filler clips.
+- The document carries an integer `schemaVersion`. Readers migrate older versions forward; they refuse newer versions with a visible error.
+
+### Anchoring and ripple
+
+- A clip may declare an anchor: `anchor = (parentClipId, offsetMicros)`. Its absolute start is derived from the parent's start plus the offset.
+- Anchors form a forest; cycles are rejected at command validation.
+- When a parent clip moves or ripples, anchored children move with it. When a parent is deleted, children become unanchored at their current absolute position.
+- Ripple on a magnetic track shifts following clips on that track and, through anchors, their children on other tracks.
+
+### Edit commands and history
+
+- Every project mutation is an `EditCommand` that is pure: `apply(Project) → Project` plus an inverse. UI code never mutates the project directly.
+- Commands validate before applying and return a typed failure instead of throwing.
+- Undo/redo is a linear history over commands. Gesture-driven edits (a drag) coalesce into one command on gesture end.
+- History is persisted (see below), so undo works after a restart.
+
+### Project persistence and recovery
+
+- Each project is a directory containing a versioned JSON snapshot and an append-only JSON-lines command journal.
+- Every applied command is appended and flushed before the UI reports it done. A periodic compaction writes a new snapshot atomically (write temp, fsync, rename) and truncates the journal.
+- Recovery on open: load the latest snapshot, replay the journal, and drop a torn final line.
+- Rationale versus Room: the project is a single aggregate tree; whole-document snapshots plus a journal give atomic saves, cheap duplication, and persistent undo without relational mapping.
+
+### Engine translation
+
+- The engine consumes immutable project snapshots only. It never writes back to the project.
+- The adapter maps each track to a Media3 `EditedMediaItemSequence` and pads implicit gaps with generated silent or transparent segments at preview and export time.
+- Transitions consume clip handles (overlapping source media); they never freeze frames.
+- Preview and export use the same translation so what you see is what you export.
+
+### Media access
+
+- Import uses Android photo picker and media store APIs and handles partial access (`READ_MEDIA_VISUAL_USER_SELECTED`) on Android 14 and later.
+- Loss of access to a referenced source is a recoverable state (offline clip with relink), never a crash or silent removal.
+
+### Threading
+
+- Domain code is synchronous and thread-agnostic.
+- Media3 players are accessed only from their application looper thread. Persistence I/O runs on a dedicated dispatcher.
+- UI state is exposed as `StateFlow` from ViewModels.
+
+### Error and recovery
+
+- Failures are typed results surfaced to the user with a cause and a next action; nothing fails silently.
+- Long-running export runs in a foreground service and reports progress, success, and failure through a notification and in-app state.
+
+## Verification boundaries
+
+- `:domain`: JUnit 5 unit tests for time math, commands, anchoring, ripple, and migrations.
+- `:data:project`: unit tests for journal append, compaction, torn-write recovery, and schema migration.
+- `:engine:media3`: unit tests for snapshot-to-composition mapping; instrumented tests where a device is required.
+- UI: Compose UI tests for screen state and interactions.
+- GitHub Actions CI is the only build authority: ktlint, detekt, Android Lint, unit tests, and assemble must pass on every push.
+
+## Product decisions
+
+- App name **Framecraft**, application ID and root package `com.framecraft.editor`.
+- Monetization: fully free; no feature gating. Revisit only by explicit user decision.
+
+## Feature blueprints
+
+See [the blueprint manifest](blueprints/README.md).

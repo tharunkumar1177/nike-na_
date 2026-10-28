@@ -1,0 +1,11 @@
+# Framecraft detekt overrides layered on the default rule set.
+naming:
+  FunctionNaming:
+    ignoreAnnotated:
+      - Composable
+
+style:
+  MagicNumber:
+    ignorePropertyDeclaration: true
+    excludes:
+      - '**/test/**'

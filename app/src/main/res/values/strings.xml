@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Framecraft user-facing strings. -->
+<resources>
+  <string name="app_name">Framecraft</string>
+  <string name="home_empty_headline">No projects yet</string>
+  <string name="home_empty_body">Create your first project to start editing.</string>
+  <string name="home_new_project">New project</string>
+  <string name="home_new_project_unavailable">New project, disabled. Feature arriving in next update.</string>
+</resources>

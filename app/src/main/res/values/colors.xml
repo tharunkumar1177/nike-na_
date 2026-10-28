@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Framecraft XML colors used before Compose draws (window and launcher icon). -->
+<resources>
+  <color name="window_background">#111318</color>
+  <color name="launcher_background">#11448F</color>
+  <color name="launcher_foreground">#D7E2FF</color>
+</resources>
