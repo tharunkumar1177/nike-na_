@@ -155,7 +155,14 @@ fun DrawScope.drawTrack(
             val left = x(frame, clip.startMicros) + metrics.clipInset
             val width = x(frame, clip.endMicros) - metrics.clipInset - left
             if (width > 0f) {
-                val block = RoundRect(left, top, left + width, top + metrics.rowHeight, CornerRadius(metrics.clipCorner))
+                val block =
+                    RoundRect(
+                        left = left,
+                        top = top,
+                        right = left + width,
+                        bottom = top + metrics.rowHeight,
+                        cornerRadius = CornerRadius(metrics.clipCorner),
+                    )
                 clipPath(Path().apply { addRoundRect(block) }) {
                     drawRect(color = frame.style.colors.clip, topLeft = Offset(left, top), size = block.size())
                     drawThumbnails(frame, clip, top)
