@@ -1,10 +1,13 @@
 /*
- * Editor screen: preview, playback bar, and the zones reserved for the timeline and tools.
+ * Editor screen: top bar with undo and redo, preview, playback bar, timeline, and the contextual tools zone.
  */
 package com.framecraft.editor.editor
 
 import androidx.activity.compose.BackHandler
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -15,7 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -24,28 +27,35 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import com.framecraft.editor.R
 import com.framecraft.editor.domain.time.Timecode
 import com.framecraft.editor.engine.PreviewState
 import com.framecraft.editor.ui.spokenDuration
 import com.framecraft.editor.ui.theme.Spacing
+
+/** Test tag of the undo action. */
+const val UNDO_TAG = "editor_undo"
+
+/** Test tag of the redo action. */
+const val REDO_TAG = "editor_redo"
+
+/** Test tag of the delete clip tool. */
+const val TOOL_DELETE_TAG = "editor_tool_delete"
 
 /** Share of the editor height given to the preview. */
 private const val PREVIEW_WEIGHT = 0.45f
@@ -56,9 +66,41 @@ private const val TIMELINE_WEIGHT = 0.40f
 /** Share of the editor height reserved for the tool bar. */
 private const val TOOLS_WEIGHT = 0.15f
 
+/** Size of a tool button in the tools zone. */
+private val TOOL_SIZE = 64.dp
+
+/** One-shot notices the editor shows as snackbars. */
+enum class EditorNotice {
+    /** Some picked files could not be read. */
+    SKIPPED_FILES,
+
+    /** Edits at the end of the journal were lost in a crash. */
+    DROPPED_EDITS,
+
+    /** An edit could not be saved. */
+    SAVE_FAILED,
+}
+
+/** Notices waiting to be shown: [skippedCount] unreadable files, [droppedEditCount] lost edits, and [saveFailed]. */
+data class EditorNotices(
+    val skippedCount: Int = 0,
+    val droppedEditCount: Int = 0,
+    val saveFailed: Boolean = false,
+)
+
+/** What the editor's controls do. */
+class EditorActions(
+    val onPlayPause: () -> Unit,
+    val onClose: () -> Unit,
+    val onUndo: () -> Unit,
+    val onRedo: () -> Unit,
+    val onDeleteClip: () -> Unit,
+    val onNoticeShown: (EditorNotice) -> Unit,
+)
+
 /**
- * Stateless editor screen. [previewSurface] renders the video into the modifier it receives;
- * back navigation asks for confirmation before [onDiscard].
+ * Stateless editor screen. [previewSurface] renders the video and [timeline] the timeline into the
+ * modifiers they receive. Every edit is already saved, so back closes the editor without asking.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,72 +108,94 @@ fun EditorScreen(
     projectName: String,
     previewState: PreviewState,
     aspectRatio: Float,
-    skippedCount: Int,
-    onSkippedShown: () -> Unit,
-    onPlayPause: () -> Unit,
-    onDiscard: () -> Unit,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    hasSelection: Boolean,
+    notices: EditorNotices,
+    actions: EditorActions,
     previewSurface: @Composable (Modifier) -> Unit,
     timeline: @Composable (Modifier) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
-    var confirmDiscard by rememberSaveable { mutableStateOf(false) }
-    EditorNotices(snackbarHostState, skippedCount, previewState.errorCode, onSkippedShown)
-    BackHandler { confirmDiscard = true }
+    EditorSnackbars(snackbarHostState, notices, previewState.errorCode, actions.onNoticeShown)
+    BackHandler(onBack = actions.onClose)
     Scaffold(
         modifier = modifier,
-        topBar = {
-            TopAppBar(
-                title = { Text(projectName) },
-                navigationIcon = {
-                    IconButton(onClick = { confirmDiscard = true }) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_arrow_back),
-                            contentDescription = stringResource(R.string.editor_navigate_up),
-                        )
-                    }
-                },
-            )
-        },
+        topBar = { EditorTopBar(projectName, canUndo, canRedo, actions) },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             PreviewArea(aspectRatio, previewSurface)
-            PlaybackBar(previewState, onPlayPause)
+            PlaybackBar(previewState, actions.onPlayPause)
             timeline(Modifier.fillMaxWidth().weight(TIMELINE_WEIGHT))
-            ToolsZone()
+            ToolsZone(hasSelection, actions.onDeleteClip)
         }
-    }
-    if (confirmDiscard) {
-        DiscardDialog(
-            onCancel = { confirmDiscard = false },
-            onDiscard = {
-                confirmDiscard = false
-                onDiscard()
-            },
-        )
     }
 }
 
-/** Shows snackbars for skipped files and playback errors. */
+/** Back on the start edge, the project name, and undo and redo on the end edge. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun EditorNotices(
-    snackbarHostState: SnackbarHostState,
-    skippedCount: Int,
-    errorCode: String?,
-    onSkippedShown: () -> Unit,
+private fun EditorTopBar(
+    projectName: String,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    actions: EditorActions,
 ) {
-    val skippedMessage = stringResource(R.string.editor_skipped_files)
-    val playbackMessage = stringResource(R.string.editor_playback_failed)
-    LaunchedEffect(skippedCount) {
-        if (skippedCount > 0) {
-            snackbarHostState.showSnackbar(skippedMessage)
-            onSkippedShown()
+    TopAppBar(
+        title = { Text(projectName) },
+        navigationIcon = {
+            IconButton(onClick = actions.onClose) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_arrow_back),
+                    contentDescription = stringResource(R.string.editor_navigate_up),
+                )
+            }
+        },
+        actions = {
+            IconButton(onClick = actions.onUndo, enabled = canUndo, modifier = Modifier.testTag(UNDO_TAG)) {
+                Icon(painterResource(R.drawable.ic_undo), contentDescription = stringResource(R.string.editor_undo))
+            }
+            IconButton(onClick = actions.onRedo, enabled = canRedo, modifier = Modifier.testTag(REDO_TAG)) {
+                Icon(painterResource(R.drawable.ic_redo), contentDescription = stringResource(R.string.editor_redo))
+            }
+        },
+    )
+}
+
+/** Shows each pending notice once, then reports it shown; playback errors show whenever the code changes. */
+@Composable
+private fun EditorSnackbars(
+    snackbarHostState: SnackbarHostState,
+    notices: EditorNotices,
+    errorCode: String?,
+    onShown: (EditorNotice) -> Unit,
+) {
+    val resources = LocalResources.current
+    LaunchedEffect(notices.skippedCount) {
+        if (notices.skippedCount > 0) {
+            snackbarHostState.showSnackbar(resources.getString(R.string.editor_skipped_files))
+            onShown(EditorNotice.SKIPPED_FILES)
+        }
+    }
+    LaunchedEffect(notices.droppedEditCount) {
+        val count = notices.droppedEditCount
+        if (count > 0) {
+            val message = resources.getQuantityString(R.plurals.editor_recovered_edits, count, count)
+            snackbarHostState.showSnackbar(message)
+            onShown(EditorNotice.DROPPED_EDITS)
+        }
+    }
+    LaunchedEffect(notices.saveFailed) {
+        if (notices.saveFailed) {
+            snackbarHostState.showSnackbar(resources.getString(R.string.editor_save_failed))
+            onShown(EditorNotice.SAVE_FAILED)
         }
     }
     LaunchedEffect(errorCode) {
         if (errorCode != null) {
-            snackbarHostState.showSnackbar(playbackMessage)
+            snackbarHostState.showSnackbar(resources.getString(R.string.editor_playback_failed))
         }
     }
 }
@@ -186,32 +250,54 @@ private fun PlaybackBar(
     }
 }
 
-/** Zone kept free for the tool bar. */
+/** Contextual tools for the selection; empty when nothing is selected. */
 @Composable
-private fun ColumnScope.ToolsZone() {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .weight(TOOLS_WEIGHT)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
-    )
+private fun ColumnScope.ToolsZone(
+    hasSelection: Boolean,
+    onDeleteClip: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .weight(TOOLS_WEIGHT)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(horizontal = Spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (hasSelection) {
+            ToolButton(
+                iconRes = R.drawable.ic_delete,
+                label = stringResource(R.string.editor_tool_delete),
+                description = stringResource(R.string.editor_tool_delete_description),
+                onClick = onDeleteClip,
+                modifier = Modifier.testTag(TOOL_DELETE_TAG),
+            )
+        }
+    }
 }
 
-/** Confirms leaving the editor, which discards the unsaved project. */
+/** 64dp tool with an icon over a label, read by TalkBack as [description]. */
 @Composable
-private fun DiscardDialog(
-    onCancel: () -> Unit,
-    onDiscard: () -> Unit,
+private fun ToolButton(
+    @DrawableRes iconRes: Int,
+    label: String,
+    description: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    AlertDialog(
-        onDismissRequest = onCancel,
-        title = { Text(stringResource(R.string.editor_discard_title)) },
-        text = { Text(stringResource(R.string.editor_discard_body)) },
-        confirmButton = {
-            TextButton(onClick = onDiscard) { Text(stringResource(R.string.editor_discard_confirm)) }
-        },
-        dismissButton = {
-            TextButton(onClick = onCancel) { Text(stringResource(R.string.editor_discard_cancel)) }
-        },
-    )
+    Column(
+        modifier =
+            modifier
+                .size(TOOL_SIZE)
+                .clickable(role = Role.Button, onClick = onClick)
+                .semantics(mergeDescendants = true) { contentDescription = description },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        val color = MaterialTheme.colorScheme.onSurface
+        Icon(painter = painterResource(iconRes), contentDescription = null, tint = color)
+        Spacer(Modifier.height(Spacing.xs))
+        Text(text = label, style = MaterialTheme.typography.labelLarge, color = color)
+    }
 }

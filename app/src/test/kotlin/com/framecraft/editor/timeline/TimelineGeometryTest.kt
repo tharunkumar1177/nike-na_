@@ -3,8 +3,12 @@
  */
 package com.framecraft.editor.timeline
 
+import com.framecraft.editor.domain.model.Clip
+import com.framecraft.editor.domain.model.Track
+import com.framecraft.editor.domain.model.TrackKind
 import com.framecraft.editor.domain.time.FrameRate
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 /** Verifies the pure timeline math used by the timeline strip. */
@@ -51,6 +55,35 @@ class TimelineGeometryTest {
         assertEquals(listOf(100f, 100f, 50f), tiles.map { it.widthPx })
         assertEquals(listOf(2_000_000L, 3_000_000L, 4_000_000L), tiles.map { it.sourceMicros })
         assertEquals(0, TimelineGeometry.thumbnailTiles(ClipSpan(1_200f, 100f, 0L), 100f, 100f, 1_000f).size)
+    }
+
+    /** Rows are found below the ruler, and gaps between rows hit nothing. */
+    @Test
+    fun rowAtSkipsRulerAndGaps() {
+        assertNull(TimelineGeometry.rowAt(10f, 32f, 64f, 8f))
+        assertEquals(0, TimelineGeometry.rowAt(40f, 32f, 64f, 8f))
+        assertEquals(0, TimelineGeometry.rowAt(103.9f, 32f, 64f, 8f))
+        assertNull(TimelineGeometry.rowAt(108f, 32f, 64f, 8f))
+        assertEquals(1, TimelineGeometry.rowAt(112f, 32f, 64f, 8f))
+    }
+
+    /** Clip extents are half-open, so the boundary belongs to the next clip. */
+    @Test
+    fun clipAtUsesHalfOpenExtents() {
+        val track =
+            Track(
+                id = "track",
+                kind = TrackKind.VIDEO,
+                magnetic = false,
+                clips =
+                    listOf(
+                        Clip("a", "asset", 0L, 0L, 1_000_000L),
+                        Clip("b", "asset", 2_000_000L, 0L, 1_000_000L),
+                    ),
+            )
+        assertEquals("a", TimelineGeometry.clipAt(track, 0L)?.id)
+        assertNull(TimelineGeometry.clipAt(track, 1_000_000L))
+        assertEquals("b", TimelineGeometry.clipAt(track, 2_000_000L)?.id)
     }
 
     /** Clip durations show one decimal place. */

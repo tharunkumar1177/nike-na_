@@ -22,4 +22,5 @@ rootProject.name = "framecraft"
 
 include(":app")
 include(":domain")
+include(":data:project")
 include(":engine:media3")
