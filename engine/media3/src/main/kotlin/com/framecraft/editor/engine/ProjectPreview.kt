@@ -106,6 +106,18 @@ class ProjectPreview(
         player.play()
     }
 
+    /** Pauses and switches the player to frame-accurate scrubbing; pause first so ending the scrub cannot resume. */
+    fun beginScrub() {
+        player.pause()
+        player.setScrubbingModeEnabled(true)
+    }
+
+    /** Leaves scrubbing mode and records the final position. */
+    fun endScrub() {
+        player.setScrubbingModeEnabled(false)
+        syncPosition()
+    }
+
     /** Moves the playhead to [positionMicros]. */
     fun seekTo(positionMicros: Long) {
         val clamped = positionMicros.coerceIn(0L, mutableState.value.durationMicros)

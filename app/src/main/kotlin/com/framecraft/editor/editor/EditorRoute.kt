@@ -23,6 +23,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.framecraft.editor.R
 import com.framecraft.editor.engine.PreviewSurface
+import com.framecraft.editor.timeline.ScrubCallbacks
+import com.framecraft.editor.timeline.TimelineStrip
 import com.framecraft.editor.ui.theme.Spacing
 
 /** Preview aspect ratio used when a project has no visual clip. */
@@ -51,6 +53,7 @@ private fun ReadyEditor(
     modifier: Modifier = Modifier,
 ) {
     val preview = viewModel.preview ?: return
+    val thumbnails = viewModel.thumbnails ?: return
     val previewState by preview.state.collectAsStateWithLifecycle()
     val project = state.project
     val firstClip = project.tracks.flatMap { it.clips }.firstOrNull()
@@ -64,6 +67,15 @@ private fun ReadyEditor(
         onPlayPause = preview::togglePlayPause,
         onDiscard = viewModel::close,
         previewSurface = { surfaceModifier -> PreviewSurface(preview, surfaceModifier) },
+        timeline = { timelineModifier ->
+            TimelineStrip(
+                project = project,
+                positionMicros = { previewState.positionMicros },
+                thumbnails = thumbnails,
+                callbacks = ScrubCallbacks(preview::beginScrub, preview::seekTo, preview::endScrub),
+                modifier = timelineModifier,
+            )
+        },
         modifier = modifier,
     )
 }

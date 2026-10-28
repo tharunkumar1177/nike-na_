@@ -36,14 +36,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.framecraft.editor.R
 import com.framecraft.editor.domain.time.Timecode
 import com.framecraft.editor.engine.PreviewState
+import com.framecraft.editor.ui.spokenDuration
 import com.framecraft.editor.ui.theme.Spacing
 
 /** Share of the editor height given to the preview. */
@@ -70,6 +71,7 @@ fun EditorScreen(
     onPlayPause: () -> Unit,
     onDiscard: () -> Unit,
     previewSurface: @Composable (Modifier) -> Unit,
+    timeline: @Composable (Modifier) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -96,7 +98,8 @@ fun EditorScreen(
         Column(Modifier.fillMaxSize().padding(padding)) {
             PreviewArea(aspectRatio, previewSurface)
             PlaybackBar(previewState, onPlayPause)
-            ReservedZones()
+            timeline(Modifier.fillMaxWidth().weight(TIMELINE_WEIGHT))
+            ToolsZone()
         }
     }
     if (confirmDiscard) {
@@ -157,11 +160,12 @@ private fun PlaybackBar(
     state: PreviewState,
     onPlayPause: () -> Unit,
 ) {
+    val resources = LocalResources.current
     val spokenProgress =
         stringResource(
             R.string.editor_time_of,
-            spokenDuration(state.positionMicros),
-            spokenDuration(state.durationMicros),
+            spokenDuration(resources, state.positionMicros),
+            spokenDuration(resources, state.durationMicros),
         )
     Row(
         modifier = Modifier.fillMaxWidth().height(Spacing.xxl).padding(end = Spacing.md),
@@ -182,15 +186,9 @@ private fun PlaybackBar(
     }
 }
 
-/** Zones kept free for the timeline and the tool bar. */
+/** Zone kept free for the tool bar. */
 @Composable
-private fun ColumnScope.ReservedZones() {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .weight(TIMELINE_WEIGHT)
-            .background(MaterialTheme.colorScheme.surface),
-    )
+private fun ColumnScope.ToolsZone() {
     Box(
         Modifier
             .fillMaxWidth()
@@ -216,18 +214,4 @@ private fun DiscardDialog(
             TextButton(onClick = onCancel) { Text(stringResource(R.string.editor_discard_cancel)) }
         },
     )
-}
-
-/** Spoken form of a duration, for example "1 minute 23 seconds". */
-@Composable
-private fun spokenDuration(micros: Long): String {
-    val parts = Timecode.parts(micros)
-    val hours = pluralStringResource(R.plurals.duration_hours, parts.hours.toInt(), parts.hours)
-    val minutes = pluralStringResource(R.plurals.duration_minutes, parts.minutes.toInt(), parts.minutes)
-    val seconds = pluralStringResource(R.plurals.duration_seconds, parts.seconds.toInt(), parts.seconds)
-    return buildList {
-        if (parts.hours > 0) add(hours)
-        if (parts.minutes > 0) add(minutes)
-        if (parts.seconds > 0 || isEmpty()) add(seconds)
-    }.joinToString(" ")
 }
