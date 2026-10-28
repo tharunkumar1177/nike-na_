@@ -69,7 +69,10 @@ class ProjectSession internal constructor(
     suspend fun dispatch(command: EditCommand): DispatchResult =
         withContext(ioDispatcher) {
             when (val outcome = command.applyTo(project)) {
-                is CommandOutcome.Rejected -> DispatchResult.Rejected(outcome.reason)
+                is CommandOutcome.Rejected -> {
+                    DispatchResult.Rejected(outcome.reason)
+                }
+
                 is CommandOutcome.Applied -> {
                     persist(command, outcome)
                     DispatchResult.Applied(state)

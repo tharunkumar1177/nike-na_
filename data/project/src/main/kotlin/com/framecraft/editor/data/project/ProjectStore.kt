@@ -51,7 +51,8 @@ class ProjectStore(
     suspend fun create(project: Project): ProjectSession =
         withContext(ioDispatcher) {
             val directory = directoryOf(project.id)
-            if (!directory.dir.isDirectory && !directory.dir.mkdirs()) throw IOException("Cannot create ${directory.dir}")
+            val dir = directory.dir
+            if (!dir.isDirectory && !dir.mkdirs()) throw IOException("Cannot create $dir")
             val snapshot = SnapshotDocument(baseSeq = 0L, createdAtEpochMillis = clock(), project = project)
             directory.writeSnapshot(snapshot)
             directory.writeJournal(emptyList())
@@ -110,8 +111,13 @@ class ProjectStore(
                 OpenProjectResult.Opened(session, result.project.droppedRecords)
             }
 
-            is LoadResult.TooNew -> OpenProjectResult.TooNew(result.version)
-            is LoadResult.Corrupt -> OpenProjectResult.Corrupt(result.detail)
+            is LoadResult.TooNew -> {
+                OpenProjectResult.TooNew(result.version)
+            }
+
+            is LoadResult.Corrupt -> {
+                OpenProjectResult.Corrupt(result.detail)
+            }
         }
 
     /** Returns the stored summary of [directory], rebuilding it when missing; null if the project is unreadable. */

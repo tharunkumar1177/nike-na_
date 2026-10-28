@@ -89,12 +89,12 @@ fun TimelineStrip(
             Modifier
                 .fillMaxSize()
                 .testTag(TIMELINE_TAG)
+                .timelineSemantics(resources, project, positionMicros, callbacks.onSeek)
                 .pointerInput(project) {
                     scrubGestures(state, project, positionMicros, callbacks) { tap ->
                         currentOnClipSelected(clipAtPosition(project, state, tap))
                     }
-                }
-                .timelineSemantics(resources, project, positionMicros, callbacks.onSeek),
+                },
         ) {
             // Reading the version here redraws the canvas whenever a thumbnail finishes loading.
             thumbnailVersion

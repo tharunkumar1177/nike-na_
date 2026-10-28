@@ -238,7 +238,8 @@ class EditorViewModel(
     /** Shows [next] in the preview and state, dropping a selection whose clip no longer exists. */
     private fun publish(next: SessionState) {
         preview?.setProject(next.project)
-        val clipIds = next.project.tracks.flatMap { track -> track.clips.map { it.id } }.toSet()
+        val tracks = next.project.tracks
+        val clipIds = tracks.flatMap { track -> track.clips.map { it.id } }.toSet()
         updateReady { ready ->
             ready.copy(
                 project = next.project,

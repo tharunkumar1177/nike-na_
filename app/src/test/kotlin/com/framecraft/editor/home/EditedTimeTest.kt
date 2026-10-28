@@ -11,7 +11,12 @@ import java.time.ZoneOffset
 /** Verifies each band of the "Edited ..." rules. */
 class EditedTimeTest {
     private val zone = ZoneOffset.UTC
-    private val now = LocalDate.of(2026, 10, 29).atTime(12, 0).toInstant(zone).toEpochMilli()
+    private val now =
+        LocalDate
+            .of(2026, 10, 29)
+            .atTime(12, 0)
+            .toInstant(zone)
+            .toEpochMilli()
 
     /** Returns the classification of an edit [agoMillis] before now. */
     private fun ago(agoMillis: Long) = EditedTime.classify(now, now - agoMillis, zone)

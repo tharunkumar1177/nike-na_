@@ -96,7 +96,8 @@ class ProjectStoreTest {
             session.close()
             val reopened = store().opened().session.state
             assertEquals("Beach", reopened.project.name)
-            assertEquals(listOf("b"), reopened.project.tracks.single().clips.map { it.id })
+            val track = reopened.project.tracks.single()
+            assertEquals(listOf("b"), track.clips.map { it.id })
             assertTrue(reopened.canUndo)
             assertEquals(listOf("Beach"), store().list().summaries.map { it.name })
         }
@@ -113,7 +114,8 @@ class ProjectStoreTest {
             assertEquals("B", reopened.state.project.name)
             assertTrue(reopened.state.canRedo)
             assertEquals("C", reopened.redo()?.project?.name)
-            assertEquals("Trip", reopened.undo()?.let { reopened.undo() }?.project?.name)
+            reopened.undo()
+            assertEquals("Trip", reopened.undo()?.project?.name)
         }
 
     /** A new edit after undo discards the redo tail on disk. */
@@ -236,7 +238,8 @@ class ProjectStoreTest {
             store().create(project).close()
             assertTrue(store().change(project.id, RenameProject("Renamed")))
             assertFalse(store().change(project.id, RenameProject(" ")))
-            assertEquals("Renamed", store().list().summaries.single().name)
+            val summaries = store().list().summaries
+            assertEquals("Renamed", summaries.single().name)
             assertTrue(store().delete(project.id))
             assertEquals(OpenProjectResult.NotFound, store().open(project.id))
             assertNull(store().list().summaries.firstOrNull())

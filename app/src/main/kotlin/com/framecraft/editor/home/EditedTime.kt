@@ -55,12 +55,19 @@ object EditedTime {
             elapsed < HOUR_MILLIS -> EditedAgo.Minutes((elapsed / MINUTE_MILLIS).toInt())
             elapsed < DAY_MILLIS -> EditedAgo.Hours((elapsed / HOUR_MILLIS).toInt())
             elapsed < 2 * DAY_MILLIS -> EditedAgo.Yesterday
-            else -> {
-                val date = Instant.ofEpochMilli(editedMillis).atZone(zone).toLocalDate()
-                val currentYear = Instant.ofEpochMilli(nowMillis).atZone(zone).year
-                EditedAgo.OnDate(date, date.year == currentYear)
-            }
+            else -> onDate(nowMillis, editedMillis, zone)
         }
+    }
+
+    /** Classifies an edit older than a day by its calendar date in [zone]. */
+    private fun onDate(
+        nowMillis: Long,
+        editedMillis: Long,
+        zone: ZoneId,
+    ): EditedAgo {
+        val date = Instant.ofEpochMilli(editedMillis).atZone(zone).toLocalDate()
+        val currentYear = Instant.ofEpochMilli(nowMillis).atZone(zone).year
+        return EditedAgo.OnDate(date, date.year == currentYear)
     }
 }
 
@@ -75,10 +82,15 @@ fun editedLabel(
         is EditedAgo.Minutes -> resources.getQuantityString(R.plurals.home_edited_minutes, ago.count, ago.count)
         is EditedAgo.Hours -> resources.getQuantityString(R.plurals.home_edited_hours, ago.count, ago.count)
         EditedAgo.Yesterday -> resources.getString(R.string.home_edited_yesterday)
-        is EditedAgo.OnDate -> {
-            val skeleton = if (ago.sameYear) "MMMd" else "yMMMd"
-            val pattern = DateFormat.getBestDateTimePattern(locale, skeleton)
-            val date = DateTimeFormatter.ofPattern(pattern, locale).format(ago.date)
-            resources.getString(R.string.home_edited_on, date)
-        }
+        is EditedAgo.OnDate -> resources.getString(R.string.home_edited_on, formatDate(locale, ago))
     }
+
+/** Formats the date of [ago] in [locale]'s month-day order, adding the year when it is not this year. */
+private fun formatDate(
+    locale: Locale,
+    ago: EditedAgo.OnDate,
+): String {
+    val skeleton = if (ago.sameYear) "MMMd" else "yMMMd"
+    val pattern = DateFormat.getBestDateTimePattern(locale, skeleton)
+    return DateTimeFormatter.ofPattern(pattern, locale).format(ago.date)
+}

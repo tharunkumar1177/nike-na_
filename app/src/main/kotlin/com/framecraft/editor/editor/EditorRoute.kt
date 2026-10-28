@@ -40,18 +40,30 @@ fun EditorRoute(
     modifier: Modifier = Modifier,
 ) {
     when (state) {
-        EditorState.Idle -> Unit
-        EditorState.Loading -> LoadingScreen(modifier)
-        EditorState.AllFailed ->
+        EditorState.Idle -> {
+            Unit
+        }
+
+        EditorState.Loading -> {
+            LoadingScreen(modifier)
+        }
+
+        EditorState.AllFailed -> {
             FailureScreen(
                 titleRes = R.string.editor_import_failed_title,
                 bodyRes = R.string.editor_import_failed_body,
                 onGoBack = viewModel::close,
                 modifier = modifier,
             )
+        }
 
-        is EditorState.OpenFailed -> OpenFailedScreen(state.reason, viewModel::close, modifier)
-        is EditorState.Ready -> ReadyEditor(viewModel, state, modifier)
+        is EditorState.OpenFailed -> {
+            OpenFailedScreen(state.reason, viewModel::close, modifier)
+        }
+
+        is EditorState.Ready -> {
+            ReadyEditor(viewModel, state, modifier)
+        }
     }
 }
 

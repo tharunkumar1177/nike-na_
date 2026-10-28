@@ -69,6 +69,9 @@ class EditCommandTest {
         return outcome as CommandOutcome.Applied
     }
 
+    /** Returns the clips on the single track of [project]. */
+    private fun clipsOf(project: Project): List<Clip> = project.tracks.single().clips
+
     /** Asserts that applying [command] then its inverse restores [project]. */
     private fun assertRoundTrips(
         command: EditCommand,
@@ -100,7 +103,7 @@ class EditCommandTest {
     fun deleteClosesGapOnMagneticTrack() {
         val start = project(magnetic = true, clip("a", 0), clip("b", 1), clip("c", 2))
         val result = applied(DeleteClip("b"), start)
-        assertEquals(listOf(0L, 1_000_000L), result.project.tracks.single().clips.map { it.startMicros })
+        assertEquals(listOf(0L, 1_000_000L), clipsOf(result.project).map { it.startMicros })
         assertRoundTrips(DeleteClip("b"), start)
     }
 
@@ -109,7 +112,7 @@ class EditCommandTest {
     fun deleteLeavesGapOnFreeTrack() {
         val start = project(magnetic = false, clip("a", 0), clip("b", 1), clip("c", 2))
         val result = applied(DeleteClip("b"), start)
-        assertEquals(listOf(0L, 2_000_000L), result.project.tracks.single().clips.map { it.startMicros })
+        assertEquals(listOf(0L, 2_000_000L), clipsOf(result.project).map { it.startMicros })
         assertRoundTrips(DeleteClip("b"), start)
     }
 
@@ -117,7 +120,7 @@ class EditCommandTest {
     @Test
     fun deleteLastClip() {
         val start = project(magnetic = true, clip("a", 0))
-        assertTrue(applied(DeleteClip("a"), start).project.tracks.single().clips.isEmpty())
+        assertTrue(clipsOf(applied(DeleteClip("a"), start).project).isEmpty())
         assertRoundTrips(DeleteClip("a"), start)
     }
 
@@ -140,8 +143,8 @@ class EditCommandTest {
     fun addShiftsFollowersOnMagneticTrack() {
         val start = project(magnetic = true, clip("a", 0), clip("c", 1))
         val result = applied(AddClip("track", clip("b", 1)), start)
-        assertEquals(listOf("a", "b", "c"), result.project.tracks.single().clips.map { it.id })
-        assertEquals(2_000_000L, result.project.tracks.single().clips.last().startMicros)
+        assertEquals(listOf("a", "b", "c"), clipsOf(result.project).map { it.id })
+        assertEquals(2_000_000L, clipsOf(result.project).last().startMicros)
         assertRoundTrips(AddClip("track", clip("b", 1)), start)
     }
 
@@ -155,7 +158,12 @@ class EditCommandTest {
     /** Every command survives a JSON round-trip through the sealed hierarchy. */
     @Test
     fun commandsRoundTripThroughJson() {
-        val commands: List<EditCommand> = listOf(RenameProject("Beach"), DeleteClip("a"), AddClip("track", clip("a", 0)))
+        val commands: List<EditCommand> =
+            listOf(
+                RenameProject("Beach"),
+                DeleteClip("a"),
+                AddClip("track", clip("a", 0)),
+            )
         commands.forEach { command ->
             val text = json.encodeToString(EditCommand.serializer(), command)
             assertEquals(command, json.decodeFromString(EditCommand.serializer(), text))
