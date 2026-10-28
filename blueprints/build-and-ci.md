@@ -6,9 +6,9 @@ Own the Gradle multi-module scaffold and the GitHub Actions workflow that is the
 
 ## Current verified status
 
-**Status:** Planned
+**Status:** Implemented
 
-No build files or workflow exist yet.
+Verified by a green CI run of `.github/workflows/ci.yml` on the slice 1 branch: all five verification steps pass and the debug APK artifact is uploaded.
 
 ## Architecture dependencies
 
@@ -28,7 +28,7 @@ The scaffold creates the modules listed in the architecture as they are needed, 
 
 ### Verification boundaries
 
-The workflow runs ktlint, detekt, Android Lint, JUnit 5 unit tests, and `assembleDebug`. Each runs as a distinct step so failures are attributable.
+The workflow runs ktlint, detekt, Android Lint, unit tests, and `assembleDebug`. Each runs as a distinct step so failures are attributable. Gradle runs on JDK 21 (Robolectric's SDK 36 sandbox requires it) while bytecode targets Java 17. Robolectric JVM tests need `--add-opens` for `java.base` internals, configured in `app/build.gradle.kts`. `:domain` uses JUnit 5; Robolectric tests in `:app` use JUnit 4.
 
 ## Related blueprints
 
@@ -42,14 +42,16 @@ None
 
 ## Relevant implementation and tests
 
-Planned: `settings.gradle.kts`, `build.gradle.kts`, `gradle/libs.versions.toml`, `.github/workflows/ci.yml`, `app/`, `domain/`.
+- `settings.gradle.kts`, `build.gradle.kts`, `gradle/libs.versions.toml`, `gradle.properties`, `.editorconfig`, `config/detekt/detekt.yml` — build configuration
+- `.github/workflows/ci.yml` — CI workflow
+- `app/src/test/kotlin/com/framecraft/editor/MainActivityTest.kt` — launch test
 
 ## Acceptance or verification criteria
 
-- [ ] CI workflow triggers on push and pull request to `main`.
-- [ ] ktlint, detekt, Android Lint, unit tests, and `assembleDebug` each pass as separate steps.
-- [ ] The debug APK is uploaded as a workflow artifact.
-- [ ] The app launches to a placeholder-free empty home screen (verified by a Compose UI test).
+- [x] CI workflow triggers on push to any branch and on pull requests to `main`.
+- [x] ktlint, detekt, Android Lint, unit tests, and `assembleDebug` each pass as separate steps.
+- [x] The debug APK is uploaded as a workflow artifact.
+- [x] The app launches to the empty home screen (verified by a Robolectric Compose UI test).
 
 ## Remaining gaps and unknowns
 

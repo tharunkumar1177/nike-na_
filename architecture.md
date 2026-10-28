@@ -26,18 +26,18 @@ Out of scope until explicitly planned: cloud sync, accounts, online asset librar
 
 ## Stack and versions
 
-Versions were reported by the architect as checked against registries; slice 1 re-verifies each one in CI and records the result here.
+Versions are declared in `gradle/libs.versions.toml` and resolved in CI; the table lists the governing ones.
 
 | Concern | Choice |
 |---|---|
-| Language | Kotlin 2.4.21 |
-| Build | Android Gradle Plugin 9.4.0, Gradle 9.6.0 (wrapper generated in CI) |
+| Language | Kotlin 2.4.21 (AGP built-in Kotlin) |
+| Build | Android Gradle Plugin 9.5.0, Gradle 9.8.2 run directly in CI on JDK 21 (no committed wrapper) |
 | UI | Jetpack Compose, BOM 2026.09.00 |
 | Media engine | AndroidX Media3 1.11.1 (Transformer, Composition, CompositionPlayer) |
-| Dependency injection | Hilt |
+| Dependency injection | Manual app container (Hilt deferred until the graph needs it) |
 | Serialization | kotlinx.serialization (JSON) |
-| Unit tests | JUnit 5 via `de.mannodermaus.android-junit` 2.0.2 |
-| Static analysis | ktlint, detekt, Android Lint |
+| Unit tests | JUnit 5 for pure Kotlin modules; Robolectric 4.17 with JUnit 4 for Android JVM tests |
+| Static analysis | ktlint (kotlinter 5.7.0), detekt 2.0.0-alpha.6, Android Lint |
 | SDK levels | minSdk 29, targetSdk 37 |
 
 Rejected: Flutter and React Native (frame-accurate scrubbing and multi-track rendering need native media access); an FFmpeg-centric engine (`ffmpeg-kit` was retired in 2025; only community forks remain); Room for project storage (see [Project persistence and recovery](#project-persistence-and-recovery)).

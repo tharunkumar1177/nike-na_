@@ -6,7 +6,7 @@ Ordered vertical slices. Each slice is user-visible, shipped on its own branch, 
 
 ## Foundation
 
-- [ ] 1. **Walking skeleton** — Gradle modules `:app` and `:domain`, version catalog, CI workflow (ktlint, detekt, Android Lint, unit tests, assemble), app opens to an empty home screen. UI: yes.
+- [x] 1. **Walking skeleton** — Gradle modules `:app` and `:domain`, version catalog, CI workflow (ktlint, detekt, Android Lint, unit tests, assemble), app opens to an empty home screen. UI: yes.
 - [ ] 2. **Import and play** — pick videos and photos (partial media access handled), build a project, preview it. UI: yes.
 - [ ] 3. **See the timeline** — pinch-zoom timeline showing tracks, clips, and gaps with a playhead synced to preview. UI: yes.
 - [ ] 4. **Never lose work** — project list, autosave via snapshot plus journal, crash recovery, persistent undo/redo buttons. UI: yes.
