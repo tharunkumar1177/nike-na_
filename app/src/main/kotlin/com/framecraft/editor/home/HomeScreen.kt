@@ -23,8 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.framecraft.editor.R
@@ -39,14 +37,17 @@ private const val EMPTY_ICON_ALPHA = 0.5f
 /** Shows the project list; with no projects it shows the empty state and a bottom-centered create action. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(modifier: Modifier = Modifier) {
+fun HomeScreen(
+    onNewProject: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Scaffold(
         modifier = modifier,
         topBar = {
             CenterAlignedTopAppBar(title = { Text(stringResource(R.string.app_name)) })
         },
         floatingActionButtonPosition = FabPosition.Center,
-        floatingActionButton = { NewProjectButton() },
+        floatingActionButton = { NewProjectButton(onNewProject) },
     ) { padding ->
         EmptyProjects(Modifier.padding(padding))
     }
@@ -83,19 +84,13 @@ private fun EmptyProjects(modifier: Modifier = Modifier) {
     }
 }
 
-/** Primary create action; disabled until media import is available. */
+/** Primary create action that opens the system photo picker. */
 @Composable
-private fun NewProjectButton() {
-    val unavailableDescription = stringResource(R.string.home_new_project_unavailable)
+private fun NewProjectButton(onClick: () -> Unit) {
     Button(
-        onClick = {},
-        enabled = false,
+        onClick = onClick,
         shape = MaterialTheme.shapes.extraLarge,
-        modifier =
-            Modifier
-                .heightIn(min = 56.dp)
-                .semantics { contentDescription = unavailableDescription }
-                .testTag(NEW_PROJECT_TAG),
+        modifier = Modifier.heightIn(min = 56.dp).testTag(NEW_PROJECT_TAG),
     ) {
         Icon(painter = painterResource(R.drawable.ic_add), contentDescription = null)
         Text(

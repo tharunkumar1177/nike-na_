@@ -5,5 +5,33 @@
   <string name="home_empty_headline">No projects yet</string>
   <string name="home_empty_body">Create your first project to start editing.</string>
   <string name="home_new_project">New project</string>
-  <string name="home_new_project_unavailable">New project, disabled. Feature arriving in next update.</string>
+
+  <string name="editor_default_project_name">New project</string>
+  <string name="editor_navigate_up">Navigate up</string>
+  <string name="editor_play">Play video</string>
+  <string name="editor_pause">Pause video</string>
+  <string name="editor_time_of">%1$s of %2$s</string>
+  <string name="editor_preparing_media">Preparing media…</string>
+  <string name="editor_skipped_files">Some files couldn\'t be read and were skipped.</string>
+  <string name="editor_playback_failed">Playback failed. Try restarting the app.</string>
+  <string name="editor_import_failed_title">Couldn\'t load media</string>
+  <string name="editor_import_failed_body">None of the selected files could be read. They might be corrupted or in an unsupported format.</string>
+  <string name="editor_import_failed_action">Go back</string>
+  <string name="editor_discard_title">Discard project?</string>
+  <string name="editor_discard_body">Projects aren\'t saved yet (saving arrives in a future update). If you leave, your edits will be lost.</string>
+  <string name="editor_discard_confirm">Discard</string>
+  <string name="editor_discard_cancel">Cancel</string>
+
+  <plurals name="duration_hours">
+    <item quantity="one">%d hour</item>
+    <item quantity="other">%d hours</item>
+  </plurals>
+  <plurals name="duration_minutes">
+    <item quantity="one">%d minute</item>
+    <item quantity="other">%d minutes</item>
+  </plurals>
+  <plurals name="duration_seconds">
+    <item quantity="one">%d second</item>
+    <item quantity="other">%d seconds</item>
+  </plurals>
 </resources>

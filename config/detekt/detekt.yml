@@ -4,6 +4,11 @@ naming:
     ignoreAnnotated:
       - Composable
 
+complexity:
+  LongParameterList:
+    ignoreAnnotated:
+      - Composable
+
 style:
   MagicNumber:
     ignorePropertyDeclaration: true
