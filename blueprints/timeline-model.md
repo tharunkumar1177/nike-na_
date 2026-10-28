@@ -6,7 +6,9 @@ Own the pure Kotlin project model: tracks, clips, implicit gaps, magnetic tracks
 
 ## Current verified status
 
-**Status:** Planned
+**Status:** Partial
+
+Time math (`FrameRate`, `Timecode`) and the validated document model (`MediaAsset`, `Clip`, `Track`, `Project`, `ProjectFactory`) are implemented and verified by CI unit tests. Anchoring and ripple are not built yet (slice 7).
 
 ## Architecture dependencies
 
@@ -46,11 +48,15 @@ None
 
 ## Relevant implementation and tests
 
-Planned: `domain/src/main/kotlin/.../model/`, `domain/src/test/kotlin/.../model/`.
+- `domain/src/main/kotlin/com/framecraft/editor/domain/time/` — `FrameRate`, `Timecode`.
+- `domain/src/main/kotlin/com/framecraft/editor/domain/model/` — `MediaAsset`, `Clip`, `Track`, `Project`, `ProjectFactory`, `IdGenerator`.
+- Tests: `domain/src/test/kotlin/com/framecraft/editor/domain/time/FrameRateTest.kt`, `TimecodeTest.kt`, `domain/src/test/kotlin/com/framecraft/editor/domain/model/ProjectTest.kt`.
 
 ## Acceptance or verification criteria
 
-- [ ] Overlapping clips on one track are rejected.
+- [x] Frame math round-trips at fractional rates (29.97) and never returns negative time.
+- [x] Overlapping clips on one track are rejected.
+- [x] Magnetic tracks reject gaps; duplicate IDs and unknown asset references are rejected.
 - [ ] Anchored children resolve to parent start plus offset.
 - [ ] Anchor cycles are rejected.
 - [ ] Ripple on a magnetic track shifts later clips and their anchored children.

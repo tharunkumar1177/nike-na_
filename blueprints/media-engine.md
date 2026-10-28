@@ -6,7 +6,9 @@ Own translation of project snapshots into Media3 compositions for real-time prev
 
 ## Current verified status
 
-**Status:** Planned
+**Status:** Partial
+
+`PlaybackPlanner` maps a project to a Media3-free plan (media segments and gaps), `CompositionFactory` turns the plan into a `Composition`, and `ProjectPreview` drives a `CompositionPlayer` shown through `PreviewSurface`. The planner is verified by CI unit tests; export is not built yet (slice 6).
 
 ## Architecture dependencies
 
@@ -45,14 +47,18 @@ None
 
 ## Relevant implementation and tests
 
-Planned: `engine/media3/src/main/kotlin/`, `engine/media3/src/test/kotlin/`.
+- `engine/media3/src/main/kotlin/com/framecraft/editor/engine/plan/PlaybackPlan.kt` — plan types and `PlaybackPlanner`.
+- `engine/media3/src/main/kotlin/com/framecraft/editor/engine/CompositionFactory.kt` — plan to `Composition` (clipping for video, image durations, `addGap` padding).
+- `engine/media3/src/main/kotlin/com/framecraft/editor/engine/ProjectPreview.kt`, `PreviewSurface.kt` — preview player and its SurfaceView.
+- Tests: `engine/media3/src/test/kotlin/com/framecraft/editor/engine/plan/PlaybackPlannerTest.kt`.
 
 ## Acceptance or verification criteria
 
-- [ ] A project with gaps maps to sequences whose durations match the timeline.
+- [x] A project with gaps maps to sequences whose durations match the timeline.
 - [ ] Preview and export use the same mapper.
 - [ ] Export continues with the screen off and reports completion or failure.
 
 ## Remaining gaps and unknowns
 
+- `CompositionFactory` and `ProjectPreview` have no automated tests; they need a device, and CI runs JVM tests only.
 - Multi-video preview (picture in picture) depends on `MultipleInputVideoGraph` behavior that research flagged as still evolving.

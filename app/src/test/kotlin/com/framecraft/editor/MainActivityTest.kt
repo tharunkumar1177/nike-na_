@@ -4,7 +4,7 @@
 package com.framecraft.editor
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -28,9 +28,9 @@ class MainActivityTest {
         composeRule.onNodeWithText("Create your first project to start editing.").assertIsDisplayed()
     }
 
-    /** The create action is present but disabled until import exists. */
+    /** The create action is available. */
     @Test
-    fun newProjectIsDisabled() {
-        composeRule.onNodeWithTag(NEW_PROJECT_TAG).assertIsDisplayed().assertIsNotEnabled()
+    fun newProjectIsEnabled() {
+        composeRule.onNodeWithTag(NEW_PROJECT_TAG).assertIsDisplayed().assertIsEnabled()
     }
 }
