@@ -46,6 +46,8 @@ dependencies {
     implementation(libs.media3.transformer)
     implementation(libs.media3.effect)
     implementation(libs.media3.ui.compose)
+    implementation(libs.media3.inspector.frame)
+    implementation(libs.kotlinx.coroutines.guava)
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.kotlinx.coroutines.android)

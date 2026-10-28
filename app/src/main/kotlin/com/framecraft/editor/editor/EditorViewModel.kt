@@ -12,6 +12,7 @@ import com.framecraft.editor.di.AppContainer
 import com.framecraft.editor.domain.model.IdGenerator
 import com.framecraft.editor.domain.model.Project
 import com.framecraft.editor.domain.model.ProjectFactory
+import com.framecraft.editor.engine.ClipThumbnails
 import com.framecraft.editor.engine.ProjectPreview
 import com.framecraft.editor.media.ImportResult
 import com.framecraft.editor.media.MediaImporter
@@ -47,6 +48,7 @@ class EditorViewModel(
     private val importer: MediaImporter,
     private val idGenerator: IdGenerator,
     private val previewFactory: () -> ProjectPreview,
+    private val thumbnailsFactory: () -> ClipThumbnails,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
     private val mutableState = MutableStateFlow<EditorState>(EditorState.Idle)
@@ -56,6 +58,10 @@ class EditorViewModel(
 
     /** Preview of the open project; non-null while the state is [EditorState.Ready]. */
     var preview: ProjectPreview? = null
+        private set
+
+    /** Timeline thumbnails of the open project; non-null while the state is [EditorState.Ready]. */
+    var thumbnails: ClipThumbnails? = null
         private set
 
     /** Imports [uris] into a new project named [projectName]; ignored when empty or a project is open. */
@@ -74,6 +80,7 @@ class EditorViewModel(
                 } else {
                     val project = ProjectFactory.create(projectName, assets, idGenerator)
                     preview = previewFactory().also { it.setProject(project) }
+                    thumbnails = thumbnailsFactory()
                     EditorState.Ready(project, skippedCount = results.size - assets.size)
                 }
         }
@@ -86,19 +93,21 @@ class EditorViewModel(
 
     /** Closes the open project and returns to the home screen. */
     fun close() {
-        releasePreview()
+        releaseProjectResources()
         mutableState.value = EditorState.Idle
     }
 
-    /** Releases the preview player when the view model is destroyed. */
+    /** Releases the preview player and thumbnails when the view model is destroyed. */
     override fun onCleared() {
-        releasePreview()
+        releaseProjectResources()
     }
 
-    /** Releases and forgets the preview player. */
-    private fun releasePreview() {
+    /** Releases and forgets the preview player and thumbnails. */
+    private fun releaseProjectResources() {
         preview?.release()
         preview = null
+        thumbnails?.close()
+        thumbnails = null
     }
 
     /** Factory wiring. */
@@ -107,7 +116,12 @@ class EditorViewModel(
         fun factory(container: AppContainer): ViewModelProvider.Factory =
             viewModelFactory {
                 initializer {
-                    EditorViewModel(container.mediaImporter, container.idGenerator, container::createPreview)
+                    EditorViewModel(
+                        importer = container.mediaImporter,
+                        idGenerator = container.idGenerator,
+                        previewFactory = container::createPreview,
+                        thumbnailsFactory = container::createThumbnails,
+                    )
                 }
             }
     }

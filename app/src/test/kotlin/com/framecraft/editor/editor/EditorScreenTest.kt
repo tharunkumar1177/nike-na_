@@ -42,6 +42,7 @@ class EditorScreenTest {
                     onPlayPause = { playPauseClicks++ },
                     onDiscard = { discarded = true },
                     previewSurface = { modifier -> Box(modifier) },
+                    timeline = { modifier -> Box(modifier) },
                 )
             }
         }

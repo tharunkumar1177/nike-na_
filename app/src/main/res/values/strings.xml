@@ -22,6 +22,13 @@
   <string name="editor_discard_confirm">Discard</string>
   <string name="editor_discard_cancel">Cancel</string>
 
+  <string name="timeline_zoom_to_fit">Zoom to fit timeline</string>
+  <string name="timeline_description">Timeline. Playhead at %1$s. %2$s Swipe up or down to seek.</string>
+  <plurals name="timeline_track_clips">
+    <item quantity="one">%1$d clip on track %2$d.</item>
+    <item quantity="other">%1$d clips on track %2$d.</item>
+  </plurals>
+
   <plurals name="duration_hours">
     <item quantity="one">%d hour</item>
     <item quantity="other">%d hours</item>
