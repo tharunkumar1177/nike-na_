@@ -46,6 +46,7 @@ The commands `RenameProject`, `DeleteClip`, `AddClip`, `TrimClip`, `SplitClip`, 
 ### Transition editing
 
 - `SetTransition` and `ApplyTransitionToAll` invert through `SetTransitions`, which restores each clip's previous transition verbatim. `SplitClip` hands a transition to the right part and `MergeClips` keeps the right part's, so splits and merges undo exactly; no other command touches transitions (`TransitionCommandsTest`). Details belong to [transitions](transitions.md).
+- `SetClipLook` and `ApplyLookToAll` invert through `SetLooks`, which restores each clip's previous look verbatim. `SplitClip` gives both parts the look and `MergeClips` requires both parts to share it, and extracted sound carries none (`LookCommandsTest`). Details belong to [look](look.md).
 
 ## Related blueprints
 

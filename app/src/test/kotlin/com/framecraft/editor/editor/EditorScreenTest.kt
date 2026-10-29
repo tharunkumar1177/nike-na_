@@ -66,6 +66,7 @@ class EditorScreenTest {
             onToggleFit = { events += "fit" },
             onToggleAdjust = { events += "adjust" },
             onOpenSpeed = { events += "speed" },
+            onOpenLook = { events += "look" },
         )
 
     /** The tools of a selected video clip that plays at 80% for six seconds. */
@@ -360,5 +361,24 @@ class EditorScreenTest {
     fun noSpeedToolOtherwise() {
         showEditor(availability = ToolAvailability(hasSelection = true, canSplit = true))
         composeRule.onAllNodesWithTag(TOOL_SPEED_TAG).assertCountEquals(0)
+    }
+
+    /** A selected picture offers Look, which opens the look sheet. */
+    @Test
+    fun lookToolForPictures() {
+        showEditor(availability = ToolAvailability(hasSelection = true, canSplit = true, showLook = true))
+        composeRule
+            .onNodeWithContentDescription("Adjust filters and colors")
+            .performScrollTo()
+            .assertIsEnabled()
+            .performClick()
+        assertEquals(listOf("look"), events)
+    }
+
+    /** Audio and text selections have no Look tool. */
+    @Test
+    fun noLookToolOtherwise() {
+        showEditor(availability = ToolAvailability(hasSelection = true, canSplit = true))
+        composeRule.onAllNodesWithTag(TOOL_LOOK_TAG).assertCountEquals(0)
     }
 }

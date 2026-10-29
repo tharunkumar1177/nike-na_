@@ -138,7 +138,7 @@ private fun ReadyEditor(
 }
 
 /**
- * Shows whichever of the text, canvas, speed, and transition sheets is open over [project] with the playhead at
+ * Shows whichever of the text, canvas, speed, transition, and look sheets is open over [project] with the playhead at
  * [positionMicros]; edits go to [dispatch] and the transition sheet moves the preview through [onSeek].
  */
 @Composable
@@ -154,6 +154,7 @@ private fun EditorSheets(
     CanvasSheetHost(canvas, project, dispatch)
     SpeedSheetHost(pickers.speed, project, positionMicros, dispatch)
     TransitionSheetHost(pickers.transition, project, dispatch, onSeek)
+    LookSheetHost(pickers.look, project, dispatch)
 }
 
 /**

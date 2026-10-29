@@ -35,7 +35,7 @@ Where a cut can take a transition, the transition commands, and how split, merge
 
 ### Engine
 
-- `TransitionLanes` keeps the base track playing the outgoing clip on through each window into its hidden source, with its sound fading out over the window, and adds an incoming lane that plays the next clip's hidden lead-in, fading in. Fades to black or white add a backdrop lane of a solid PNG. Per base track the lanes register incoming first, then the base, then the backdrop.
+- `TransitionLanes` keeps the base track playing the outgoing clip on through each window into its hidden source, with its sound fading out over the window, and adds an incoming lane that plays the next clip's hidden lead-in, fading in. Fades to black or white add a backdrop lane of a solid PNG. Per base track the lanes register incoming first, then the base, then the backdrop. Both clip lanes carry their clip's look ([look](look.md)).
 - `TransitionMotion` gives each side its opacity, horizontal shift, and zoom from the window's progress. Off-canvas shifts combine Media3's background and overlay anchors so neither leaves the range -1 to 1.
 
 ### Editing

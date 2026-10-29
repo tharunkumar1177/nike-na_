@@ -21,7 +21,8 @@ const val UNITY_VOLUME_PERCENT: Int = 100
  * fit the canvas, centered and upright. A timed clip may play at a [speed]; it then reads [sourceDurationMicros] of
  * source, and its sound keeps its pitch when [maintainPitch] is set. Without a speed the clip reads exactly its own
  * duration of source. A video-track clip may carry the [outTransition] into the clip that starts where it ends; it
- * stays stored while the cut is gone or too short and plays again once the cut allows it.
+ * stays stored while the cut is gone or too short and plays again once the cut allows it. A clip on a video or
+ * overlay track may carry a [look] that colors its picture.
  */
 @Serializable
 data class Clip(
@@ -41,6 +42,7 @@ data class Clip(
     val sourceDurationMicros: Long? = null,
     val maintainPitch: Boolean = true,
     val outTransition: ClipTransition? = null,
+    val look: ClipLook? = null,
 ) {
     init {
         require(id.isNotBlank()) { "Clip id must not be blank" }

@@ -63,7 +63,8 @@ internal object CompositionFactory {
      * draws earlier sequences on top. A hidden clock sequence of the project's frame rate goes first so output frames
      * keep that rate through gaps and overlay videos; the background, when not black, goes after the pictures and
      * before the sound. [CanvasCompositorSettings] sizes the canvas and places every input. HDR inputs are tone-mapped
-     * because the compositor draws only SDR.
+     * because the compositor draws only SDR, and so are they whenever a picture uses a filter, whose color table
+     * Media3 applies only to SDR frames.
      */
     fun create(
         plan: PlaybackPlan,
@@ -86,10 +87,12 @@ internal object CompositionFactory {
         val text: List<Effect> =
             if (plan.textSpans.isEmpty()) emptyList() else listOf(OverlayEffect(plan.textSpans.map(::TextOverlay)))
         val builder = Composition.Builder(sequences).setEffects(Effects(emptyList(), text + videoEffects))
-        if (plan.composited && durationMicros != null) {
-            builder
-                .setVideoCompositorSettings(CanvasCompositorSettings(CanvasLayout.inputsOf(plan), plan.aspectRatio))
-                .setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL)
+        val composited = plan.composited && durationMicros != null
+        if (composited) {
+            builder.setVideoCompositorSettings(CanvasCompositorSettings(CanvasLayout.inputsOf(plan), plan.aspectRatio))
+        }
+        if (composited || plan.hasLutLook) {
+            builder.setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL)
         }
         return builder.build()
     }
@@ -121,7 +124,7 @@ internal object CompositionFactory {
             }
         }
 
-    /** Returns the picture of [segment], silent, reduced, and blurred, in a project at [frameRate]. */
+    /** Returns the picture of [segment], silent, reduced, blurred, and colored, in a project at [frameRate]. */
     private fun blurredItem(
         segment: PlanSegment.Media,
         frameRate: FrameRate,
@@ -136,7 +139,7 @@ internal object CompositionFactory {
         return picture
             .buildUpon()
             .setRemoveAudio(true)
-            .setEffects(Effects(emptyList(), blur))
+            .setEffects(Effects(emptyList(), blur + LookEffects.of(segment.look)))
             .build()
     }
 
@@ -199,9 +202,9 @@ internal object CompositionFactory {
         }
 
     /**
-     * Returns the clipped source of [segment] with its speed and sound chain, in a project at [frameRate]. A muted
-     * picture item drops its sound; a [soundOnly] item drops its picture and keeps its sound, silenced by the gain
-     * envelope when muted. A sped-up picture is capped at the project's frame rate so it drops frames instead of
+     * Returns the clipped source of [segment] with its look, speed, and sound chain, in a project at [frameRate]. A
+     * muted picture item drops its sound; a [soundOnly] item drops its picture and keeps its sound, silenced by the
+     * gain envelope when muted. A sped-up picture is capped at the project's frame rate so it drops frames instead of
      * playing them faster.
      */
     private fun clippedItem(
@@ -222,10 +225,12 @@ internal object CompositionFactory {
                 .setClippingConfiguration(clipping)
                 .build()
         val builder = EditedMediaItem.Builder(item).setDurationUs(segment.sourceDurationMicros)
+        val look = if (soundOnly) emptyList() else LookEffects.of(segment.look)
         if (!soundOnly && segment.volumePercent == 0) {
             builder.setRemoveAudio(true)
+            if (look.isNotEmpty()) builder.setEffects(Effects(emptyList(), look))
         } else {
-            builder.setEffects(Effects(AudioItemEffects.processorsFor(segment), emptyList()))
+            builder.setEffects(Effects(AudioItemEffects.processorsFor(segment), look))
         }
         if (soundOnly) {
             builder.setRemoveVideo(true)
@@ -241,8 +246,8 @@ internal object CompositionFactory {
     }
 
     /**
-     * Returns [segment] as a still image shown for its duration at [framesPerSecond]. A generated still in a `data:`
-     * URI names its type, which Media3 cannot infer from the URI.
+     * Returns [segment] as a still image colored by its look, shown for its duration at [framesPerSecond]. A
+     * generated still in a `data:` URI names its type, which Media3 cannot infer from the URI.
      */
     private fun imageItem(
         segment: PlanSegment.Media,
@@ -254,11 +259,13 @@ internal object CompositionFactory {
                 .setUri(segment.uri)
                 .setImageDurationMs(segment.durationMicros / MICROS_PER_MILLI)
         if (segment.uri.startsWith(DATA_URI_PREFIX)) builder.setMimeType(MimeTypes.IMAGE_PNG)
-        val item = builder.build()
-        return EditedMediaItem
-            .Builder(item)
-            .setDurationUs(segment.durationMicros)
-            .setFrameRate(framesPerSecond)
-            .build()
+        val edited =
+            EditedMediaItem
+                .Builder(builder.build())
+                .setDurationUs(segment.durationMicros)
+                .setFrameRate(framesPerSecond)
+        val look = LookEffects.of(segment.look)
+        if (look.isNotEmpty()) edited.setEffects(Effects(emptyList(), look))
+        return edited.build()
     }
 }

@@ -66,6 +66,7 @@ object AudioPlacement {
                     overlayTransform = null,
                     canvasPlacement = null,
                     outTransition = null,
+                    look = null,
                     volumePercent = video.volumePercent.takeIf { it > 0 } ?: UNITY_VOLUME_PERCENT,
                 )
             ExtractAudio(video.id, laneId, clip)

@@ -89,7 +89,8 @@ Feature modules never import Media3 types directly; they talk to engine interfac
 - Every clip carries a volume from 0 to 200 percent (100 is unchanged) and fade-in and fade-out lengths whose sum fits within the clip. Gain is the volume times linear fades from the clip's edges. Images and text keep the defaults, and neither has a source offset to trim.
 - The canvas aspect ratio is a project setting: original (the first base clip's displayed shape, the default) or a fixed ratio (9:16, 16:9, 1:1, 4:5, 4:3). Its pixel size keeps the first base clip's short side, never coming from an overlay, a sound, or text. Placements are normalized to the canvas, so changing the shape moves no clip. The background behind the base is black (default), one opaque color, or a blurred copy of the first base track.
 - A clip on a video track may carry an outgoing transition (kind and length) into the next clip. It plays only while the two clips touch and both have enough hidden source, centered on the cut without changing the timeline's length; otherwise it is kept unplayed, so edits around it and their undo never rewrite it.
-- The document carries an integer `schemaVersion` (currently 7). Readers migrate older versions forward; they refuse newer versions with a visible error.
+- A clip on a video or overlay track may carry a look: one catalog filter, stored by a stable id, at an intensity from 0 to 100 percent, and six color adjustments (brightness, contrast, saturation, exposure, temperature, tint) from -100 to 100 where 0 changes nothing. A look that changes nothing is stored as none. A filter id the app does not know is kept and draws as no filter.
+- The document carries an integer `schemaVersion` (currently 8). Readers migrate older versions forward; they refuse newer versions with a visible error.
 
 ### Anchoring and ripple
 
@@ -123,6 +124,7 @@ Feature modules never import Media3 types directly; they talk to engine interfac
 - A sped clip's item is clipped to its source span and given a Media3 speed provider built from its `SpeedMap` steps, with pitch kept when the clip asks; a sped-up picture is capped at the project frame rate. Gaps, stills, and the clock and background sequences never carry speed.
 - Text tracks add no sequence. Each text clip becomes a bitmap overlay in one overlay effect applied to the composed picture, before any export resizing, so preview and export draw it the same way; upper text lanes draw on top. Text tracks still count toward the padded end. A project with only text has nothing to export.
 - Transitions consume clip handles (overlapping source media); they never freeze frames. Through each window the base sequence keeps playing the outgoing clip's hidden source, an incoming sequence placed just before it plays the next clip's hidden lead-in, and fades add a solid backdrop sequence just after it; the compositor moves and fades each side.
+- A look becomes per-clip video effects on the clip's item, in a fixed order: the filter as a 33-point color table blended at its intensity, then one color matrix for brightness, contrast, exposure, temperature, and tint, then saturation. Every lane that draws the clip (base, transition, blurred background) carries its look. Color tables draw only SDR, so a project with any filter tone-maps HDR to SDR in OpenGL even when not composited.
 - Preview and export use the same translation so what you see is what you export.
 
 ### Media access

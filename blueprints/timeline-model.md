@@ -44,6 +44,7 @@ Clips on one track must not overlap. Magnetic tracks are kept gap-free by the co
 ### Clip transitions
 
 - A clip may carry `outTransition` (`ClipTransition`: kind and a positive length) into the next clip. Whether it plays is computed from the track by `TransitionGeometry`, never stored, so the field survives edits that separate the clips. The rules and commands belong to [transitions](transitions.md).
+- A clip on a video or overlay track may carry `look` (`ClipLook`: an optional catalog filter at an intensity and six color adjustments); the project refuses a look on any other track. The rules and commands belong to [look](look.md).
 
 ## Related blueprints
 

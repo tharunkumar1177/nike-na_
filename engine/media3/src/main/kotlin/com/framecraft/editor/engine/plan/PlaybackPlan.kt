@@ -6,6 +6,7 @@ package com.framecraft.editor.engine.plan
 import com.framecraft.editor.domain.model.CanvasBackground
 import com.framecraft.editor.domain.model.CanvasPlacement
 import com.framecraft.editor.domain.model.CanvasSettings
+import com.framecraft.editor.domain.model.ClipLook
 import com.framecraft.editor.domain.model.ClipSpeed
 import com.framecraft.editor.domain.model.MediaKind
 import com.framecraft.editor.domain.model.OverlayTransform
@@ -26,7 +27,7 @@ sealed interface PlanSegment {
      * Plays [sourceSpanMicros] of [uri] starting at [sourceStartMicros] over [durationMicros] of timeline;
      * [sourceDurationMicros] is the full source. The source plays at [speed], normal when null, keeping its pitch when
      * [maintainPitch] is set. Its sound plays at [volumePercent] (0 is silent) with fades of [fadeInMicros] and
-     * [fadeOutMicros] in timeline time.
+     * [fadeOutMicros] in timeline time. A picture is colored by its [look].
      */
     data class Media(
         val uri: String,
@@ -40,6 +41,7 @@ sealed interface PlanSegment {
         val speed: ClipSpeed? = null,
         val sourceSpanMicros: Long = durationMicros,
         val maintainPitch: Boolean = true,
+        val look: ClipLook? = null,
     ) : PlanSegment
 
     /** Empty timeline span: black frames and silence on the base sequence, hidden on overlay sequences. */
@@ -134,7 +136,14 @@ data class PlaybackPlan(
     val composited: Boolean = false,
     val aspectRatio: Float? = null,
     val background: BackgroundPlan? = null,
-)
+) {
+    /** True when any picture uses a filter, whose color table Media3 can only apply to SDR frames. */
+    val hasLutLook: Boolean
+        get() =
+            sequences.any { sequence ->
+                sequence.segments.any { (it as? PlanSegment.Media)?.look?.usesFilter == true }
+            }
+}
 
 /** Converts project snapshots into playback plans. */
 object PlaybackPlanner {
@@ -242,6 +251,7 @@ object PlaybackPlanner {
                     speed = clip.speed,
                     sourceSpanMicros = clip.sourceSpanMicros,
                     maintainPitch = clip.maintainPitch,
+                    look = clip.look,
                 )
             cursor = clip.endMicros
         }

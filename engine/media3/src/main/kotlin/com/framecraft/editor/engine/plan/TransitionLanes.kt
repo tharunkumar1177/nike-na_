@@ -99,6 +99,7 @@ internal object TransitionLanes {
             speed = clip.speed,
             sourceSpanMicros = if (asset.isTimed) to - from else duration,
             maintainPitch = clip.maintainPitch,
+            look = clip.look,
         )
     }
 
@@ -157,6 +158,7 @@ internal object TransitionLanes {
             speed = clip.speed,
             sourceSpanMicros = if (asset.isTimed) end - start else duration,
             maintainPitch = clip.maintainPitch,
+            look = clip.look,
         )
     }
 
