@@ -57,8 +57,8 @@ internal class OverlayCompositorSettings(
     private fun fitFactor(inputId: Int): Float {
         val sizes = inputSizes
         val canvas = sizes.firstOrNull()
-        val overlay = sizes.getOrNull(inputId)
-        return if (canvas == null || overlay == null || overlay.width <= 0 || overlay.height <= 0) {
+        val overlay = sizes.getOrNull(inputId)?.takeIf { it.width > 0 && it.height > 0 }
+        return if (canvas == null || overlay == null) {
             1f
         } else {
             minOf(canvas.width.toFloat() / overlay.width, canvas.height.toFloat() / overlay.height)

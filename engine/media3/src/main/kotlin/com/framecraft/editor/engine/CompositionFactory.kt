@@ -25,7 +25,8 @@ private const val MICROS_PER_MILLI = 1_000L
 internal object CompositionFactory {
     /**
      * Returns a composition with one audio-and-video sequence per planned track, with overlay sequences placed by
-     * [OverlayCompositorSettings]. Export passes [videoEffects] that apply to the whole output; the preview passes none.
+     * [OverlayCompositorSettings]. Export passes [videoEffects] that apply to the whole output; the preview passes
+     * none.
      */
     fun create(
         plan: PlaybackPlan,
