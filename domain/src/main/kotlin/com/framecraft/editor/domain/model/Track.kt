@@ -16,6 +16,14 @@ enum class TrackKind {
 
     /** Sound-only clips mixed under the picture. */
     AUDIO,
+
+    /** Text clips drawn above every picture. */
+    TEXT,
+    ;
+
+    /** True for kinds whose clips are placed on the canvas with an overlay transform. */
+    val isPlaced: Boolean
+        get() = this == OVERLAY || this == TEXT
 }
 
 /**

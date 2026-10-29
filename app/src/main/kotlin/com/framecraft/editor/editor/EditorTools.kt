@@ -1,5 +1,6 @@
 /*
- * Wires the editor's tools zone and preview overlay handles to the view model: availability, actions, and picker.
+ * Wires the editor's tools zone and preview overlay and text handles to the view model: availability, actions, and
+ * pickers.
  */
 package com.framecraft.editor.editor
 
@@ -8,27 +9,42 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.res.stringResource
+import com.framecraft.editor.R
 import com.framecraft.editor.domain.command.DeleteClip
 import com.framecraft.editor.domain.command.EditCommand
 import com.framecraft.editor.domain.command.RemoveAudioClip
 import com.framecraft.editor.domain.command.RemoveOverlayClip
+import com.framecraft.editor.domain.command.RemoveTextClip
 import com.framecraft.editor.domain.command.SetClipAudio
 import com.framecraft.editor.domain.command.SetOverlayTransform
 import com.framecraft.editor.domain.command.SplitClip
 import com.framecraft.editor.domain.edit.AudioPlacement
 import com.framecraft.editor.domain.edit.OverlayPlacement
+import com.framecraft.editor.domain.edit.TextPlacement
 import com.framecraft.editor.domain.model.Clip
 import com.framecraft.editor.domain.model.MediaKind
 import com.framecraft.editor.domain.model.OverlayTransform
 import com.framecraft.editor.domain.model.Project
+import com.framecraft.editor.domain.model.TextContent
 import com.framecraft.editor.domain.model.TrackKind
 import com.framecraft.editor.engine.ProjectPreview
+import com.framecraft.editor.engine.text.TextBox
+import com.framecraft.editor.engine.text.TextLayouter
+import kotlin.math.roundToInt
 
 /** MIME types the music picker offers. */
 private const val AUDIO_MIME_TYPES = "audio/*"
+
+/** Canvas height text is measured at for its handles; only the proportions matter. */
+private const val MEASURE_HEIGHT = 1080
+
+/** Preview aspect ratio used when a project has no visual clip. */
+private const val DEFAULT_ASPECT_RATIO = 16f / 9f
 
 /**
  * Returns an action that opens the photo and video picker and adds the picked item through [overlays] at
@@ -62,15 +78,20 @@ internal fun rememberAudioPicker(
     return { launcher.launch(arrayOf(AUDIO_MIME_TYPES)) }
 }
 
-/** The media pickers the add tools open: [overlay] for photos and videos and [audio] for sound files. */
+/**
+ * What the add and text tools open: [overlay] picks photos and videos, [audio] picks sound files, and [text] holds
+ * the text sheet.
+ */
 internal class MediaPickers(
     val overlay: () -> Unit,
     val audio: () -> Unit,
+    val text: TextEditing,
 )
 
 /**
  * Returns which tools apply to [selected], which sits on a track of [selectedKind], at [positionMicros]. Overlays
- * can be added when the project has a base clip, and both add tools wait while a pick is still [importing].
+ * can be added when the project has a base clip, and text when a text lane is free at the playhead too; the
+ * picker tools wait while a pick is still [importing].
  */
 internal fun toolAvailability(
     project: Project,
@@ -80,15 +101,18 @@ internal fun toolAvailability(
     importing: Boolean,
 ): ToolAvailability {
     val asset = selected?.let(project::assetOf)
-    val overlay = selected?.takeIf { selectedKind == TrackKind.OVERLAY }
+    val placed = selected?.takeIf { selectedKind?.isPlaced == true }
     val isVideo = asset?.kind == MediaKind.VIDEO && selectedKind != TrackKind.AUDIO
     return ToolAvailability(
         hasSelection = selected != null,
         canSplit = selected != null && SplitClip.isSplittable(selected, positionMicros, project.frameRate),
         canAddOverlay = !importing && OverlayPlacement.baseTrack(project) != null,
-        overlayOpacity = overlay?.let { (it.overlayTransform ?: OverlayTransform()).opacity },
+        overlayOpacity = placed?.let { (it.overlayTransform ?: OverlayTransform()).opacity },
         selectedClipId = selected?.id,
         showAddOverlay = selectedKind != TrackKind.AUDIO,
+        showAddText = selectedKind == null || selectedKind == TrackKind.VIDEO,
+        canAddText = !importing && TextPlacement.canPlace(project, positionMicros),
+        isText = selectedKind == TrackKind.TEXT,
         canAddAudio = !importing,
         showExtract = isVideo,
         canExtract = isVideo && selected != null && AudioPlacement.canExtract(project, selected),
@@ -101,7 +125,8 @@ internal fun toolAvailability(
 
 /**
  * Tools for the [selected] clip on a track of [selectedKind]: split at [positionMicros], delete, opacity, extract,
- * and sound, plus the add tools that open [pickers]. The clip tools do nothing without a selection.
+ * sound, and the text sheet, plus the add tools that open [pickers] or add text at [positionMicros]. The clip tools
+ * do nothing without a selection.
  */
 internal fun toolActions(
     viewModel: EditorViewModel,
@@ -135,6 +160,11 @@ internal fun toolActions(
                 viewModel.dispatch(SetClipAudio(it.id, audio.volumePercent, audio.fadeInMicros, audio.fadeOutMicros))
             }
         },
+        onAddText = {
+            (viewModel.state.value as? EditorState.Ready)?.project?.let { pickers.text.add(it, positionMicros) }
+        },
+        onEditText = { pickers.text.open(selected?.id, TextSheetTab.STYLE) },
+        onAnimateText = { pickers.text.open(selected?.id, TextSheetTab.ANIMATION) },
     )
 
 /** Returns the command that removes clip [clipId] from a track of [kind]. */
@@ -145,27 +175,57 @@ private fun deleteCommand(
     when (kind) {
         TrackKind.OVERLAY -> RemoveOverlayClip(clipId)
         TrackKind.AUDIO -> RemoveAudioClip(clipId)
+        TrackKind.TEXT -> RemoveTextClip(clipId)
         TrackKind.VIDEO, null -> DeleteClip(clipId)
     }
 
 /**
- * Returns the handles layer for overlay [clip] of [project]; a finished gesture goes to [dispatch] as one placement
- * change, and [haptics] ticks when rotation snaps.
+ * Returns the handles layer for overlay or text [clip] of [project]; a finished gesture goes to [dispatch] as one
+ * placement change, and [haptics] ticks when rotation snaps. A text box matches the text's laid-out size on the
+ * project canvas, and double-tapping it calls [onEditText].
  */
 internal fun overlayLayer(
     clip: Clip,
     project: Project,
     dispatch: (EditCommand, String?) -> Unit,
     haptics: HapticFeedback,
+    onEditText: () -> Unit,
 ): @Composable (Modifier) -> Unit =
     { layerModifier ->
         key(clip.id) {
+            val text = clip.text
+            val aspect = project.assetOf(clip).displayAspectRatio
+            val canvasAspect = canvasAspectRatio(project)
+            val box = remember(text, canvasAspect) { text?.let { measureText(it, canvasAspect) } }
+            val description = if (text == null) R.string.editor_overlay_box else R.string.editor_text_box
             OverlayTransformLayer(
                 transform = clip.overlayTransform ?: OverlayTransform(),
-                overlayAspect = project.assetOf(clip).displayAspectRatio,
+                boxSize = { canvas, scale ->
+                    box?.let { OverlayGeometry.textBoxSize(canvas, it.widthFraction, it.heightFraction, scale) }
+                        ?: OverlayGeometry.boxSize(canvas, aspect, scale)
+                },
                 onCommit = { dispatch(SetOverlayTransform(clip.id, it), null) },
                 onSnap = { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove) },
                 modifier = layerModifier,
+                description = stringResource(description),
+                onDoubleTap = onEditText.takeIf { text != null },
+                doubleTapLabel = stringResource(R.string.editor_text_edit_description),
             )
         }
     }
+
+/** Returns the share of a canvas of [canvasAspect] (width over height) that [content] takes at scale 1. */
+private fun measureText(
+    content: TextContent,
+    canvasAspect: Float,
+): TextBox = TextLayouter.measure(content, (MEASURE_HEIGHT * canvasAspect).roundToInt(), MEASURE_HEIGHT)
+
+/** Returns the preview aspect ratio: the first base clip's, else the first overlay's, else the default. */
+internal fun canvasAspectRatio(project: Project): Float {
+    val first =
+        project.tracks
+            .filter { it.kind == TrackKind.VIDEO || it.kind == TrackKind.OVERLAY }
+            .sortedBy { it.kind != TrackKind.VIDEO }
+            .firstNotNullOfOrNull { it.clips.firstOrNull() }
+    return first?.let { project.assetOf(it).displayAspectRatio } ?: DEFAULT_ASPECT_RATIO
+}

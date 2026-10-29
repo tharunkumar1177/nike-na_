@@ -41,8 +41,9 @@ private const val BITS_PER_BYTE = 8L
 /** A half turn in degrees; rotations that are multiples of it keep width and height. */
 private const val HALF_TURN_DEGREES = 180
 
-/** Returns the tracks of [project] that show pictures. */
-private fun pictureTracks(project: Project): List<Track> = project.tracks.filter { it.kind != TrackKind.AUDIO }
+/** Returns the tracks of [project] that show source pictures; text is drawn at the canvas size, so it never sets it. */
+private fun pictureTracks(project: Project): List<Track> =
+    project.tracks.filter { it.kind == TrackKind.VIDEO || it.kind == TrackKind.OVERLAY }
 
 /**
  * Derives export choices from a project. The canvas follows the first clip's displayed size, as the preview
@@ -122,7 +123,7 @@ object ExportPlanner {
 
     /**
      * Returns the displayed size of the first base clip's source (overlays only when there is no base clip), or the
-     * default canvas when there is no picture clip. Sound-only tracks never set the canvas.
+     * default canvas when there is no picture clip. Sound and text tracks never set the canvas.
      */
     private fun canvasOf(project: Project): ExportSize {
         val baseFirst = pictureTracks(project).sortedBy { it.kind != TrackKind.VIDEO }

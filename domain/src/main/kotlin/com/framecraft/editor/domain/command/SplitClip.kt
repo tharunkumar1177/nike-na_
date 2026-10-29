@@ -5,7 +5,6 @@ package com.framecraft.editor.domain.command
 
 import com.framecraft.editor.domain.model.Clip
 import com.framecraft.editor.domain.model.ClipAnchor
-import com.framecraft.editor.domain.model.MediaKind
 import com.framecraft.editor.domain.model.Project
 import com.framecraft.editor.domain.time.FrameRate
 import kotlinx.serialization.SerialName
@@ -15,7 +14,8 @@ import kotlinx.serialization.Serializable
  * Cuts clip [clipId] at [atMicros]. The left part keeps [clipId]; the right part becomes [rightClipId], which the
  * caller generates so replaying the command creates the same id. Both parts must last at least one frame. Clips
  * anchored to the cut clip that start at or after the cut move their anchor to the right part. The left part keeps
- * the fade-in and the right part keeps the fade-out, each shortened to fit its part.
+ * the fade-in and the right part keeps the fade-out, each shortened to fit its part; a text clip's in and out
+ * animations split the same way.
  */
 @Serializable
 @SerialName("splitClip")
@@ -31,15 +31,25 @@ data class SplitClip(
         return if (!isSplittable(clip, atMicros, project.frameRate)) {
             CommandOutcome.Rejected(CommandRejection.ClipTooShort(minimum))
         } else {
-            project.replacingTracks(MergeClips(clipId, rightClipId, clip.fadeInMicros, clip.fadeOutMicros)) {
+            val inverse =
+                MergeClips(
+                    clipId,
+                    rightClipId,
+                    clip.fadeInMicros,
+                    clip.fadeOutMicros,
+                    clip.text?.animationIn,
+                    clip.text?.animationOut,
+                )
+            project.replacingTracks(inverse) {
                 val leftDuration = atMicros - clip.startMicros
                 val left =
                     clip.copy(
                         durationMicros = leftDuration,
                         fadeInMicros = minOf(clip.fadeInMicros, leftDuration),
                         fadeOutMicros = 0,
+                        text = clip.text?.copy(animationOut = null)?.fitted(leftDuration),
                     )
-                val right = rightPart(clip, left.durationMicros, project.assetOf(clip).kind == MediaKind.IMAGE)
+                val right = rightPart(clip, left.durationMicros, project.assetOf(clip).isTimed)
                 val parts = track.clips.flatMap { if (it.id == clipId) listOf(left, right) else listOf(it) }
                 val cut = track.copy(clips = parts)
                 project.tracks
@@ -59,20 +69,21 @@ data class SplitClip(
         }
     }
 
-    /** Returns the part of [clip] after the cut, [leftDurationMicros] in; [isImage] clips keep their offset. */
+    /** Returns the part of [clip] after the cut, [leftDurationMicros] in; only [isTimed] clips move their offset. */
     private fun rightPart(
         clip: Clip,
         leftDurationMicros: Long,
-        isImage: Boolean,
+        isTimed: Boolean,
     ): Clip =
         clip.copy(
             id = rightClipId,
             startMicros = atMicros,
-            trimStartMicros = if (isImage) clip.trimStartMicros else clip.trimStartMicros + leftDurationMicros,
+            trimStartMicros = if (isTimed) clip.trimStartMicros + leftDurationMicros else clip.trimStartMicros,
             durationMicros = clip.endMicros - atMicros,
             anchor = shiftedAnchor(clip.anchor, leftDurationMicros),
             fadeInMicros = 0,
             fadeOutMicros = minOf(clip.fadeOutMicros, clip.endMicros - atMicros),
+            text = clip.text?.copy(animationIn = null)?.fitted(clip.endMicros - atMicros),
         )
 
     /** Split rules shared with the editor's Split tool. */

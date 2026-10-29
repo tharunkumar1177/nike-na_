@@ -18,7 +18,6 @@ import com.framecraft.editor.domain.command.MoveOverlay
 import com.framecraft.editor.domain.edit.OverlayPlacement
 import com.framecraft.editor.domain.edit.SnapPoints
 import com.framecraft.editor.domain.model.Project
-import com.framecraft.editor.domain.model.TrackKind
 import com.framecraft.editor.domain.time.MICROS_PER_SECOND
 import kotlin.math.abs
 import kotlin.math.roundToLong
@@ -66,7 +65,7 @@ internal suspend fun AwaitPointerEventScope.overlayDrag(
 
 /**
  * Returns TalkBack actions that move the selected clip [selectedClipId] of [project] one frame earlier or later
- * through [onEdit], or none when the selection is not an overlay. Earlier is left out at time zero.
+ * through [onEdit], or none when the selection is neither an overlay nor text. Earlier is left out at time zero.
  */
 @Composable
 internal fun overlayNudges(
@@ -78,7 +77,7 @@ internal fun overlayNudges(
     val later = stringResource(R.string.timeline_nudge_later)
     val clip =
         project.tracks
-            .filter { it.kind == TrackKind.OVERLAY }
+            .filter { it.kind.isPlaced }
             .firstNotNullOfOrNull { track -> track.clips.firstOrNull { it.id == selectedClipId } }
     return clip?.let { overlay ->
         /** Returns an action labelled [label] that moves the overlay by [frames] frames. */

@@ -56,6 +56,6 @@ class SchemaMigrations(
         const val SCHEMA_VERSION_KEY = "schemaVersion"
 
         /** The chain shipped with this build, from schema 1 (the first) to the current schema. */
-        val SHIPPED = SchemaMigrations(listOf(Migration1To2, Migration2To3))
+        val SHIPPED = SchemaMigrations(listOf(Migration1To2, Migration2To3, Migration3To4))
     }
 }

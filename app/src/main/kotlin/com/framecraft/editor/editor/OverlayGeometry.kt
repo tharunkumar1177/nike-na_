@@ -41,6 +41,17 @@ object OverlayGeometry {
         return Size(fitWidth * scale, fitWidth / overlayAspect * scale)
     }
 
+    /**
+     * Returns the on-screen size of text at [scale] on a canvas of [canvas] pixels, where at scale 1 it takes
+     * [widthFraction] of the canvas width and [heightFraction] of its height: text is drawn at its natural size.
+     */
+    fun textBoxSize(
+        canvas: Size,
+        widthFraction: Float,
+        heightFraction: Float,
+        scale: Float,
+    ): Size = Size(canvas.width * widthFraction * scale, canvas.height * heightFraction * scale)
+
     /** Returns the screen position of [transform]'s center on a canvas of [canvas] pixels. */
     fun center(
         canvas: Size,

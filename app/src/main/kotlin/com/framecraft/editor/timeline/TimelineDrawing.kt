@@ -58,6 +58,12 @@ class OverlayStyle(
     val linkOffTint: Color,
 )
 
+/** How text clips look: their [clip] fill and the [label] color of their words. */
+class TextLaneStyle(
+    val clip: Color,
+    val label: Color,
+)
+
 /** Colors, text, and icons used to draw the timeline. */
 class TimelineStyle(
     val colors: TimelineColors,
@@ -66,6 +72,7 @@ class TimelineStyle(
     val brokenImage: Painter,
     val overlay: OverlayStyle,
     val audio: AudioStyle,
+    val text: TextLaneStyle,
 )
 
 /** Pixel sizes derived from the design's dp values for the current density. */
@@ -194,9 +201,9 @@ fun DrawScope.drawTrack(
 ) {
     val metrics = frame.metrics
     val range = TimelineGeometry.visibleRange(frame.centerMicros, frame.pxPerSecond, size.width)
-    val isOverlay = track.kind == TrackKind.OVERLAY
     val isAudio = track.kind == TrackKind.AUDIO
-    val fill = if (isOverlay) frame.style.overlay.clip else frame.style.colors.clip
+    val isText = track.kind == TrackKind.TEXT
+    val fill = if (track.kind == TrackKind.OVERLAY) frame.style.overlay.clip else frame.style.colors.clip
     track.clips
         .filter { it.endMicros >= range.first && it.startMicros <= range.last }
         .forEach { clip ->
@@ -212,16 +219,25 @@ fun DrawScope.drawTrack(
                         cornerRadius = CornerRadius(metrics.clipCorner),
                     )
                 clipPath(Path().apply { addRoundRect(block) }) {
-                    if (isAudio) {
-                        val bounds = Rect(left, top, block.right, block.bottom)
-                        drawAudioClip(frame, clip, bounds, selected = clip.id == selectedClipId)
-                    } else {
-                        drawRect(color = fill, topLeft = Offset(left, top), size = block.size())
-                        drawThumbnails(frame, clip, top)
+                    val bounds = Rect(left, top, block.right, block.bottom)
+                    when {
+                        isAudio -> {
+                            drawAudioClip(frame, clip, bounds, selected = clip.id == selectedClipId)
+                        }
+
+                        isText -> {
+                            drawTextClip(frame, clip, bounds)
+                        }
+
+                        else -> {
+                            drawRect(color = fill, topLeft = Offset(left, top), size = block.size())
+                            drawThumbnails(frame, clip, top)
+                        }
                     }
                 }
                 drawClipLabel(frame, TimelineGeometry.formatClipDuration(clip.durationMicros), left, width, top)
-                if (isOverlay || (isAudio && clip.anchor != null)) drawLinkBadge(frame, clip, left, width, top)
+                val linkable = track.kind.isPlaced || (isAudio && clip.anchor != null)
+                if (linkable) drawLinkBadge(frame, clip, left, width, top)
             }
         }
 }

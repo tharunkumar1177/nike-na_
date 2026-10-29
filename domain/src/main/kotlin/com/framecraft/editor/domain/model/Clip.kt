@@ -16,7 +16,8 @@ const val UNITY_VOLUME_PERCENT: Int = 100
  * reading the source from [trimStartMicros]. The timeline extent is half-open. An [anchor] keeps the clip in sync
  * with another clip; [startMicros] then always equals the start the anchor resolves to. Overlay clips carry an
  * [overlayTransform]. [volumePercent] scales the clip's sound, where 0 mutes it; the sound rises from silence over
- * [fadeInMicros] and falls back to silence over the last [fadeOutMicros], and the two fades never overlap.
+ * [fadeInMicros] and falls back to silence over the last [fadeOutMicros], and the two fades never overlap. Text clips
+ * carry [text], whose animations each fit within the clip.
  */
 @Serializable
 data class Clip(
@@ -30,6 +31,7 @@ data class Clip(
     val volumePercent: Int = UNITY_VOLUME_PERCENT,
     val fadeInMicros: Long = 0,
     val fadeOutMicros: Long = 0,
+    val text: TextContent? = null,
 ) {
     init {
         require(id.isNotBlank()) { "Clip id must not be blank" }
@@ -39,6 +41,8 @@ data class Clip(
         require(volumePercent in 0..MAX_VOLUME_PERCENT) { "Clip $id has volume out of range: $volumePercent" }
         require(fadeInMicros >= 0 && fadeOutMicros >= 0) { "Clip $id has a negative fade" }
         require(fadeInMicros + fadeOutMicros <= durationMicros) { "Clip $id has fades longer than the clip" }
+        val animations = listOfNotNull(text?.animationIn, text?.animationOut)
+        require(animations.all { it.durationMicros <= durationMicros }) { "Clip $id has an animation longer than it" }
     }
 
     /** Exclusive end of the clip on the timeline. */

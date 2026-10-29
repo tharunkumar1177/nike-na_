@@ -221,6 +221,7 @@ private fun rememberTimelineStyle(): TimelineStyle {
             brokenImage = brokenImage,
             overlay = OverlayStyle(scheme.primaryContainer, link, linkOff, linkOffTint = scheme.error),
             audio = AudioStyle(clip = scheme.tertiaryContainer, wave = scheme.onTertiaryContainer),
+            text = TextLaneStyle(clip = scheme.secondaryContainer, label = scheme.onSecondaryContainer),
         )
     }
 }

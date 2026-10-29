@@ -10,6 +10,9 @@ import com.framecraft.editor.domain.model.MediaKind
 import com.framecraft.editor.domain.model.OverlayTransform
 import com.framecraft.editor.domain.model.Project
 import com.framecraft.editor.domain.model.SourceFingerprint
+import com.framecraft.editor.domain.model.TEXT_ASSET
+import com.framecraft.editor.domain.model.TEXT_ASSET_ID
+import com.framecraft.editor.domain.model.TextContent
 import com.framecraft.editor.domain.model.Track
 import com.framecraft.editor.domain.model.TrackKind
 import com.framecraft.editor.domain.time.FrameRate
@@ -93,9 +96,9 @@ class PlaybackPlannerTest {
         assertEquals(0, PlaybackPlanner.plan(project(true)).sequences.size)
     }
 
-    /** Overlay lanes follow the base sequence, padded from zero, with one placement span per overlay clip. */
+    /** Overlay lanes come before the base from the top lane down, padded to the end, with one span per clip. */
     @Test
-    fun plansOverlaysAfterBase() {
+    fun plansOverlaysBeforeBase() {
         val placed = OverlayTransform(centerX = 0.5f, scale = 0.4f)
         val o1 = Clip("o1", "v", 1_000_000, 0, 2_000_000, ClipAnchor("a", 1_000_000), placed)
         val o3 = Clip("o3", "i", 1_250_000, 0, 1_000_000, ClipAnchor("o1", 250_000), null)
@@ -114,13 +117,16 @@ class PlaybackPlannerTest {
                     ),
             )
         val sequences = PlaybackPlanner.plan(project).sequences
-        assertEquals(3, sequences.size)
-        assertEquals(emptyList<OverlaySpan>(), sequences[0].overlaySpans)
+        assertEquals(listOf(TrackKind.OVERLAY, TrackKind.OVERLAY, TrackKind.VIDEO), sequences.map { it.kind })
         val overlayMedia = PlanSegment.Media("content://media/v", MediaKind.VIDEO, 10_000_000, 0, 2_000_000)
-        assertEquals(listOf(PlanSegment.Gap(1_000_000), overlayMedia), sequences[1].segments)
-        assertEquals(listOf(OverlaySpan(1_000_000, 3_000_000, placed)), sequences[1].overlaySpans)
-        assertEquals(listOf(1_250_000L, 1_000_000L), sequences[2].segments.map { it.durationMicros })
-        assertEquals(listOf(OverlaySpan(1_250_000, 2_250_000, OverlayTransform())), sequences[2].overlaySpans)
+        assertEquals(
+            listOf(PlanSegment.Gap(1_000_000), overlayMedia, PlanSegment.Gap(3_000_000)),
+            sequences[0].segments,
+        )
+        assertEquals(listOf(OverlaySpan(1_000_000, 3_000_000, placed)), sequences[0].overlaySpans)
+        assertEquals(listOf(1_250_000L, 1_000_000L, 3_750_000L), sequences[1].segments.map { it.durationMicros })
+        assertEquals(listOf(OverlaySpan(1_250_000, 2_250_000, OverlayTransform())), sequences[1].overlaySpans)
+        assertEquals(emptyList<OverlaySpan>(), sequences[2].overlaySpans)
     }
 
     /** Audio lanes come last with their volume and fades, and the base pads to music that outlasts it. */
@@ -147,5 +153,39 @@ class PlaybackPlannerTest {
         assertEquals(listOf(muted, PlanSegment.Gap(2_000_000)), sequences[0].segments)
         val tune = PlanSegment.Media("content://media/s", MediaKind.AUDIO, 10_000_000, 0, 5_000_000, 150, 0, 1_000_000)
         assertEquals(listOf(PlanSegment.Gap(1_000_000), tune), sequences[1].segments)
+    }
+
+    /** Text adds no sequence, pads the base to its end, and lists spans from the bottom text lane up. */
+    @Test
+    fun plansTextAsSpansOnTop() {
+        val placed = OverlayTransform(centerY = 0.6f)
+        val title = TextContent("Title")
+        val caption = TextContent("Caption")
+        val top = Clip("top", TEXT_ASSET_ID, 0, 0, 2_000_000, ClipAnchor("a", 0), placed, text = title)
+        val lower = Clip("low", TEXT_ASSET_ID, 1_000_000, 0, 4_000_000, ClipAnchor("a", 1_000_000), text = caption)
+        val project =
+            Project(
+                id = "p",
+                name = "P",
+                frameRate = FrameRate.FPS_30,
+                assets = listOf(video, TEXT_ASSET),
+                tracks =
+                    listOf(
+                        Track("upper", TrackKind.TEXT, false, listOf(top)),
+                        Track("lower", TrackKind.TEXT, false, listOf(lower)),
+                        Track("t", TrackKind.VIDEO, true, listOf(Clip("a", "v", 0, 0, 3_000_000))),
+                    ),
+            )
+        val plan = PlaybackPlanner.plan(project)
+        assertEquals(listOf(TrackKind.VIDEO), plan.sequences.map { it.kind })
+        val base = plan.sequences.single()
+        assertEquals(PlanSegment.Gap(2_000_000), base.segments.last())
+        assertEquals(
+            listOf(
+                TextSpan(1_000_000, 5_000_000, OverlayTransform(), caption),
+                TextSpan(0, 2_000_000, placed, title),
+            ),
+            plan.textSpans,
+        )
     }
 }

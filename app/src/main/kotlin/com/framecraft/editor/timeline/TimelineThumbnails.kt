@@ -41,13 +41,16 @@ fun clipThumbnails(
     }
 }
 
-/** Returns the distinct thumbnail keys visible across all picture tracks; audio lanes show waveforms instead. */
+/**
+ * Returns the distinct thumbnail keys visible across all picture tracks; audio lanes show waveforms and text lanes
+ * their words instead.
+ */
 fun visibleThumbnailKeys(
     project: Project,
     viewport: TimelineViewport,
 ): List<ThumbnailKey> =
     project.tracks
-        .filter { it.kind != TrackKind.AUDIO }
+        .filter { it.kind == TrackKind.VIDEO || it.kind == TrackKind.OVERLAY }
         .flatMap { it.clips }
         .flatMap { clip -> clipThumbnails(project, clip, viewport).map { it.key } }
         .distinct()

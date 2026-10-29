@@ -149,11 +149,18 @@ private fun ToolRow(
     tools: ToolActions,
     onOpen: (ToolPanel) -> Unit,
 ) {
+    if (availability.isText) {
+        ToolButton(Tool.EDIT_TEXT, tools.onEditText)
+        ToolButton(Tool.ANIMATE_TEXT, tools.onAnimateText)
+    }
     val opacity = availability.overlayOpacity
     if (opacity != null) {
         OpacitySlider(opacity, tools.onOpacityCommit, Modifier.width(OPACITY_WIDTH))
     } else if (availability.showAddOverlay) {
         ToolButton(Tool.OVERLAY, tools.onAddOverlay, availability.canAddOverlay)
+    }
+    if (availability.showAddText) {
+        ToolButton(Tool.TEXT, tools.onAddText, availability.canAddText)
     }
     if (!availability.hasSelection) {
         ToolButton(Tool.AUDIO, tools.onAddAudio, availability.canAddAudio)
@@ -335,6 +342,25 @@ private enum class Tool(
         R.string.editor_tool_overlay,
         R.string.editor_tool_overlay_description,
         TOOL_OVERLAY_TAG,
+    ),
+
+    /** Adds text at the playhead. */
+    TEXT(R.drawable.ic_text, R.string.editor_tool_text, R.string.editor_tool_text_description, TOOL_TEXT_TAG),
+
+    /** Opens the text sheet on the style tab. */
+    EDIT_TEXT(
+        R.drawable.ic_edit,
+        R.string.editor_tool_edit_text,
+        R.string.editor_text_edit_description,
+        TOOL_EDIT_TEXT_TAG,
+    ),
+
+    /** Opens the text sheet on the animation tab. */
+    ANIMATE_TEXT(
+        R.drawable.ic_animation,
+        R.string.editor_tool_animate_text,
+        R.string.editor_tool_animate_text_description,
+        TOOL_ANIMATE_TEXT_TAG,
     ),
 
     /** Adds music at the playhead. */

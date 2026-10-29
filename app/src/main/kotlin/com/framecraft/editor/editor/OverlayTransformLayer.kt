@@ -9,6 +9,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateRotation
 import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -61,42 +62,66 @@ private val HANDLE_RADIUS = 6.dp
 private val ROTATE_HANDLE_OFFSET = 24.dp
 
 /**
- * Draws the selected overlay's outline at [transform] for an overlay of aspect [overlayAspect]. One-finger drags
- * move it and two-finger pinches and twists resize and rotate it anywhere on the canvas; the result goes to
- * [onCommit] once, when the last finger lifts. [onSnap] fires when rotation snaps to a quarter turn.
+ * Draws the selected overlay's outline at [transform], [boxSize] big on a canvas of a given size at a given scale.
+ * One-finger drags move it and two-finger pinches and twists resize and rotate it anywhere on the canvas; the result
+ * goes to [onCommit] once, when the last finger lifts. [onSnap] fires when rotation snaps to a quarter turn. When
+ * [onDoubleTap] is set, a double tap calls it and TalkBack offers it as [doubleTapLabel].
  */
 @Composable
 fun OverlayTransformLayer(
     transform: OverlayTransform,
-    overlayAspect: Float,
+    boxSize: (canvas: Size, scale: Float) -> Size,
     onCommit: (OverlayTransform) -> Unit,
     onSnap: () -> Unit,
     modifier: Modifier = Modifier,
+    description: String = stringResource(R.string.editor_overlay_box),
+    onDoubleTap: (() -> Unit)? = null,
+    doubleTapLabel: String = "",
 ) {
     var live by remember(transform) { mutableStateOf(transform) }
     var canvas by remember { mutableStateOf(Size.Zero) }
     val commit by rememberUpdatedState(onCommit)
     val snap by rememberUpdatedState(onSnap)
     val color = MaterialTheme.colorScheme.primary
-    val description = stringResource(R.string.editor_overlay_box)
-    val actions =
+    val moves =
         overlayActions(transform) { pan, zoom, turn ->
             if (canvas != Size.Zero) commit(OverlayGeometry.transformed(transform, canvas, pan(canvas), zoom, turn))
         }
+    val doubleTap by rememberUpdatedState(onDoubleTap)
+    val edit =
+        onDoubleTap?.let { tap ->
+            CustomAccessibilityAction(doubleTapLabel) {
+                tap()
+                true
+            }
+        }
+    val actions = listOfNotNull(edit) + moves
     Canvas(
         modifier =
             modifier
                 .testTag(OVERLAY_LAYER_TAG)
                 .onSizeChanged { canvas = it.toSize() }
                 .overlayGestures(transform, onChange = { live = it }, onCommit = { commit(it) }, onSnap = { snap() })
+                .doubleTaps(enabled = onDoubleTap != null) { doubleTap?.invoke() }
                 .semantics {
                     contentDescription = description
                     customActions = actions
                 },
     ) {
-        drawOverlayBox(live, overlayAspect, color)
+        drawOverlayBox(live, boxSize(size, live.scale), color)
     }
 }
+
+/** Calls [onDoubleTap] on each double tap while [enabled]. */
+private fun Modifier.doubleTaps(
+    enabled: Boolean,
+    onDoubleTap: () -> Unit,
+): Modifier =
+    if (enabled) {
+        pointerInput(Unit) { detectTapGestures(onDoubleTap = { onDoubleTap() }) }
+    } else {
+        this
+    }
 
 /**
  * Turns every gesture on the canvas into a change of [transform]: [onChange] gets each step, with rotation snapped
@@ -166,13 +191,12 @@ private fun overlayActions(
     )
 }
 
-/** Draws the outline of an overlay at [transform] with corner handles and a rotation handle above its top edge. */
+/** Draws the [box]-sized outline of an overlay at [transform] with corner handles and a rotation handle on top. */
 private fun DrawScope.drawOverlayBox(
     transform: OverlayTransform,
-    overlayAspect: Float,
+    box: Size,
     color: Color,
 ) {
-    val box = OverlayGeometry.boxSize(size, overlayAspect, transform.scale)
     val center = OverlayGeometry.center(size, transform)
     val topLeft = center - Offset(box.width / 2f, box.height / 2f)
     val radius = HANDLE_RADIUS.toPx()

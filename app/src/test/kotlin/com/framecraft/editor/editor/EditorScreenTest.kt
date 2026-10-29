@@ -1,6 +1,6 @@
 /*
  * JVM UI tests (Robolectric) for the editor screen: playback, frame steps, closing, undo and redo, and tools,
- * including the audio tools.
+ * including the audio and text tools.
  */
 package com.framecraft.editor.editor
 
@@ -58,6 +58,9 @@ class EditorScreenTest {
             onAddAudio = { events += "audio" },
             onExtractAudio = { events += "extract" },
             onAudioCommit = { events += "volume ${it.volumePercent}" },
+            onAddText = { events += "text" },
+            onEditText = { events += "editText" },
+            onAnimateText = { events += "animateText" },
         )
 
     /** The tools of a selected video clip that plays at 80% for six seconds. */
@@ -262,5 +265,37 @@ class EditorScreenTest {
         assertEquals(listOf("volume 0", "volume 80"), events)
         composeRule.onNodeWithContentDescription("Back to tools").performClick()
         composeRule.onNodeWithTag(TOOL_VOLUME_TAG).assertExists()
+    }
+
+    /** Without a selection the Text tool is offered and reports; it is dimmed while no lane is free. */
+    @Test
+    fun textToolWithoutSelection() {
+        showEditor(availability = ToolAvailability(showAddText = true, canAddText = true))
+        composeRule
+            .onNodeWithContentDescription("Add text at playhead")
+            .performScrollTo()
+            .assertIsEnabled()
+            .performClick()
+        assertEquals(listOf("text"), events)
+    }
+
+    /** The Text tool is disabled when no text can be added at the playhead. */
+    @Test
+    fun textToolDisabledWhenFull() {
+        showEditor(availability = ToolAvailability(showAddText = true, canAddText = false))
+        composeRule.onNodeWithTag(TOOL_TEXT_TAG).assertIsNotEnabled()
+    }
+
+    /** Selected text leads with Edit and Animate, then its opacity, Split, and Delete. */
+    @Test
+    fun selectedTextShowsTextTools() {
+        val text = ToolAvailability(hasSelection = true, canSplit = true, overlayOpacity = 1f, isText = true)
+        showEditor(availability = text)
+        composeRule.onAllNodesWithTag(TOOL_TEXT_TAG).assertCountEquals(0)
+        composeRule.onNodeWithContentDescription("Edit text").performClick()
+        composeRule.onNodeWithContentDescription("Animate text").performClick()
+        composeRule.onNodeWithText("Opacity 100%").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(TOOL_DELETE_TAG).performScrollTo().assertIsDisplayed()
+        assertEquals(listOf("editText", "animateText"), events)
     }
 }

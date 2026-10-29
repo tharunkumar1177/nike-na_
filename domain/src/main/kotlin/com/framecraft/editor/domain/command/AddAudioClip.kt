@@ -34,27 +34,29 @@ data class AddAudioClip(
         } else {
             val assets = if (known == null) project.assets + asset else project.assets
             project.replacingTracks(RemoveAudioClip(clip.id), assets) {
-                project.tracks.withAudioClip(trackId, clip, trackIndex).restoringAnchors(anchorRestorations)
+                val laid = project.tracks.withLaneClip(TrackKind.AUDIO, trackId, clip, trackIndex)
+                laid.restoringAnchors(anchorRestorations)
             }
         }
     }
 }
 
 /**
- * Returns these tracks with [clip] added to audio track [trackId], which is created at [trackIndex] (clamped) when
- * missing. Throws when [trackId] names a track of another kind; overlaps fail track validation.
+ * Returns these tracks with [clip] added to non-magnetic track [trackId] of [kind], which is created at [trackIndex]
+ * (clamped) when missing. Throws when [trackId] names a track of another kind; overlaps fail track validation.
  */
-internal fun List<Track>.withAudioClip(
+internal fun List<Track>.withLaneClip(
+    kind: TrackKind,
     trackId: String,
     clip: Clip,
     trackIndex: Int,
 ): List<Track> {
     val existing = firstOrNull { it.id == trackId }
     return if (existing == null) {
-        val lane = Track(trackId, TrackKind.AUDIO, false, listOf(clip))
+        val lane = Track(trackId, kind, false, listOf(clip))
         toMutableList().apply { add(trackIndex.coerceIn(0, size), lane) }
     } else {
-        require(existing.kind == TrackKind.AUDIO) { "Track $trackId is not an audio track" }
+        require(existing.kind == kind) { "Track $trackId is not a $kind track" }
         val placed = existing.copy(clips = (existing.clips + clip).sortedBy { it.startMicros })
         map { if (it.id == trackId) placed else it }
     }

@@ -24,8 +24,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.framecraft.editor.R
-import com.framecraft.editor.domain.model.Project
-import com.framecraft.editor.domain.model.TrackKind
 import com.framecraft.editor.domain.time.FrameRate
 import com.framecraft.editor.engine.PreviewSurface
 import com.framecraft.editor.engine.ProjectPreview
@@ -33,9 +31,6 @@ import com.framecraft.editor.export.ExportViewModel
 import com.framecraft.editor.timeline.ScrubCallbacks
 import com.framecraft.editor.timeline.TimelineStrip
 import com.framecraft.editor.ui.theme.Spacing
-
-/** Preview aspect ratio used when a project has no visual clip. */
-private const val DEFAULT_ASPECT_RATIO = 16f / 9f
 
 /** Shows the screen for the current non-idle [state]. */
 @Composable
@@ -90,14 +85,16 @@ private fun ReadyEditor(
     val project = state.project
     val selectedTrack = project.tracks.firstOrNull { track -> track.clips.any { it.id == state.selectedClipId } }
     val selected = selectedTrack?.clips?.firstOrNull { it.id == state.selectedClipId }
-    val overlay = selected?.takeIf { selectedTrack?.kind == TrackKind.OVERLAY }
+    val placed = selected?.takeIf { selectedTrack?.kind?.isPlaced == true }
     val position = previewState.positionMicros
     val export = rememberExportControls(exportViewModel, project)
     val pickers =
         MediaPickers(
             overlay = rememberOverlayPicker(viewModel.overlays, preview),
             audio = rememberAudioPicker(viewModel.audio, preview),
+            text = rememberTextEditing(viewModel),
         )
+    TextEditHost(pickers.text, project)
     EditorScreen(
         projectName = project.name,
         previewState = previewState,
@@ -106,14 +103,7 @@ private fun ReadyEditor(
         canRedo = state.canRedo,
         availability = toolAvailability(project, selected, selectedTrack?.kind, position, overlayBusy || audioBusy),
         notices = EditorNotices(state.skippedCount, state.droppedEditCount, state.saveFailed, state.editRejected),
-        actions =
-            EditorActions(
-                onClose = viewModel::close,
-                onUndo = viewModel::undo,
-                onRedo = viewModel::redo,
-                onExport = export.open,
-                onNoticeShown = viewModel::acknowledge,
-            ),
+        actions = editorActions(viewModel, export.open),
         playback = playbackActions(preview, project.frameRate, position),
         tools = toolActions(viewModel, selected, selectedTrack?.kind, position, pickers),
         previewSurface = { surfaceModifier -> PreviewSurface(preview, surfaceModifier) },
@@ -134,21 +124,28 @@ private fun ReadyEditor(
         modifier = modifier,
         export = export.indicator,
         overlayLayer =
-            overlay
+            placed
                 ?.takeIf { position >= it.startMicros && position < it.endMicros }
-                ?.let { overlayLayer(it, project, viewModel::dispatch, haptics) },
+                ?.let { clip ->
+                    overlayLayer(clip, project, viewModel::dispatch, haptics) {
+                        pickers.text.open(clip.id, TextSheetTab.STYLE)
+                    }
+                },
     )
 }
 
-/** Returns the preview aspect ratio: the first base clip's, else the first overlay's, else the default. */
-private fun canvasAspectRatio(project: Project): Float {
-    val first =
-        project.tracks
-            .filter { it.kind != TrackKind.AUDIO }
-            .sortedBy { it.kind != TrackKind.VIDEO }
-            .firstNotNullOfOrNull { it.clips.firstOrNull() }
-    return first?.let { project.assetOf(it).displayAspectRatio } ?: DEFAULT_ASPECT_RATIO
-}
+/** Top bar and notice actions on [viewModel]; export opens the sheet through [onExport]. */
+private fun editorActions(
+    viewModel: EditorViewModel,
+    onExport: () -> Unit,
+): EditorActions =
+    EditorActions(
+        onClose = viewModel::close,
+        onUndo = viewModel::undo,
+        onRedo = viewModel::redo,
+        onExport = onExport,
+        onNoticeShown = viewModel::acknowledge,
+    )
 
 /** Play/pause and frame steps on [preview]; a step pauses and moves one [frameRate] frame from [positionMicros]. */
 private fun playbackActions(

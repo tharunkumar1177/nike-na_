@@ -22,6 +22,13 @@ class OverlayGeometryTest {
         assertEquals(Size(180f, 360f), OverlayGeometry.boxSize(canvas, 0.5f, 0.4f))
     }
 
+    /** Text keeps its natural share of the canvas at scale 1 and grows with the scale. */
+    @Test
+    fun textBoxFollowsCanvasShare() {
+        assertEquals(Size(800f, 90f), OverlayGeometry.textBoxSize(canvas, 0.5f, 0.1f, 1f))
+        assertEquals(Size(1600f, 180f), OverlayGeometry.textBoxSize(canvas, 0.5f, 0.1f, 2f))
+    }
+
     /** The normalized center maps to pixels with y downward. */
     @Test
     fun centerMapsToPixels() {
