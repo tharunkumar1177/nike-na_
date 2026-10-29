@@ -58,6 +58,12 @@ class OverlayStyle(
     val linkOffTint: Color,
 )
 
+/** How text clips look: their [clip] fill and the [label] color of their words. */
+class TextLaneStyle(
+    val clip: Color,
+    val label: Color,
+)
+
 /** Colors, text, and icons used to draw the timeline. */
 class TimelineStyle(
     val colors: TimelineColors,

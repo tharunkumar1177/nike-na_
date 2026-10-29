@@ -14,8 +14,8 @@ import kotlinx.serialization.Serializable
  * Cuts clip [clipId] at [atMicros]. The left part keeps [clipId]; the right part becomes [rightClipId], which the
  * caller generates so replaying the command creates the same id. Both parts must last at least one frame. Clips
  * anchored to the cut clip that start at or after the cut move their anchor to the right part. The left part keeps
- * the fade-in and the right part keeps the fade-out, each shortened to fit its part; a text clip's in and out animations
- * split the same way.
+ * the fade-in and the right part keeps the fade-out, each shortened to fit its part; a text clip's in and out
+ * animations split the same way.
  */
 @Serializable
 @SerialName("splitClip")

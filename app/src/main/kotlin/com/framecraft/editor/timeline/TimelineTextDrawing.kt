@@ -5,18 +5,11 @@ package com.framecraft.editor.timeline
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import com.framecraft.editor.domain.model.Clip
-
-/** How text clips look: their [clip] fill and the [label] color of their words. */
-class TextLaneStyle(
-    val clip: Color,
-    val label: Color,
-)
 
 /** Draws text [clip] filling [block], with its words on one line at the top start, cut off with an ellipsis. */
 internal fun DrawScope.drawTextClip(

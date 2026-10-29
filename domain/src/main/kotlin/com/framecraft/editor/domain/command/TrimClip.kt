@@ -10,7 +10,8 @@ import kotlinx.serialization.Serializable
 /**
  * Sets clip [clipId] to start at [startMicros], read its source from [trimStartMicros], and last [durationMicros].
  * On a magnetic track the start must not move and later clips shift by the change in duration; on other tracks
- * an overlap is rejected. Clips shorter than one frame and image or text clips with a changed source offset are rejected.
+ * an overlap is rejected. Clips shorter than one frame and image or text clips with a changed source offset are
+ * rejected.
  * An anchored clip keeps its parent and its anchor offset moves with the start; clips anchored to moved clips follow.
  * [fadeInMicros] and [fadeOutMicros] set the fades when given; otherwise fades shrink to fit the new duration,
  * fade-in first. A text clip's animations take [animationInMicros] and [animationOutMicros] when given; otherwise each
