@@ -175,8 +175,21 @@ private fun ToolRow(
     if (canvas.show) {
         ToolButton(Tool.CANVAS, tools.onOpenCanvas, canvas.enabled)
     }
+    ClipToolButtons(availability, tools, onOpen)
+}
+
+/** The tools of the selected clip that apply to [availability], in order; panel tools call [onOpen]. */
+@Composable
+private fun ClipToolButtons(
+    availability: ToolAvailability,
+    tools: ToolActions,
+    onOpen: (ToolPanel) -> Unit,
+) {
     if (availability.showSpeed) {
         ToolButton(Tool.SPEED, tools.onOpenSpeed)
+    }
+    if (availability.showLook) {
+        ToolButton(Tool.LOOK, tools.onOpenLook)
     }
     if (availability.showExtract) {
         ToolButton(Tool.EXTRACT, tools.onExtractAudio, availability.canExtract)
@@ -403,6 +416,9 @@ private enum class Tool(
 
     /** Opens the speed sheet for the selected video. */
     SPEED(R.drawable.ic_speed, R.string.editor_tool_speed, R.string.editor_tool_speed_description, TOOL_SPEED_TAG),
+
+    /** Opens the look sheet for the selected picture. */
+    LOOK(R.drawable.ic_look, R.string.editor_tool_look, R.string.editor_tool_look_description, TOOL_LOOK_TAG),
 
     /** Lifts the selected video's sound onto an audio lane. */
     EXTRACT(

@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
 import kotlin.math.abs
 
 /** Schema version written by this build. */
-const val CURRENT_SCHEMA_VERSION: Int = 7
+const val CURRENT_SCHEMA_VERSION: Int = 8
 
 /** An immutable project snapshot. Construction fails if any cross-object invariant is broken. */
 @Serializable
@@ -32,6 +32,9 @@ data class Project(
             track.clips.forEach { clip ->
                 val asset = requireNotNull(assetsById[clip.assetId]) { "Clip ${clip.id} references unknown asset" }
                 requireFits(track, clip, asset)
+                require(clip.look == null || track.kind == TrackKind.VIDEO || track.kind == TrackKind.OVERLAY) {
+                    "Clip ${clip.id} has a look off a picture track"
+                }
             }
         }
         AnchorResolver.validate(tracks)

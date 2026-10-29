@@ -76,6 +76,19 @@ sealed interface CommandRejection {
     data class TransitionTooShort(
         val maxMicros: Long,
     ) : CommandRejection
+
+    /** Clip [id] is not on a video or overlay track, the only kinds that take a look. */
+    data class LookNotSupported(
+        val id: String,
+    ) : CommandRejection
+
+    /** No catalog filter has id [filterId]. */
+    data class UnknownLookFilter(
+        val filterId: String,
+    ) : CommandRejection
+
+    /** The project has no picture clip to give a look. */
+    data object NoLookTargets : CommandRejection
 }
 
 /** A clip together with the track that holds it. */

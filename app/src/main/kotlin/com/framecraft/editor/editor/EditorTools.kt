@@ -32,6 +32,7 @@ import com.framecraft.editor.domain.model.OverlayTransform
 import com.framecraft.editor.domain.model.Project
 import com.framecraft.editor.domain.model.TextContent
 import com.framecraft.editor.domain.model.TrackKind
+import com.framecraft.editor.domain.model.takesLook
 import com.framecraft.editor.engine.ProjectPreview
 import com.framecraft.editor.engine.text.TextBox
 import com.framecraft.editor.engine.text.TextLayouter
@@ -79,8 +80,9 @@ internal fun rememberAudioPicker(
 }
 
 /**
- * What the add, text, and speed tools and the cut badges open: [overlay] picks photos and videos, [audio] picks sound
- * files, [text] holds the text sheet, [speed] the speed sheet, and [transition] the transition sheet.
+ * What the add, text, speed, and look tools and the cut badges open: [overlay] picks photos and videos, [audio] picks
+ * sound files, [text] holds the text sheet, [speed] the speed sheet, [transition] the transition sheet, and [look]
+ * the look sheet.
  */
 internal class MediaPickers(
     val overlay: () -> Unit,
@@ -88,11 +90,12 @@ internal class MediaPickers(
     val text: TextEditing,
     val speed: SpeedEditing,
     val transition: TransitionEditing,
+    val look: LookEditing,
 )
 
 /**
- * Returns the overlay and music pickers, the text sheet, the speed sheet, and the transition sheet of [viewModel],
- * adding at [preview]'s playhead.
+ * Returns the overlay and music pickers, the text sheet, the speed sheet, the transition sheet, and the look sheet of
+ * [viewModel], adding at [preview]'s playhead.
  */
 @Composable
 internal fun rememberMediaPickers(
@@ -105,6 +108,7 @@ internal fun rememberMediaPickers(
         text = rememberTextEditing(viewModel),
         speed = rememberSpeedEditing(),
         transition = rememberTransitionEditing(),
+        look = rememberLookEditing(),
     )
 
 /**
@@ -135,6 +139,7 @@ internal fun toolAvailability(
         canAddAudio = !importing,
         showExtract = isVideo,
         showSpeed = isVideo,
+        showLook = selectedKind?.takesLook == true,
         canExtract = isVideo && selected != null && AudioPlacement.canExtract(project, selected),
         audio =
             selected
@@ -186,6 +191,7 @@ internal fun toolActions(
         onEditText = { pickers.text.open(selected?.id, TextSheetTab.STYLE) },
         onAnimateText = { pickers.text.open(selected?.id, TextSheetTab.ANIMATION) },
         onOpenSpeed = { pickers.speed.open(selected?.id) },
+        onOpenLook = { pickers.look.open(selected?.id) },
     )
 
 /** Returns the command that removes clip [clipId] from a track of [kind]. */

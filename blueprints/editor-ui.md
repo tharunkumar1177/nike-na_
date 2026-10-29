@@ -49,6 +49,7 @@ Timeline drawing reads derived state so scrubbing does not recompose the whole s
 ### Transition badges and sheet
 
 - Each cut between touching clips on a video track shows a badge (`TimelineCuts`) whose touch zone opens the transition sheet (`TransitionSheet`) per `assets/wireframes/transitions-slice12.md`; TalkBack has one action per cut (`TimelineCutsTest`, `TransitionSheetTest`). Details belong to [transitions](transitions.md).
+- The Look tool follows Speed for any clip on a video or overlay track and opens the look sheet (`LookSheet`, `LookTabs`) per `assets/wireframes/look-slice13.md`, with Filters and Adjust tabs, Apply to all, and Reset all (`LookSheetTest`, `EditorScreenTest`). Details belong to [look](look.md).
 
 ## Related blueprints
 
