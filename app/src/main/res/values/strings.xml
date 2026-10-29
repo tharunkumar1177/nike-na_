@@ -175,6 +175,24 @@
   <string name="editor_speed_add_point">Add point</string>
   <string name="editor_speed_delete_point">Delete point</string>
   <string name="editor_speed_reset">Reset</string>
+  <string name="editor_transition_title">Transition</string>
+  <string name="editor_transition_none">None</string>
+  <string name="editor_transition_dissolve">Dissolve</string>
+  <string name="editor_transition_fade_black">Fade Black</string>
+  <string name="editor_transition_fade_white">Fade White</string>
+  <string name="editor_transition_slide_left">Slide Left</string>
+  <string name="editor_transition_push_left">Push Left</string>
+  <string name="editor_transition_zoom">Zoom</string>
+  <string name="editor_transition_unavailable">Not available</string>
+  <string name="editor_transition_apply_all">Apply to all</string>
+  <string name="editor_transition_slider">Transition duration</string>
+  <string name="editor_transition_duration">Duration: %1$s</string>
+  <string name="editor_transition_error_handles">More media needed. Both clips need extra trimmed frames to overlap.</string>
+  <plurals name="editor_transition_applied_all">
+    <item quantity="one">Applied to %1$d cut</item>
+    <item quantity="other">Applied to %1$d cuts</item>
+  </plurals>
+  <string name="timeline_cut_action">Edit transition at %1$s, %2$s</string>
   <string name="timeline_nudge_earlier">Move one frame earlier</string>
   <string name="timeline_nudge_later">Move one frame later</string>
   <plurals name="editor_recovered_edits">

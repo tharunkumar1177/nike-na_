@@ -48,6 +48,9 @@ private const val BLUR_HEIGHT_PIXELS = 360
 /** Gaussian blur strength of the background, in pixels at [BLUR_HEIGHT_PIXELS]. */
 private const val BLUR_SIGMA = 12f
 
+/** Scheme prefix of a URI that carries its own bytes, as generated stills do. */
+private const val DATA_URI_PREFIX = "data:"
+
 /** Creates Media3 compositions. */
 @OptIn(markerClass = [UnstableApi::class, ExperimentalApi::class])
 internal object CompositionFactory {
@@ -237,17 +240,21 @@ internal object CompositionFactory {
         return builder.build()
     }
 
-    /** Returns [segment] as a still image shown for its duration at [framesPerSecond]. */
+    /**
+     * Returns [segment] as a still image shown for its duration at [framesPerSecond]. A generated still in a `data:`
+     * URI names its type, which Media3 cannot infer from the URI.
+     */
     private fun imageItem(
         segment: PlanSegment.Media,
         framesPerSecond: Int,
     ): EditedMediaItem {
-        val item =
+        val builder =
             MediaItem
                 .Builder()
                 .setUri(segment.uri)
                 .setImageDurationMs(segment.durationMicros / MICROS_PER_MILLI)
-                .build()
+        if (segment.uri.startsWith(DATA_URI_PREFIX)) builder.setMimeType(MimeTypes.IMAGE_PNG)
+        val item = builder.build()
         return EditedMediaItem
             .Builder(item)
             .setDurationUs(segment.durationMicros)

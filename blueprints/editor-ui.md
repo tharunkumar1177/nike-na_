@@ -46,6 +46,10 @@ Timeline drawing reads derived state so scrubbing does not recompose the whole s
 
 - A selected video on the base or an overlay lane shows Speed, which opens the speed sheet (`SpeedSheet`, `SpeedCurveEditor`) per `assets/wireframes/speed-slice11.md` (`EditorScreenTest`, `SpeedSheetTest`). Sped clips' timeline labels start with their speed, and thumbnails and waveforms map through `SpeedMap` (`TimelineGeometryTest`). Details belong to [clip-speed](clip-speed.md).
 
+### Transition badges and sheet
+
+- Each cut between touching clips on a video track shows a badge (`TimelineCuts`) whose touch zone opens the transition sheet (`TransitionSheet`) per `assets/wireframes/transitions-slice12.md`; TalkBack has one action per cut (`TimelineCutsTest`, `TransitionSheetTest`). Details belong to [transitions](transitions.md).
+
 ## Related blueprints
 
 ### Required

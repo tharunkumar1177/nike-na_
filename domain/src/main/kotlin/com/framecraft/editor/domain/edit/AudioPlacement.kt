@@ -65,6 +65,7 @@ object AudioPlacement {
                     anchor = ClipAnchor(video.id, 0L),
                     overlayTransform = null,
                     canvasPlacement = null,
+                    outTransition = null,
                     volumePercent = video.volumePercent.takeIf { it > 0 } ?: UNITY_VOLUME_PERCENT,
                 )
             ExtractAudio(video.id, laneId, clip)

@@ -16,6 +16,7 @@ import com.framecraft.editor.engine.plan.BaseSpan
 import com.framecraft.editor.engine.plan.CanvasLayout
 import com.framecraft.editor.engine.plan.CompositorInput
 import com.framecraft.editor.engine.plan.PixelSize
+import com.framecraft.editor.engine.plan.TransitionSpan
 
 /** Media3 frame anchors run from -1 to 1. */
 private const val ANCHOR_LIMIT = 1f
@@ -74,7 +75,11 @@ internal class CanvasCompositorSettings(
                 }
 
                 is CompositorInput.Base -> {
-                    input.spans.at(presentationTimeUs)?.let { baseSettings(it.placement, inputId) }
+                    input.spans.at(presentationTimeUs)?.let { span ->
+                        val progress = TransitionMotion.progress(span.startMicros, span.endMicros, presentationTimeUs)
+                        val motion = span.outgoing?.let { TransitionMotion.outgoing(it, progress) } ?: Motion()
+                        movedSettings(span.placement, inputId, motion)
+                    }
                 }
 
                 CompositorInput.Solid -> {
@@ -82,7 +87,18 @@ internal class CanvasCompositorSettings(
                 }
 
                 is CompositorInput.Blur -> {
-                    input.spans.at(presentationTimeUs)?.let { baseSettings(BLUR_PLACEMENT, inputId) }
+                    input.spans.at(presentationTimeUs)?.let { movedSettings(BLUR_PLACEMENT, inputId, Motion()) }
+                }
+
+                is CompositorInput.Incoming -> {
+                    input.spans.during(presentationTimeUs)?.let { span ->
+                        val progress = TransitionMotion.progress(span.startMicros, span.endMicros, presentationTimeUs)
+                        movedSettings(span.placement, inputId, TransitionMotion.incoming(span.kind, progress))
+                    }
+                }
+
+                is CompositorInput.Backdrop -> {
+                    input.spans.during(presentationTimeUs)?.let { stretched(inputId) }
                 }
             }
         return settings ?: hidden
@@ -90,6 +106,10 @@ internal class CanvasCompositorSettings(
 
     /** Returns the span covering [timeUs], if any. */
     private fun List<BaseSpan>.at(timeUs: Long): BaseSpan? =
+        firstOrNull { timeUs >= it.startMicros && timeUs < it.endMicros }
+
+    /** Returns the transition playing at [timeUs], if any. */
+    private fun List<TransitionSpan>.during(timeUs: Long): TransitionSpan? =
         firstOrNull { timeUs >= it.startMicros && timeUs < it.endMicros }
 
     /** Returns the factor that sizes input [inputId] to the canvas by [fit]; it is 1 before any size is known. */
@@ -119,18 +139,35 @@ internal class CanvasCompositorSettings(
             alpha = transform.opacity,
         )
 
-    /** Maps base [placement] of input [inputId] to opaque Media3 settings. */
-    private fun baseSettings(
+    /** Maps base [placement] of input [inputId], moved by [motion], to Media3 settings. */
+    private fun movedSettings(
         placement: CanvasPlacement,
         inputId: Int,
-    ): OverlaySettings =
-        placementSettings(
+        motion: Motion,
+    ): OverlaySettings {
+        val scale = placement.scale * fit(inputId, placement.fit) * motion.zoom
+        return placementSettings(
             centerX = placement.centerX,
             centerY = placement.centerY,
             rotationDegrees = placement.rotationDegrees,
-            scale = placement.scale * fit(inputId, placement.fit),
-            alpha = 1f,
+            scale = scale,
+            alpha = motion.alpha,
+            shift = Shift(motion.shiftX, widthShare(inputId, scale)),
         )
+    }
+
+    /**
+     * Returns half of input [inputId]'s drawn width at [scale] over half the canvas width, the distance in
+     * normalized canvas units from the input's center to its side; it is [scale] before any size is known.
+     */
+    private fun widthShare(
+        inputId: Int,
+        scale: Float,
+    ): Float {
+        val target = canvas
+        val input = inputSizes.getOrNull(inputId)?.takeIf { it.width > 0 }
+        return if (target == null || input == null) scale else scale * input.width / target.width
+    }
 
     /** Returns settings that stretch input [inputId] over the whole canvas, each axis on its own. */
     private fun stretched(inputId: Int): OverlaySettings {
@@ -143,9 +180,24 @@ internal class CanvasCompositorSettings(
 }
 
 /**
+ * A horizontal move of [x] normalized canvas units for an input whose side is [widthShare] units from its center.
+ */
+internal data class Shift(
+    val x: Float,
+    val widthShare: Float,
+) {
+    /** The unmoved shift. */
+    companion object {
+        /** No move at all. */
+        val NONE = Shift(0f, 1f)
+    }
+}
+
+/**
  * Maps a placement in project terms (center with y downward, clockwise [rotationDegrees]) to Media3 settings at
- * [scale] and [alpha]. Media3 y points up and its rotation runs counter-clockwise; centers past the canvas edge are
- * held at the edge.
+ * [scale] and [alpha], moved sideways by [shift]. Media3 y points up and its rotation runs counter-clockwise. Media3
+ * anchors stay within the canvas, so a move past the edge anchors the input's own side there instead of its center;
+ * other centers past the canvas edge are held at the edge.
  */
 @OptIn(markerClass = [UnstableApi::class])
 internal fun placementSettings(
@@ -154,14 +206,22 @@ internal fun placementSettings(
     rotationDegrees: Float,
     scale: Float,
     alpha: Float,
-): OverlaySettings =
-    StaticOverlaySettings
+    shift: Shift = Shift.NONE,
+): OverlaySettings {
+    val wanted = centerX + shift.x
+    val backgroundX = wanted.coerceIn(-ANCHOR_LIMIT, ANCHOR_LIMIT)
+    val overlayX =
+        if (shift.x == 0f || shift.widthShare <= 0f) {
+            0f
+        } else {
+            ((backgroundX - wanted) / shift.widthShare).coerceIn(-ANCHOR_LIMIT, ANCHOR_LIMIT)
+        }
+    return StaticOverlaySettings
         .Builder()
         .setScale(scale, scale)
         .setRotationDegrees(-rotationDegrees)
         .setAlphaScale(alpha)
-        .setOverlayFrameAnchor(0f, 0f)
-        .setBackgroundFrameAnchor(
-            centerX.coerceIn(-ANCHOR_LIMIT, ANCHOR_LIMIT),
-            (-centerY).coerceIn(-ANCHOR_LIMIT, ANCHOR_LIMIT),
-        ).build()
+        .setOverlayFrameAnchor(overlayX, 0f)
+        .setBackgroundFrameAnchor(backgroundX, (-centerY).coerceIn(-ANCHOR_LIMIT, ANCHOR_LIMIT))
+        .build()
+}

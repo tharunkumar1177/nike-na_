@@ -36,24 +36,36 @@ sealed interface CompositorInput {
     data class Blur(
         val spans: List<BaseSpan>,
     ) : CompositorInput
+
+    /** The incoming clips of a base track's transitions, each shown during its span. */
+    data class Incoming(
+        val spans: List<TransitionSpan>,
+    ) : CompositorInput
+
+    /** The black or white still a base track's fades pass through, filling the canvas during its [spans]. */
+    data class Backdrop(
+        val spans: List<TransitionSpan>,
+    ) : CompositorInput
 }
 
 /** Layout rules shared by the composition builder and the compositor settings. */
 object CanvasLayout {
     /**
      * Returns the compositor inputs of [plan] in registration order: the clock, then every picture sequence (overlays
-     * from the top lane down, then the base), then the background when it is not black. Media3 draws earlier inputs
-     * on top, so the background sits under everything. Sound sequences register no picture input.
+     * from the top lane down, then each base track between its incoming lane and its fade backdrop), then the
+     * background when it is not black. Media3 draws earlier inputs on top, so the background sits under everything.
+     * Sound sequences register no picture input.
      */
     fun inputsOf(plan: PlaybackPlan): List<CompositorInput> {
         val pictures =
             plan.sequences
                 .filter { it.kind != TrackKind.AUDIO }
                 .map { sequence ->
-                    if (sequence.kind == TrackKind.OVERLAY) {
-                        CompositorInput.Overlay(sequence.overlaySpans)
-                    } else {
-                        CompositorInput.Base(sequence.baseSpans)
+                    when {
+                        sequence.role == SequenceRole.INCOMING -> CompositorInput.Incoming(sequence.transitionSpans)
+                        sequence.role == SequenceRole.BACKDROP -> CompositorInput.Backdrop(sequence.transitionSpans)
+                        sequence.kind == TrackKind.OVERLAY -> CompositorInput.Overlay(sequence.overlaySpans)
+                        else -> CompositorInput.Base(sequence.baseSpans)
                     }
                 }
         val background =

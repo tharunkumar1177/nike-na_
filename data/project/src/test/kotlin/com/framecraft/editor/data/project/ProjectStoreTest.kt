@@ -10,6 +10,7 @@ import com.framecraft.editor.domain.model.CanvasAspect
 import com.framecraft.editor.domain.model.CanvasFit
 import com.framecraft.editor.domain.model.CanvasSettings
 import com.framecraft.editor.domain.model.Clip
+import com.framecraft.editor.domain.model.ClipSpeed
 import com.framecraft.editor.domain.model.MediaAsset
 import com.framecraft.editor.domain.model.MediaKind
 import com.framecraft.editor.domain.model.Project
@@ -186,7 +187,7 @@ class ProjectStoreTest {
         runBlocking {
             store().create(project).close()
             val snapshot = File(dir(), "snapshot.json")
-            val newer = snapshot.readText().replace("\"schemaVersion\":6", "\"schemaVersion\":99")
+            val newer = snapshot.readText().replace("\"schemaVersion\":7", "\"schemaVersion\":99")
             snapshot.writeText(newer)
             assertEquals(OpenProjectResult.TooNew(99), store().open(project.id))
             assertEquals(newer, snapshot.readText())
@@ -201,7 +202,7 @@ class ProjectStoreTest {
             snapshot.writeText(
                 snapshot
                     .readText()
-                    .replace("\"schemaVersion\":6", "\"schemaVersion\":0")
+                    .replace("\"schemaVersion\":7", "\"schemaVersion\":0")
                     .replace("\"name\":\"Trip\"", "\"title\":\"Trip\""),
             )
             val renameTitle =
@@ -215,11 +216,12 @@ class ProjectStoreTest {
                     /** Commands are unchanged between these versions. */
                     override fun migrateCommand(command: JsonObject) = command
                 }
-            val shipped = listOf(Migration1To2, Migration2To3, Migration3To4, Migration4To5, Migration5To6)
+            val shipped =
+                listOf(Migration1To2, Migration2To3, Migration3To4, Migration4To5, Migration5To6, Migration6To7)
             val migrations = SchemaMigrations(listOf(renameTitle) + shipped)
             val opened = store(migrations).opened()
             assertEquals("Trip", opened.session.state.project.name)
-            assertTrue(snapshot.readText().contains("\"schemaVersion\":6"))
+            assertTrue(snapshot.readText().contains("\"schemaVersion\":7"))
         }
 
     /** A project and journal written verbatim in schema 1 open through the shipped chain and are saved as schema 4. */
@@ -240,7 +242,7 @@ class ProjectStoreTest {
                     .anchor,
             )
             opened.session.close()
-            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":6"))
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":7"))
         }
 
     /** A schema 2 project with an overlay and its journal open, replay, undo, and are saved as schema 4. */
@@ -261,7 +263,7 @@ class ProjectStoreTest {
             assertEquals("a", overlay.anchor?.parentClipId)
             assertTrue(overlay.hasDefaultAudio)
             opened.session.close()
-            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":6"))
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":7"))
         }
 
     /** A schema 3 project with extracted sound and its journal open, replay, undo, and are saved as schema 4. */
@@ -282,7 +284,7 @@ class ProjectStoreTest {
             assertEquals(500_000L, sound.fadeInMicros)
             assertNull(sound.text)
             opened.session.close()
-            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":6"))
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":7"))
         }
 
     /** A schema 4 project with a title and its journal open, replay, undo, and are saved as schema 5. */
@@ -311,7 +313,7 @@ class ProjectStoreTest {
                     .single()
             assertNull(base.canvasPlacement)
             opened.session.close()
-            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":6"))
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":7"))
         }
 
     /** A schema 5 project on a portrait canvas and its journal open, replay, undo, and are saved as schema 6. */
@@ -337,7 +339,28 @@ class ProjectStoreTest {
             assertNull(base.sourceDurationMicros)
             assertTrue(base.maintainPitch)
             opened.session.close()
-            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":6"))
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":7"))
+        }
+
+    /** A schema 6 project with a sped clip and its journal open, replay, undo, and are saved as schema 7. */
+    @Test
+    fun schemaSixFixtureOpens() =
+        runBlocking {
+            dir().mkdirs()
+            File(dir(), "snapshot.json").writeText(SCHEMA_SIX_SNAPSHOT)
+            File(dir(), "journal.jsonl").writeText(SCHEMA_SIX_JOURNAL)
+            val opened = store().opened()
+            val reopened = opened.session.state.project
+            val clips = reopened.tracks.single().clips
+            assertEquals(listOf("a", "a2", "b"), clips.map { it.id })
+            assertEquals(ClipSpeed.Constant(4_000), clips.last().speed)
+            assertTrue(clips.all { it.outTransition == null })
+            val restored = requireNotNull(opened.session.undo()).project
+            val back = restored.tracks.single().clips
+            assertEquals(listOf("a", "b"), back.map { it.id })
+            assertEquals(500_000L, back.last().durationMicros)
+            opened.session.close()
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":7"))
         }
 
     /** A missing list summary is rebuilt; an unreadable project is listed as unreadable and refused. */
@@ -483,4 +506,26 @@ private val SCHEMA_FIVE_JOURNAL =
         """{"seq":1,"atEpochMillis":2,"command":{"type":"setBaseClipPlacement","clipId":"a",""" +
             """"placement":{"fit":"fill","scale":1.5}}}""",
         """{"seq":2,"atEpochMillis":3,"command":{"type":"setCanvasAspect","aspect":"16:9"}}""",
+    ).joinToString(separator = "\n", postfix = "\n")
+
+/** A snapshot exactly as schema 6 wrote it: a clip followed by one playing at twice normal speed. */
+private val SCHEMA_SIX_SNAPSHOT =
+    """
+    {"baseSeq":0,"createdAtEpochMillis":1,"project":{"id":"project-1","name":"Trip",
+    "frameRate":{"numerator":30,"denominator":1},"assets":[{"id":"asset","uri":"content://media/asset",
+    "kind":"VIDEO","durationMicros":10000000,"width":1920,"height":1080,"rotationDegrees":0,"hasAudio":true,
+    "fingerprint":{"sizeBytes":1}}],"tracks":[{"id":"track","kind":"VIDEO","magnetic":true,"clips":[
+    {"id":"a","assetId":"asset","startMicros":0,"trimStartMicros":0,"durationMicros":2000000},
+    {"id":"b","assetId":"asset","startMicros":2000000,"trimStartMicros":2000000,"durationMicros":1000000,
+    "speed":{"type":"constant","speedMilli":2000},"sourceDurationMicros":2000000}]}],
+    "schemaVersion":6}}
+    """.trimIndent()
+
+/** A journal exactly as schema 6 wrote it: the sped clip at four times normal speed, then a split of the first. */
+private val SCHEMA_SIX_JOURNAL =
+    listOf(
+        """{"seq":1,"atEpochMillis":2,"command":{"type":"setClipSpeed","clipId":"b",""" +
+            """"speed":{"type":"constant","speedMilli":4000}}}""",
+        """{"seq":2,"atEpochMillis":3,"command":{"type":"splitClip","clipId":"a","atMicros":1000000,""" +
+            """"rightClipId":"a2"}}""",
     ).joinToString(separator = "\n", postfix = "\n")
