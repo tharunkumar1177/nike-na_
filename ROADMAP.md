@@ -26,7 +26,7 @@ Ordered vertical slices. Each slice is user-visible, shipped on its own branch, 
 ## Differentiators
 
 - [x] 14. **Voiceover and mixer** — record voiceover, controllable ducking. UI: yes.
-- [ ] 15. **Masks and chroma key**. UI: yes.
+- [x] 15. **Masks and chroma key**. UI: yes.
 - [ ] 16. **On-device auto-captions** — word-timed captions anchored to source clips so they survive trims. UI: yes.
 
 ## Open decisions

@@ -95,7 +95,7 @@ private fun ReadyEditor(
     val export = rememberExportControls(exportViewModel, project)
     val pickers = rememberMediaPickers(viewModel, preview)
     val canvas = rememberCanvasEditing()
-    EditorSheets(pickers, canvas, project, position, viewModel::dispatch, preview::seekTo)
+    EditorSheets(pickers, canvas, project, state.selectedClipId, position, viewModel::dispatch, preview::seekTo)
     EditorScreen(
         projectName = project.name,
         previewState = previewState,
@@ -128,6 +128,7 @@ private fun ReadyEditor(
         export = export.indicator,
         overlayLayer =
             voiceoverLayer(pickers.voiceover, preview, project.id)
+                ?: pictureEffectLayer(pickers.picture, project, state.selectedClipId, position, viewModel)
                 ?: selectionLayer(project, selected, kind, position, viewModel, canvas, pickers.text),
     )
 }
@@ -164,15 +165,17 @@ private fun timelineSlot(
     }
 
 /**
- * Shows whichever of the text, canvas, speed, transition, look, and mixer sheets is open over [project] with the
- * playhead at [positionMicros], and keeps the voiceover recorder in step with the screen; edits go to [dispatch]
- * and the transition sheet moves the preview through [onSeek].
+ * Shows whichever of the text, canvas, speed, transition, look, and mixer sheets and mask and chroma key panels is
+ * open over [project] with clip [selectedClipId] selected and the playhead at [positionMicros], and keeps the
+ * voiceover recorder in step with the screen; edits go to [dispatch] and the transition sheet moves the preview
+ * through [onSeek].
  */
 @Composable
 private fun EditorSheets(
     pickers: MediaPickers,
     canvas: CanvasEditing,
     project: Project,
+    selectedClipId: String?,
     positionMicros: Long,
     dispatch: (EditCommand) -> Unit,
     onSeek: (Long) -> Unit,
@@ -181,7 +184,9 @@ private fun EditorSheets(
     CanvasSheetHost(canvas, project, dispatch)
     SpeedSheetHost(pickers.speed, project, positionMicros, dispatch)
     TransitionSheetHost(pickers.transition, project, dispatch, onSeek)
-    LookSheetHost(pickers.look, project, dispatch)
+    LookSheetHost(pickers.picture.look, project, dispatch)
+    MaskPanelHost(pickers.picture.mask, project, selectedClipId, positionMicros, dispatch)
+    ChromaPanelHost(pickers.picture.chroma, project, selectedClipId, dispatch)
     MixerSheetHost(pickers.mixer, project, dispatch)
     VoiceoverHost(pickers.voiceover)
 }

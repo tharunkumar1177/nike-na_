@@ -101,6 +101,8 @@ internal object TransitionLanes {
             maintainPitch = clip.maintainPitch,
             look = clip.look,
             autoDuckPercent = clip.autoDuckPercent,
+            mask = clip.mask,
+            chromaKey = clip.chromaKey,
         )
     }
 
@@ -161,6 +163,8 @@ internal object TransitionLanes {
             maintainPitch = clip.maintainPitch,
             look = clip.look,
             autoDuckPercent = clip.autoDuckPercent,
+            mask = clip.mask,
+            chromaKey = clip.chromaKey,
         )
     }
 

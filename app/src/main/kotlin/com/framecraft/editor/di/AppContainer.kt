@@ -10,6 +10,8 @@ import com.framecraft.editor.domain.model.UuidIdGenerator
 import com.framecraft.editor.editor.TimelineMedia
 import com.framecraft.editor.engine.AudioWaveforms
 import com.framecraft.editor.engine.ClipThumbnails
+import com.framecraft.editor.engine.FrameExtractorKeyColorProbe
+import com.framecraft.editor.engine.KeyColorProbe
 import com.framecraft.editor.engine.ProjectPreview
 import com.framecraft.editor.engine.export.ProjectExporter
 import com.framecraft.editor.export.ExportCoordinator
@@ -41,6 +43,9 @@ class AppContainer(
     val voiceoverCapture: VoiceoverCapture =
         MediaRecorderVoiceoverCapture(appContext, File(appContext.filesDir, PROJECTS_DIRECTORY), idGenerator)
 
+    /** Reads source frames for the chroma key's eyedropper, small enough to read fast and still match colors. */
+    val keyColorProbe: KeyColorProbe = FrameExtractorKeyColorProbe(appContext, KEY_PROBE_HEIGHT_PX)
+
     /** The single app-wide export, shared by the editor and the export service. */
     val exportCoordinator: ExportCoordinator = ExportCoordinator(appContext)
 
@@ -62,5 +67,8 @@ class AppContainer(
 
         /** Directory under the app's files that holds saved projects. */
         const val PROJECTS_DIRECTORY = "projects"
+
+        /** Height in pixels of the frames the eyedropper reads. */
+        const val KEY_PROBE_HEIGHT_PX = 540
     }
 }

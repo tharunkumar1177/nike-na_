@@ -6,7 +6,9 @@ package com.framecraft.editor.engine.plan
 import com.framecraft.editor.domain.model.CanvasBackground
 import com.framecraft.editor.domain.model.CanvasPlacement
 import com.framecraft.editor.domain.model.CanvasSettings
+import com.framecraft.editor.domain.model.ChromaKey
 import com.framecraft.editor.domain.model.ClipLook
+import com.framecraft.editor.domain.model.ClipMask
 import com.framecraft.editor.domain.model.ClipSpeed
 import com.framecraft.editor.domain.model.MediaKind
 import com.framecraft.editor.domain.model.OverlayTransform
@@ -27,8 +29,9 @@ sealed interface PlanSegment {
      * Plays [sourceSpanMicros] of [uri] starting at [sourceStartMicros] over [durationMicros] of timeline;
      * [sourceDurationMicros] is the full source. The source plays at [speed], normal when null, keeping its pitch when
      * [maintainPitch] is set. Its sound plays at [volumePercent] (0 is silent) with fades of [fadeInMicros] and
-     * [fadeOutMicros] in timeline time, already scaled by its track's volume. A picture is colored by its [look]. A
-     * [voiceover] makes clips that duck by [autoDuckPercent] dip during its [duckWindows].
+     * [fadeOutMicros] in timeline time, already scaled by its track's volume. A picture is colored by its [look],
+     * keyed by its [chromaKey], and cut to its [mask]. A [voiceover] makes clips that duck by [autoDuckPercent] dip
+     * during its [duckWindows].
      */
     data class Media(
         val uri: String,
@@ -46,6 +49,8 @@ sealed interface PlanSegment {
         val voiceover: Boolean = false,
         val autoDuckPercent: Int = 0,
         val duckWindows: List<DuckWindow> = emptyList(),
+        val mask: ClipMask? = null,
+        val chromaKey: ChromaKey? = null,
     ) : PlanSegment
 
     /** Empty timeline span: black frames and silence on the base sequence, hidden on overlay sequences. */
@@ -159,7 +164,8 @@ object PlaybackPlanner {
      * this shows black under music that runs past the video. Text tracks add no sequence but count toward that end;
      * their spans run from the bottom lane up, so upper lanes draw on top. A base track that plays transitions brings
      * its incoming lane just above it and its fade backdrop just below (see [TransitionLanes]). The picture is
-     * composited when there are overlays or transitions, or the canvas or any base placement differs from the defaults.
+     * composited when there are overlays or transitions, any clip is masked or keyed (only the compositor blends their
+     * transparency), or the canvas or any base placement differs from the defaults.
      * Each track's volume scales its clips' sound, and clips that duck get their windows under voiceovers ([AudioMix]).
      */
     fun plan(project: Project): PlaybackPlan {
@@ -193,7 +199,8 @@ object PlaybackPlanner {
                 .flatMap(::textSpansOf)
         val placed = planned.any { track -> track.clips.any { it.canvasPlacement != null } }
         val transitions = base.any { it.role != SequenceRole.TRACK }
-        val composited = overlays.isNotEmpty() || placed || transitions || project.canvas != CanvasSettings()
+        val keyed = planned.any { track -> track.clips.any { it.mask != null || it.chromaKey != null } }
+        val composited = overlays.isNotEmpty() || placed || transitions || keyed || project.canvas != CanvasSettings()
         return PlaybackPlan(
             sequences = AudioMix.ducked(overlays + base + audio),
             frameRate = project.frameRate,
@@ -268,6 +275,8 @@ object PlaybackPlanner {
                     look = clip.look,
                     voiceover = clip.voiceover,
                     autoDuckPercent = clip.autoDuckPercent,
+                    mask = clip.mask,
+                    chromaKey = clip.chromaKey,
                 )
             cursor = clip.endMicros
         }

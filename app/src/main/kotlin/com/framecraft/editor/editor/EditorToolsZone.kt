@@ -212,6 +212,8 @@ private fun ClipToolButtons(
     }
     if (availability.showLook) {
         ToolButton(Tool.LOOK, tools.onOpenLook)
+        ToolButton(Tool.MASK, tools.onOpenMask, selected = availability.maskActive)
+        ToolButton(Tool.CHROMA, tools.onOpenChromaKey, selected = availability.chromaKeyActive)
     }
     if (availability.showExtract) {
         ToolButton(Tool.EXTRACT, tools.onExtractAudio, availability.canExtract)
@@ -443,6 +445,17 @@ private enum class Tool(
 
     /** Opens the look sheet for the selected picture. */
     LOOK(R.drawable.ic_look, R.string.editor_tool_look, R.string.editor_tool_look_description, TOOL_LOOK_TAG),
+
+    /** Opens the mask panel for the selected picture. */
+    MASK(R.drawable.ic_mask, R.string.editor_tool_mask, R.string.editor_tool_mask_description, TOOL_MASK_TAG),
+
+    /** Opens the chroma key panel for the selected picture. */
+    CHROMA(
+        R.drawable.ic_chroma,
+        R.string.editor_tool_chroma,
+        R.string.editor_tool_chroma_description,
+        TOOL_CHROMA_TAG,
+    ),
 
     /** Lifts the selected video's sound onto an audio lane. */
     EXTRACT(

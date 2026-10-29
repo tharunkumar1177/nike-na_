@@ -56,6 +56,7 @@ The exporter writes `cache/exports/export.mp4`, then `GallerySaver` inserts a pe
 
 - A base track with playing transitions becomes up to three sequences from `TransitionLanes`, registered as incoming lane, base, then backdrop; `CompositorInput.Incoming` and `CompositorInput.Backdrop` are shown only during their windows and moved by `TransitionMotion` (`TransitionPlanTest`, `TransitionMotionTest`). Details belong to [transitions](transitions.md).
 - Media segments carry the clip's look, and every item that draws a clip (base, incoming lane, blurred background, muted or not) gets `LookEffects.of(look)`: color table, then color matrix, then saturation. A project with any filter (`PlaybackPlan.hasLutLook`) tone-maps HDR to SDR in OpenGL even when not composited (`LookPlanTest`, `LookEffectsTest`). Details belong to [look](look.md).
+- Media segments also carry the clip's mask and chroma key. `SegmentVideoEffects.of(segment)` puts the key, then the mask, before the look on base, incoming, and overlay items; the blurred background keeps only the look. Any masked or keyed clip forces the composited path (`MaskKeyPlanTest`, `MaskMathTest`, `ChromaKeyMathTest`). Details belong to [masks](masks.md).
 
 ## Related blueprints
 
