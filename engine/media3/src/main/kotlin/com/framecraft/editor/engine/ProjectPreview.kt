@@ -5,6 +5,7 @@ package com.framecraft.editor.engine
 
 import android.content.Context
 import androidx.annotation.OptIn
+import androidx.media3.common.AudioAttributes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.ExperimentalApi
@@ -41,7 +42,8 @@ data class PreviewState(
 )
 
 /**
- * Plays a project snapshot. Must be created, used, and released on the main thread.
+ * Plays a project snapshot. Must be created, used, and released on the main thread. It holds audio focus while
+ * playing, so a call or another app's sound pauses it.
  */
 @OptIn(markerClass = [UnstableApi::class, ExperimentalApi::class])
 class ProjectPreview(
@@ -82,6 +84,7 @@ class ProjectPreview(
 
     init {
         player.addListener(listener)
+        player.setAudioAttributes(AudioAttributes.DEFAULT, true)
     }
 
     /** Replaces what the preview plays with [project], keeping the playhead within the new duration. */

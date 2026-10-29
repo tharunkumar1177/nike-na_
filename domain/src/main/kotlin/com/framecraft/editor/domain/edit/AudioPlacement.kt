@@ -1,6 +1,6 @@
 /*
- * Decides where new sound goes: imported music at the playhead and extracted audio under its video clip, each on
- * the first audio lane with room.
+ * Decides where new sound goes: imported music and recorded voiceovers at the playhead and extracted audio under its
+ * video clip, each on the first audio lane with room.
  */
 package com.framecraft.editor.domain.edit
 
@@ -39,6 +39,29 @@ object AudioPlacement {
         return laneFor(project, start, start + duration) { idGenerator.next() }?.let { laneId ->
             AddAudioClip(laneId, Clip(idGenerator.next(), asset.id, start, 0L, duration), asset)
         }
+    }
+
+    /**
+     * Returns the command that adds voiceover take [asset] at [playheadMicros] like [proposeMusic], marked as a
+     * voiceover so clips that duck lower under it. Returns null when it does not fit.
+     */
+    fun proposeTake(
+        project: Project,
+        playheadMicros: Long,
+        asset: MediaAsset,
+        idGenerator: IdGenerator,
+    ): AddAudioClip? {
+        val music = proposeMusic(project, playheadMicros, asset, idGenerator) ?: return null
+        return music.copy(clip = music.clip.copy(voiceover = true))
+    }
+
+    /** True when an audio lane has room for a voiceover starting at [playheadMicros], snapped to a frame. */
+    fun canRecord(
+        project: Project,
+        playheadMicros: Long,
+    ): Boolean {
+        val start = project.frameRate.snapToNearestFrame(playheadMicros.coerceAtLeast(0L))
+        return laneFor(project, start, start + project.frameRate.startOfFrame(1)) { NEW_LANE } != null
     }
 
     /**

@@ -65,6 +65,15 @@ const val TOOL_VOLUME_TAG = "editor_tool_volume"
 /** Test tag of the fade tool. */
 const val TOOL_FADE_TAG = "editor_tool_fade"
 
+/** Test tag of the ducking tool. */
+const val TOOL_DUCK_TAG = "editor_tool_duck"
+
+/** Test tag of the voiceover tool. */
+const val TOOL_VOICEOVER_TAG = "editor_tool_voiceover"
+
+/** Test tag of the mixer tool. */
+const val TOOL_MIXER_TAG = "editor_tool_mixer"
+
 /** Test tag of the volume slider. */
 const val VOLUME_SLIDER_TAG = "editor_volume_slider"
 
@@ -92,12 +101,17 @@ private const val DISABLED_ALPHA = 0.38f
 /** Size of a tool button in the tools zone. */
 private val TOOL_SIZE = 64.dp
 
-/** Sound of the selected clip: [volumePercent], [fadeInMicros], and [fadeOutMicros] within [durationMicros]. */
+/**
+ * Sound of the selected clip: [volumePercent], [fadeInMicros], and [fadeOutMicros] within [durationMicros], and the
+ * [autoDuckPercent] it drops by under voiceovers unless it is a [voiceover] itself.
+ */
 data class ClipAudio(
     val volumePercent: Int,
     val fadeInMicros: Long,
     val fadeOutMicros: Long,
     val durationMicros: Long,
+    val autoDuckPercent: Int = 0,
+    val voiceover: Boolean = false,
 )
 
 /** What replaces or covers the tool row. */
@@ -110,6 +124,9 @@ private enum class ToolPanel {
 
     /** The fade sheet over the row. */
     FADE,
+
+    /** The ducking sheet over the row. */
+    DUCK,
 }
 
 /**
@@ -142,6 +159,9 @@ internal fun ToolsZone(
     if (panel == ToolPanel.FADE && audio != null) {
         FadeSheet(audio, tools.onAudioCommit, onDismiss = { panel = ToolPanel.NONE })
     }
+    if (panel == ToolPanel.DUCK && audio != null) {
+        DuckingSheet(audio, tools.onAudioCommit, onDismiss = { panel = ToolPanel.NONE })
+    }
 }
 
 /** The tools that apply to [availability], in order; panel tools call [onOpen]. */
@@ -171,6 +191,8 @@ private fun ToolRow(
     }
     if (!availability.hasSelection) {
         ToolButton(Tool.AUDIO, tools.onAddAudio, availability.canAddAudio)
+        ToolButton(Tool.VOICEOVER, tools.onRecordVoiceover, availability.canRecord)
+        ToolButton(Tool.MIXER, tools.onOpenMixer)
     }
     if (canvas.show) {
         ToolButton(Tool.CANVAS, tools.onOpenCanvas, canvas.enabled)
@@ -194,9 +216,11 @@ private fun ClipToolButtons(
     if (availability.showExtract) {
         ToolButton(Tool.EXTRACT, tools.onExtractAudio, availability.canExtract)
     }
-    if (availability.audio != null) {
+    val audio = availability.audio
+    if (audio != null) {
         ToolButton(Tool.VOLUME, { onOpen(ToolPanel.VOLUME) })
         ToolButton(Tool.FADE, { onOpen(ToolPanel.FADE) })
+        if (!audio.voiceover) ToolButton(Tool.DUCK, { onOpen(ToolPanel.DUCK) }, selected = audio.autoDuckPercent > 0)
     }
     if (availability.hasSelection) {
         ToolButton(Tool.SPLIT, tools.onSplitClip, availability.canSplit)
@@ -438,6 +462,20 @@ private enum class Tool(
 
     /** Opens the fade sheet. */
     FADE(R.drawable.ic_fade, R.string.editor_tool_fade, R.string.editor_tool_fade_description, TOOL_FADE_TAG),
+
+    /** Opens the ducking sheet. */
+    DUCK(R.drawable.ic_volume_down, R.string.editor_tool_duck, R.string.editor_tool_duck_description, TOOL_DUCK_TAG),
+
+    /** Opens the voiceover recorder at the playhead. */
+    VOICEOVER(
+        R.drawable.ic_mic,
+        R.string.editor_tool_voiceover,
+        R.string.editor_tool_voiceover_description,
+        TOOL_VOICEOVER_TAG,
+    ),
+
+    /** Opens the mixer sheet. */
+    MIXER(R.drawable.ic_tune, R.string.editor_tool_mixer, R.string.editor_tool_mixer_description, TOOL_MIXER_TAG),
 
     /** Splits the selection at the playhead. */
     SPLIT(

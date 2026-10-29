@@ -33,13 +33,13 @@ The audio model rules, the commands `AddAudioClip`, `RemoveAudioClip`, `ExtractA
 
 ### Volume and fades
 
-- `SetClipAudio` sets volume and both fades on any clip except images.
+- `SetClipAudio` sets volume, both fades, and the ducking depth on any clip except images.
 - `TrimClip` shortens fades that no longer fit (fade-in first, then fade-out from what is left) and its inverse restores the original fades. `SplitClip` keeps the fade-in on the left part and the fade-out on the right; `MergeClips` joins only parts whose inner fades are zero and whose volumes match.
 
 ### Sound processing
 
 - `AudioItemEffects` builds each item's chain: `ToInt16PcmAudioProcessor`, a stereo mixer for 1 to 6 source channels (constant gain for mono and stereo, constant power above), then `ClampingGainProcessor` unless the clip plays at unity gain with no fades.
-- `GainEnvelope` multiplies the volume by linear fade ramps from the clip's start and end. `ClampingGainProcessor` applies it per frame on 16-bit samples, clamps to the sample range instead of wrapping, and restarts its frame position from the stream offset after a seek.
+- `GainEnvelope` multiplies the volume by linear fade ramps from the clip's start and end, and by any duck windows the plan gave the clip (lane volume and ducking are owned by [voiceover](voiceover.md)). `ClampingGainProcessor` applies it per frame on 16-bit samples, clamps to the sample range instead of wrapping, and restarts its frame position from the stream offset after a seek.
 - A muted picture clip is passed with its audio removed, so silence costs no processing.
 
 ### Waveforms

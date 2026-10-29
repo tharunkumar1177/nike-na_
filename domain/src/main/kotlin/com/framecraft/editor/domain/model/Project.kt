@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
 import kotlin.math.abs
 
 /** Schema version written by this build. */
-const val CURRENT_SCHEMA_VERSION: Int = 8
+const val CURRENT_SCHEMA_VERSION: Int = 9
 
 /** An immutable project snapshot. Construction fails if any cross-object invariant is broken. */
 @Serializable
@@ -34,6 +34,9 @@ data class Project(
                 requireFits(track, clip, asset)
                 require(clip.look == null || track.kind == TrackKind.VIDEO || track.kind == TrackKind.OVERLAY) {
                     "Clip ${clip.id} has a look off a picture track"
+                }
+                require(!clip.voiceover || asset.kind == MediaKind.AUDIO) {
+                    "Clip ${clip.id} is a voiceover of a picture"
                 }
             }
         }

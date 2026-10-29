@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Framecraft application manifest: app identity, the launcher activity, and the export foreground service. -->
+<!-- Framecraft application manifest: app identity, permissions, the launcher activity, and the export service. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+  <uses-feature
+    android:name="android.hardware.microphone"
+    android:required="false" />
+
+  <uses-permission android:name="android.permission.RECORD_AUDIO" />
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />

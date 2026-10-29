@@ -100,6 +100,7 @@ internal object TransitionLanes {
             sourceSpanMicros = if (asset.isTimed) to - from else duration,
             maintainPitch = clip.maintainPitch,
             look = clip.look,
+            autoDuckPercent = clip.autoDuckPercent,
         )
     }
 
@@ -159,6 +160,7 @@ internal object TransitionLanes {
             sourceSpanMicros = if (asset.isTimed) end - start else duration,
             maintainPitch = clip.maintainPitch,
             look = clip.look,
+            autoDuckPercent = clip.autoDuckPercent,
         )
     }
 

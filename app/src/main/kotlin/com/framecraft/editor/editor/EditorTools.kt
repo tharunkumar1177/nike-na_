@@ -80,9 +80,9 @@ internal fun rememberAudioPicker(
 }
 
 /**
- * What the add, text, speed, and look tools and the cut badges open: [overlay] picks photos and videos, [audio] picks
- * sound files, [text] holds the text sheet, [speed] the speed sheet, [transition] the transition sheet, and [look]
- * the look sheet.
+ * What the add, text, speed, look, mixer, and voiceover tools and the cut badges open: [overlay] picks photos and
+ * videos, [audio] picks sound files, [text] holds the text sheet, [speed] the speed sheet, [transition] the
+ * transition sheet, [look] the look sheet, [mixer] the mixer sheet, and [voiceover] starts the recorder.
  */
 internal class MediaPickers(
     val overlay: () -> Unit,
@@ -91,11 +91,13 @@ internal class MediaPickers(
     val speed: SpeedEditing,
     val transition: TransitionEditing,
     val look: LookEditing,
+    val mixer: MixerEditing,
+    val voiceover: VoiceoverStarter,
 )
 
 /**
- * Returns the overlay and music pickers, the text sheet, the speed sheet, the transition sheet, and the look sheet of
- * [viewModel], adding at [preview]'s playhead.
+ * Returns the overlay and music pickers, the text, speed, transition, look, and mixer sheets, and the voiceover
+ * recorder of [viewModel], adding at [preview]'s playhead.
  */
 @Composable
 internal fun rememberMediaPickers(
@@ -109,12 +111,14 @@ internal fun rememberMediaPickers(
         speed = rememberSpeedEditing(),
         transition = rememberTransitionEditing(),
         look = rememberLookEditing(),
+        mixer = rememberMixerEditing(),
+        voiceover = rememberVoiceoverStarter(viewModel.voiceover),
     )
 
 /**
  * Returns which tools apply to [selected], which sits on a track of [selectedKind], at [positionMicros]. Overlays
- * can be added when the project has a base clip, and text when a text lane is free at the playhead too; the
- * picker tools wait while a pick is still [importing].
+ * can be added when the project has a base clip, text when a text lane is free at the playhead too, and a
+ * voiceover when an audio lane is; the picker and recorder tools wait while a pick is still [importing].
  */
 internal fun toolAvailability(
     project: Project,
@@ -141,12 +145,21 @@ internal fun toolAvailability(
         showSpeed = isVideo,
         showLook = selectedKind?.takesLook == true,
         canExtract = isVideo && selected != null && AudioPlacement.canExtract(project, selected),
-        audio =
-            selected
-                ?.takeIf { asset?.hasAudio == true }
-                ?.let { ClipAudio(it.volumePercent, it.fadeInMicros, it.fadeOutMicros, it.durationMicros) },
+        audio = selected?.takeIf { asset?.hasAudio == true }?.let(::clipAudioOf),
+        canRecord = !importing && AudioPlacement.canRecord(project, positionMicros),
     )
 }
+
+/** Returns the sound settings of [clip]. */
+private fun clipAudioOf(clip: Clip): ClipAudio =
+    ClipAudio(
+        volumePercent = clip.volumePercent,
+        fadeInMicros = clip.fadeInMicros,
+        fadeOutMicros = clip.fadeOutMicros,
+        durationMicros = clip.durationMicros,
+        autoDuckPercent = clip.autoDuckPercent,
+        voiceover = clip.voiceover,
+    )
 
 /**
  * Tools for the [selected] clip on a track of [selectedKind]: split at [positionMicros], delete, opacity, extract,
@@ -182,7 +195,15 @@ internal fun toolActions(
         },
         onAudioCommit = { audio ->
             selected?.let {
-                viewModel.dispatch(SetClipAudio(it.id, audio.volumePercent, audio.fadeInMicros, audio.fadeOutMicros))
+                val command =
+                    SetClipAudio(
+                        clipId = it.id,
+                        volumePercent = audio.volumePercent,
+                        fadeInMicros = audio.fadeInMicros,
+                        fadeOutMicros = audio.fadeOutMicros,
+                        autoDuckPercent = audio.autoDuckPercent,
+                    )
+                viewModel.dispatch(command)
             }
         },
         onAddText = {
@@ -192,6 +213,8 @@ internal fun toolActions(
         onAnimateText = { pickers.text.open(selected?.id, TextSheetTab.ANIMATION) },
         onOpenSpeed = { pickers.speed.open(selected?.id) },
         onOpenLook = { pickers.look.open(selected?.id) },
+        onOpenMixer = pickers.mixer::open,
+        onRecordVoiceover = { pickers.voiceover.start() },
     )
 
 /** Returns the command that removes clip [clipId] from a track of [kind]. */

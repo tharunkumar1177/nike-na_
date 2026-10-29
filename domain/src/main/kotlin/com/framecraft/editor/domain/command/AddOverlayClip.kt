@@ -8,14 +8,15 @@ import com.framecraft.editor.domain.model.MediaAsset
 import com.framecraft.editor.domain.model.Project
 import com.framecraft.editor.domain.model.Track
 import com.framecraft.editor.domain.model.TrackKind
+import com.framecraft.editor.domain.model.UNITY_VOLUME_PERCENT
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
  * Places [clip], which reads [asset], on overlay track [trackId]. The asset is added if the project lacks it. A
  * missing track is created at position [trackIndex] of the track list, clamped to the list, which defaults to the
- * start so a new lane is drawn above the base video. An overlap is rejected. Each of [anchorRestorations] then
- * re-attaches a clip that lost its anchor when this clip was removed.
+ * start so a new lane is drawn above the base video, at [trackVolumePercent]. An overlap is rejected. Each of
+ * [anchorRestorations] then re-attaches a clip that lost its anchor when this clip was removed.
  */
 @Serializable
 @SerialName("addOverlayClip")
@@ -25,6 +26,7 @@ data class AddOverlayClip(
     val asset: MediaAsset,
     val anchorRestorations: List<AnchorRestoration> = emptyList(),
     val trackIndex: Int = 0,
+    val trackVolumePercent: Int = UNITY_VOLUME_PERCENT,
 ) : EditCommand {
     /** The inverse removes the overlay clip again. */
     override fun applyTo(project: Project): CommandOutcome {
@@ -44,7 +46,7 @@ data class AddOverlayClip(
                 project.replacingTracks(RemoveOverlayClip(clip.id), assets) {
                     val tracks =
                         if (existing == null) {
-                            val lane = Track(trackId, TrackKind.OVERLAY, false, listOf(clip))
+                            val lane = Track(trackId, TrackKind.OVERLAY, false, listOf(clip), trackVolumePercent)
                             project.tracks.toMutableList().apply {
                                 add(trackIndex.coerceIn(0, project.tracks.size), lane)
                             }

@@ -11,6 +11,9 @@ const val MAX_VOLUME_PERCENT: Int = 200
 /** Clip volume that leaves the source level unchanged. */
 const val UNITY_VOLUME_PERCENT: Int = 100
 
+/** Strongest ducking, in percent: the clip falls silent under a voiceover. */
+const val MAX_DUCK_PERCENT: Int = 100
+
 /**
  * A segment of [assetId] placed on the timeline at [startMicros] for [durationMicros],
  * reading the source from [trimStartMicros]. The timeline extent is half-open. An [anchor] keeps the clip in sync
@@ -22,7 +25,8 @@ const val UNITY_VOLUME_PERCENT: Int = 100
  * source, and its sound keeps its pitch when [maintainPitch] is set. Without a speed the clip reads exactly its own
  * duration of source. A video-track clip may carry the [outTransition] into the clip that starts where it ends; it
  * stays stored while the cut is gone or too short and plays again once the cut allows it. A clip on a video or
- * overlay track may carry a [look] that colors its picture.
+ * overlay track may carry a [look] that colors its picture. A [voiceover] is a sound recorded in the editor; any clip
+ * with sound may duck by [autoDuckPercent] while a voiceover plays, where 0 never ducks.
  */
 @Serializable
 data class Clip(
@@ -43,6 +47,8 @@ data class Clip(
     val maintainPitch: Boolean = true,
     val outTransition: ClipTransition? = null,
     val look: ClipLook? = null,
+    val voiceover: Boolean = false,
+    val autoDuckPercent: Int = 0,
 ) {
     init {
         require(id.isNotBlank()) { "Clip id must not be blank" }
@@ -58,6 +64,7 @@ data class Clip(
             "Clip $id needs a source length exactly when sped"
         }
         require(sourceDurationMicros == null || sourceDurationMicros > 0) { "Clip $id reads no source" }
+        require(autoDuckPercent in 0..MAX_DUCK_PERCENT) { "Clip $id has ducking out of range: $autoDuckPercent" }
     }
 
     /** Length of source the clip reads: its own duration at normal speed. */
@@ -68,7 +75,11 @@ data class Clip(
     val endMicros: Long
         get() = startMicros + durationMicros
 
-    /** True when the clip keeps the default sound: unity volume and no fades. */
+    /** True when the clip keeps the default sound: unity volume, no fades, and no ducking. */
     val hasDefaultAudio: Boolean
-        get() = volumePercent == UNITY_VOLUME_PERCENT && fadeInMicros == 0L && fadeOutMicros == 0L
+        get() =
+            volumePercent == UNITY_VOLUME_PERCENT &&
+                fadeInMicros == 0L &&
+                fadeOutMicros == 0L &&
+                autoDuckPercent == 0
 }

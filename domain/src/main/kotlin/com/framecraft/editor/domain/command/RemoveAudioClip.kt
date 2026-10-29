@@ -44,9 +44,9 @@ data class RemoveAudioClip(
         val sourceId = restoreVolumeClipId
         val inverse =
             if (sourceId == null) {
-                AddAudioClip(track.id, clip, asset, restorations, index)
+                AddAudioClip(track.id, clip, asset, restorations, index, track.volumePercent)
             } else {
-                ExtractAudio(sourceId, track.id, clip, index, restorations)
+                ExtractAudio(sourceId, track.id, clip, index, restorations, track.volumePercent)
             }
         val shared = project.tracks.any { lane -> lane.clips.any { it.id != clipId && it.assetId == asset.id } }
         val assets = if (shared) project.assets else project.assets.filter { it.id != asset.id }

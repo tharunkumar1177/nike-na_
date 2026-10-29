@@ -15,6 +15,8 @@ import com.framecraft.editor.engine.export.ProjectExporter
 import com.framecraft.editor.export.ExportCoordinator
 import com.framecraft.editor.media.AndroidMediaImporter
 import com.framecraft.editor.media.MediaImporter
+import com.framecraft.editor.media.MediaRecorderVoiceoverCapture
+import com.framecraft.editor.media.VoiceoverCapture
 import kotlinx.coroutines.Dispatchers
 import java.io.File
 import kotlin.math.roundToInt
@@ -34,6 +36,10 @@ class AppContainer(
     /** Saved projects, one directory each under the app's private files; all writes go through one thread. */
     val projectStore: ProjectStore =
         ProjectStore(File(appContext.filesDir, PROJECTS_DIRECTORY), Dispatchers.IO.limitedParallelism(1))
+
+    /** Records voiceover takes into the recordings folder of each saved project. */
+    val voiceoverCapture: VoiceoverCapture =
+        MediaRecorderVoiceoverCapture(appContext, File(appContext.filesDir, PROJECTS_DIRECTORY), idGenerator)
 
     /** The single app-wide export, shared by the editor and the export service. */
     val exportCoordinator: ExportCoordinator = ExportCoordinator(appContext)

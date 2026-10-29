@@ -27,7 +27,8 @@ sealed interface PlanSegment {
      * Plays [sourceSpanMicros] of [uri] starting at [sourceStartMicros] over [durationMicros] of timeline;
      * [sourceDurationMicros] is the full source. The source plays at [speed], normal when null, keeping its pitch when
      * [maintainPitch] is set. Its sound plays at [volumePercent] (0 is silent) with fades of [fadeInMicros] and
-     * [fadeOutMicros] in timeline time. A picture is colored by its [look].
+     * [fadeOutMicros] in timeline time, already scaled by its track's volume. A picture is colored by its [look]. A
+     * [voiceover] makes clips that duck by [autoDuckPercent] dip during its [duckWindows].
      */
     data class Media(
         val uri: String,
@@ -42,6 +43,9 @@ sealed interface PlanSegment {
         val sourceSpanMicros: Long = durationMicros,
         val maintainPitch: Boolean = true,
         val look: ClipLook? = null,
+        val voiceover: Boolean = false,
+        val autoDuckPercent: Int = 0,
+        val duckWindows: List<DuckWindow> = emptyList(),
     ) : PlanSegment
 
     /** Empty timeline span: black frames and silence on the base sequence, hidden on overlay sequences. */
@@ -156,6 +160,7 @@ object PlaybackPlanner {
      * their spans run from the bottom lane up, so upper lanes draw on top. A base track that plays transitions brings
      * its incoming lane just above it and its fade backdrop just below (see [TransitionLanes]). The picture is
      * composited when there are overlays or transitions, or the canvas or any base placement differs from the defaults.
+     * Each track's volume scales its clips' sound, and clips that duck get their windows under voiceovers ([AudioMix]).
      */
     fun plan(project: Project): PlaybackPlan {
         val planned = project.tracks.filter { it.clips.isNotEmpty() }
@@ -163,15 +168,24 @@ object PlaybackPlanner {
         val base =
             planned
                 .filter { it.kind == TrackKind.VIDEO }
-                .flatMap { baseSequencesOf(project, it, end) }
+                .flatMap { track ->
+                    baseSequencesOf(project, track, end).map { AudioMix.atTrackVolume(it, track.volumePercent) }
+                }
         val overlays =
             planned
                 .filter { it.kind == TrackKind.OVERLAY }
-                .map { SequencePlan(paddedSegmentsOf(project, it, end), spansOf(it), TrackKind.OVERLAY) }
+                .map { track ->
+                    val segments = paddedSegmentsOf(project, track, end)
+                    val sequence = SequencePlan(segments, spansOf(track), TrackKind.OVERLAY)
+                    AudioMix.atTrackVolume(sequence, track.volumePercent)
+                }
         val audio =
             planned
                 .filter { it.kind == TrackKind.AUDIO }
-                .map { SequencePlan(segmentsOf(project, it), kind = TrackKind.AUDIO) }
+                .map { track ->
+                    val sequence = SequencePlan(segmentsOf(project, track), kind = TrackKind.AUDIO)
+                    AudioMix.atTrackVolume(sequence, track.volumePercent)
+                }
         val text =
             planned
                 .filter { it.kind == TrackKind.TEXT }
@@ -181,7 +195,7 @@ object PlaybackPlanner {
         val transitions = base.any { it.role != SequenceRole.TRACK }
         val composited = overlays.isNotEmpty() || placed || transitions || project.canvas != CanvasSettings()
         return PlaybackPlan(
-            sequences = overlays + base + audio,
+            sequences = AudioMix.ducked(overlays + base + audio),
             frameRate = project.frameRate,
             textSpans = text,
             composited = composited,
@@ -252,6 +266,8 @@ object PlaybackPlanner {
                     sourceSpanMicros = clip.sourceSpanMicros,
                     maintainPitch = clip.maintainPitch,
                     look = clip.look,
+                    voiceover = clip.voiceover,
+                    autoDuckPercent = clip.autoDuckPercent,
                 )
             cursor = clip.endMicros
         }

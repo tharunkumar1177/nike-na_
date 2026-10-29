@@ -8,7 +8,7 @@ Own the pure Kotlin project model: tracks, clips, implicit gaps, magnetic tracks
 
 **Status:** Partial
 
-Time math (`FrameRate`, `Timecode`), the validated document model (`MediaAsset`, `Clip`, `Track`, `Project`, `ProjectFactory`), track kinds (`VIDEO`, `OVERLAY`, `AUDIO`, `TEXT`), clip volume and fades, clip text (see [text](text.md)), overlay placement (`OverlayTransform`), the project canvas (`CanvasSettings` with `CanvasAspect` and `CanvasBackground`) and base clip placement (`CanvasPlacement`, VIDEO clips only), and anchoring (`ClipAnchor`, `AnchorResolver`) are implemented and verified by CI unit tests. Clip speed (see [clip-speed](clip-speed.md)) and outgoing transitions (see [transitions](transitions.md)) are clip fields under the same validation.
+Time math (`FrameRate`, `Timecode`), the validated document model (`MediaAsset`, `Clip`, `Track`, `Project`, `ProjectFactory`), track kinds (`VIDEO`, `OVERLAY`, `AUDIO`, `TEXT`), clip volume and fades, clip text (see [text](text.md)), overlay placement (`OverlayTransform`), the project canvas (`CanvasSettings` with `CanvasAspect` and `CanvasBackground`) and base clip placement (`CanvasPlacement`, VIDEO clips only), and anchoring (`ClipAnchor`, `AnchorResolver`) are implemented and verified by CI unit tests. Clip speed (see [clip-speed](clip-speed.md)) and outgoing transitions (see [transitions](transitions.md)) are clip fields under the same validation, as are clip voiceover and ducking and track lane volume (see [voiceover](voiceover.md)).
 
 ## Architecture dependencies
 

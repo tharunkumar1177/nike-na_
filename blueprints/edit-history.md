@@ -60,7 +60,7 @@ The commands `RenameProject`, `DeleteClip`, `AddClip`, `TrimClip`, `SplitClip`, 
 
 ## Relevant implementation and tests
 
-- `domain/src/main/kotlin/com/framecraft/editor/domain/command/` — `EditCommand`, `RenameProject`, `DeleteClip`, `AddClip`, `TrimClip`, `SplitClip`, `MergeClips`, `MoveClip`, `AddOverlayClip`, `RemoveOverlayClip`, `MoveOverlay`, `SetOverlayTransform`, `ReanchorOverlay`, `AddAudioClip`, `RemoveAudioClip`, `ExtractAudio`, `SetClipAudio`, `AddTextClip`, `RemoveTextClip`, `SetTextContent`, `CanvasCommands` (`SetCanvasAspect`, `SetCanvasBackground`, `SetBaseClipPlacement`), `AnchorRestoration`, `EditHistory`.
+- `domain/src/main/kotlin/com/framecraft/editor/domain/command/` — `EditCommand`, `RenameProject`, `DeleteClip`, `AddClip`, `TrimClip`, `SplitClip`, `MergeClips`, `MoveClip`, `AddOverlayClip`, `RemoveOverlayClip`, `MoveOverlay`, `SetOverlayTransform`, `ReanchorOverlay`, `AddAudioClip`, `RemoveAudioClip`, `ExtractAudio`, `SetClipAudio`, `AddTextClip`, `RemoveTextClip`, `SetTextContent`, `CanvasCommands` (`SetCanvasAspect`, `SetCanvasBackground`, `SetBaseClipPlacement`), `SetTrackVolumes` (rules in [voiceover](voiceover.md), verified by `MixerCommandsTest`), `AnchorRestoration`, `EditHistory`.
 - `domain/src/main/kotlin/com/framecraft/editor/domain/edit/` — `TrimController`, `SnapPoints`, `ReorderSlots`, `OverlayPlacement`, `AudioPlacement`.
 - `domain/src/test/kotlin/com/framecraft/editor/domain/command/` — `EditCommandTest`, `ClipEditCommandsTest`, `EditHistoryTest`, `OverlayCommandsTest`, `AudioCommandsTest`, `CanvasCommandsTest`.
 - `domain/src/test/kotlin/com/framecraft/editor/domain/edit/EditGesturesTest.kt` — trim clamps, frame and target snapping, reorder slots.
