@@ -8,7 +8,7 @@ Own the pure Kotlin project model: tracks, clips, implicit gaps, magnetic tracks
 
 **Status:** Partial
 
-Time math (`FrameRate`, `Timecode`), the validated document model (`MediaAsset`, `Clip`, `Track`, `Project`, `ProjectFactory`), track kinds (`VIDEO`, `OVERLAY`, `AUDIO`, `TEXT`), clip volume and fades, clip text (see [text](text.md)), overlay placement (`OverlayTransform`), and anchoring (`ClipAnchor`, `AnchorResolver`) are implemented and verified by CI unit tests. Speed and transitions are not built yet.
+Time math (`FrameRate`, `Timecode`), the validated document model (`MediaAsset`, `Clip`, `Track`, `Project`, `ProjectFactory`), track kinds (`VIDEO`, `OVERLAY`, `AUDIO`, `TEXT`), clip volume and fades, clip text (see [text](text.md)), overlay placement (`OverlayTransform`), the project canvas (`CanvasSettings` with `CanvasAspect` and `CanvasBackground`) and base clip placement (`CanvasPlacement`, VIDEO clips only), and anchoring (`ClipAnchor`, `AnchorResolver`) are implemented and verified by CI unit tests. Speed and transitions are not built yet.
 
 ## Architecture dependencies
 
@@ -31,11 +31,11 @@ Model constructors validate ID uniqueness within a project; duplicate IDs are a 
 
 Clips on one track must not overlap. Magnetic tracks are kept gap-free by the commands that edit them, not by a background normalizer.
 
-`Project` checks that each clip fits its track: picture tracks accept only `VIDEO` and `IMAGE` assets, audio tracks reject images and text, text tracks accept only the shared `TEXT` asset, a clip carries text exactly when it is on a text track, and image and text clips keep the default volume and no fades. Placements are allowed on overlay and text clips (`TrackKind.isPlaced`); only video and audio assets are timed (`MediaAsset.isTimed`), so only they have a source offset to trim. `Clip` rejects a volume outside 0 to 200 percent, negative fades, and fades that together exceed the clip. Audio assets are stored as 1 by 1 with no rotation so the shared size checks still hold; nothing reads their size.
+`Project` checks that each clip fits its track: picture tracks accept only `VIDEO` and `IMAGE` assets, audio tracks reject images and text, text tracks accept only the shared `TEXT` asset, a clip carries text exactly when it is on a text track, and image and text clips keep the default volume and no fades. Placements are allowed on overlay and text clips (`TrackKind.isPlaced`); only video and audio assets are timed (`MediaAsset.isTimed`), so only they have a source offset to trim. A canvas placement keeps centers within ±2 canvas half-widths and a scale above 0 and at most 4, like overlays, and a solid canvas background must be opaque. `Clip` rejects a volume outside 0 to 200 percent, negative fades, and fades that together exceed the clip. Audio assets are stored as 1 by 1 with no rotation so the shared size checks still hold; nothing reads their size.
 
 ### Anchoring and ripple
 
-`AnchorResolver` is the single place that walks the anchor forest. Commands call `AnchorResolver.materialize` after editing tracks, so every stored start is already resolved and the timeline UI and the engine read `startMicros` directly; they cannot disagree. `Project` runs `AnchorResolver.validate` on construction, which rejects anchored clips on magnetic tracks, magnetic tracks that are not `VIDEO`, placements on non-overlay tracks, missing parents, cycles, negative starts, and stored starts that differ from their anchor.
+`AnchorResolver` is the single place that walks the anchor forest. Commands call `AnchorResolver.materialize` after editing tracks, so every stored start is already resolved and the timeline UI and the engine read `startMicros` directly; they cannot disagree. `Project` runs `AnchorResolver.validate` on construction, which rejects anchored clips on magnetic tracks, magnetic tracks that are not `VIDEO`, placements on non-overlay tracks, canvas placements off the `VIDEO` track, missing parents, cycles, negative starts, and stored starts that differ from their anchor.
 
 ## Related blueprints
 
@@ -51,8 +51,8 @@ None
 ## Relevant implementation and tests
 
 - `domain/src/main/kotlin/com/framecraft/editor/domain/time/` — `FrameRate`, `Timecode`.
-- `domain/src/main/kotlin/com/framecraft/editor/domain/model/` — `MediaAsset`, `Clip`, `Track`, `Project`, `ProjectFactory`, `IdGenerator`, `ClipAnchor`, `OverlayTransform`, `AnchorResolver`.
-- Tests: `domain/src/test/kotlin/com/framecraft/editor/domain/time/FrameRateTest.kt`, `TimecodeTest.kt`, `domain/src/test/kotlin/com/framecraft/editor/domain/model/ProjectTest.kt`, `domain/src/test/kotlin/com/framecraft/editor/domain/command/OverlayCommandsTest.kt`, `AudioCommandsTest.kt`.
+- `domain/src/main/kotlin/com/framecraft/editor/domain/model/` — `MediaAsset`, `Clip`, `Track`, `Project`, `ProjectFactory`, `IdGenerator`, `ClipAnchor`, `OverlayTransform`, `Canvas` (aspect, background, fit, base placement), `AnchorResolver`.
+- Tests: `domain/src/test/kotlin/com/framecraft/editor/domain/time/FrameRateTest.kt`, `TimecodeTest.kt`, `domain/src/test/kotlin/com/framecraft/editor/domain/model/ProjectTest.kt`, `domain/src/test/kotlin/com/framecraft/editor/domain/command/OverlayCommandsTest.kt`, `AudioCommandsTest.kt`, `CanvasCommandsTest.kt`.
 
 ## Acceptance or verification criteria
 
@@ -63,6 +63,7 @@ None
 - [x] Anchor cycles are rejected.
 - [x] Ripple on a magnetic track shifts later clips and their anchored children.
 - [x] Invalid volume, fades, and clip-to-track pairings are rejected (`AudioCommandsTest`).
+- [x] A new project has the original aspect and a black background, and canvas placements off the base are rejected (`CanvasCommandsTest`).
 
 ## Remaining gaps and unknowns
 

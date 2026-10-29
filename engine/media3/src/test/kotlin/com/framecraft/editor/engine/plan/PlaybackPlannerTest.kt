@@ -3,6 +3,11 @@
  */
 package com.framecraft.editor.engine.plan
 
+import com.framecraft.editor.domain.model.CanvasAspect
+import com.framecraft.editor.domain.model.CanvasBackground
+import com.framecraft.editor.domain.model.CanvasFit
+import com.framecraft.editor.domain.model.CanvasPlacement
+import com.framecraft.editor.domain.model.CanvasSettings
 import com.framecraft.editor.domain.model.Clip
 import com.framecraft.editor.domain.model.ClipAnchor
 import com.framecraft.editor.domain.model.MediaAsset
@@ -17,6 +22,9 @@ import com.framecraft.editor.domain.model.Track
 import com.framecraft.editor.domain.model.TrackKind
 import com.framecraft.editor.domain.time.FrameRate
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** Verifies segment order, gap filling, and image timing. */
@@ -188,4 +196,46 @@ class PlaybackPlannerTest {
             plan.textSpans,
         )
     }
+
+    /** Default canvases skip the compositor; a shape, a background, or a base placement turns it on. */
+    @Test
+    fun canvasChoicesTurnOnCompositing() {
+        val plain = project(true, Clip("a", "v", 0, 0, 2_000_000), Clip("b", "i", 2_000_000, 0, 1_000_000))
+        val defaults = PlaybackPlanner.plan(plain)
+        assertFalse(defaults.composited)
+        assertNull(defaults.aspectRatio)
+        assertNull(defaults.background)
+        assertEquals(
+            listOf(BaseSpan(0, 2_000_000, CanvasPlacement()), BaseSpan(2_000_000, 3_000_000, CanvasPlacement())),
+            defaults.sequences.single().baseSpans,
+        )
+        val portrait = PlaybackPlanner.plan(plain.copy(canvas = CanvasSettings(CanvasAspect.PORTRAIT_9_16)))
+        assertTrue(portrait.composited)
+        assertEquals(9f / 16f, requireNotNull(portrait.aspectRatio), 0f)
+        val filled = CanvasPlacement(CanvasFit.FILL, scale = 1.5f)
+        val track = plain.tracks.single()
+        val first = track.clips[0].copy(canvasPlacement = filled)
+        val placedTrack = track.copy(clips = listOf(first) + track.clips.drop(1))
+        val placed = PlaybackPlanner.plan(plain.copy(tracks = listOf(placedTrack)))
+        assertTrue(placed.composited)
+        assertEquals(BaseSpan(0, 2_000_000, filled), placed.sequences.single().baseSpans.single())
+    }
+
+    /** A solid background plans its color and a blur copies the first base track's segments and spans. */
+    @Test
+    fun plansBackgrounds() {
+        val plain = project(false, Clip("a", "v", 1_000_000, 0, 2_000_000))
+        val solid = PlaybackPlanner.plan(plain.copy(canvas = CanvasSettings(background = CanvasBackground.Solid(RED))))
+        assertEquals(BackgroundPlan.Solid(RED), solid.background)
+        val blur = PlaybackPlanner.plan(plain.copy(canvas = CanvasSettings(background = CanvasBackground.Blur)))
+        val base = blur.sequences.single()
+        assertEquals(BackgroundPlan.Blur(base.segments, base.baseSpans), blur.background)
+        assertEquals(
+            listOf(CompositorInput.Clock, CompositorInput.Base(base.baseSpans), CompositorInput.Blur(base.baseSpans)),
+            CanvasLayout.inputsOf(blur),
+        )
+    }
 }
+
+/** Opaque red. */
+private const val RED = 0xFFFF0000.toInt()

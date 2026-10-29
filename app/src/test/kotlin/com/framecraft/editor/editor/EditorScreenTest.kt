@@ -1,6 +1,6 @@
 /*
  * JVM UI tests (Robolectric) for the editor screen: playback, frame steps, closing, undo and redo, and tools,
- * including the audio and text tools.
+ * including the audio, text, and canvas tools.
  */
 package com.framecraft.editor.editor
 
@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -61,6 +62,9 @@ class EditorScreenTest {
             onAddText = { events += "text" },
             onEditText = { events += "editText" },
             onAnimateText = { events += "animateText" },
+            onOpenCanvas = { events += "canvas" },
+            onToggleFit = { events += "fit" },
+            onToggleAdjust = { events += "adjust" },
         )
 
     /** The tools of a selected video clip that plays at 80% for six seconds. */
@@ -297,5 +301,44 @@ class EditorScreenTest {
         composeRule.onNodeWithText("Opacity 100%").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(TOOL_DELETE_TAG).performScrollTo().assertIsDisplayed()
         assertEquals(listOf("editText", "animateText"), events)
+    }
+
+    /** Without a selection the Canvas tool is offered and opens the sheet. */
+    @Test
+    fun canvasToolWithoutSelection() {
+        showEditor(availability = ToolAvailability(canvas = CanvasToolState(show = true, enabled = true)))
+        composeRule
+            .onNodeWithContentDescription("Canvas settings")
+            .performScrollTo()
+            .assertIsEnabled()
+            .performClick()
+        assertEquals(listOf("canvas"), events)
+    }
+
+    /** The Canvas tool is dimmed while the project is empty or a pick is importing. */
+    @Test
+    fun canvasToolDisabledWhenEmpty() {
+        showEditor(availability = ToolAvailability(canvas = CanvasToolState(show = true, enabled = false)))
+        composeRule.onNodeWithTag(TOOL_CANVAS_TAG).assertIsNotEnabled()
+    }
+
+    /** A selected base clip leads with Fit / Fill and Adjust, both showing their on state. */
+    @Test
+    fun baseClipLeadsWithFitAndAdjust() {
+        val base = CanvasToolState(show = true, enabled = true, isBase = true, fill = true, adjusting = true)
+        showEditor(availability = ToolAvailability(hasSelection = true, canSplit = true, canvas = base))
+        composeRule.onNodeWithTag(TOOL_FIT_FILL_TAG).assertIsSelected().performClick()
+        composeRule.onNodeWithTag(TOOL_ADJUST_TAG).assertIsSelected().performClick()
+        composeRule.onNodeWithTag(TOOL_CANVAS_TAG).performScrollTo().assertIsDisplayed()
+        assertEquals(listOf("fit", "adjust"), events)
+    }
+
+    /** Overlays and audio clips have no canvas tools. */
+    @Test
+    fun otherSelectionsHaveNoCanvasTools() {
+        showEditor(availability = ToolAvailability(hasSelection = true, canSplit = true, overlayOpacity = 1f))
+        composeRule.onAllNodesWithTag(TOOL_CANVAS_TAG).assertCountEquals(0)
+        composeRule.onAllNodesWithTag(TOOL_FIT_FILL_TAG).assertCountEquals(0)
+        composeRule.onAllNodesWithTag(TOOL_ADJUST_TAG).assertCountEquals(0)
     }
 }

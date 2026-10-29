@@ -72,6 +72,15 @@ const val TOOL_EDIT_TEXT_TAG = "editor_tool_edit_text"
 /** Test tag of the animate text tool. */
 const val TOOL_ANIMATE_TEXT_TAG = "editor_tool_animate_text"
 
+/** Test tag of the canvas tool. */
+const val TOOL_CANVAS_TAG = "editor_tool_canvas"
+
+/** Test tag of the base clip fit and fill tool. */
+const val TOOL_FIT_FILL_TAG = "editor_tool_fit_fill"
+
+/** Test tag of the base clip placement tool. */
+const val TOOL_ADJUST_TAG = "editor_tool_adjust"
+
 /** Test tag of the previous frame action. */
 const val FRAME_BACK_TAG = "editor_frame_back"
 
@@ -149,7 +158,8 @@ class PlaybackActions(
 
 /**
  * What the tools do: split and delete the selection, add an overlay, text, or music, save the selected overlay's or
- * text's opacity, edit or animate the selected text, extract the selected clip's audio, and save its volume and fades.
+ * text's opacity, edit or animate the selected text, extract the selected clip's audio, save its volume and fades,
+ * open the canvas sheet, and toggle the selected base clip's fit and its placement handles.
  */
 data class ToolActions(
     val onSplitClip: () -> Unit,
@@ -162,6 +172,21 @@ data class ToolActions(
     val onAddText: () -> Unit = {},
     val onEditText: () -> Unit = {},
     val onAnimateText: () -> Unit = {},
+    val onOpenCanvas: () -> Unit = {},
+    val onToggleFit: () -> Unit = {},
+    val onToggleAdjust: () -> Unit = {},
+)
+
+/**
+ * The canvas tools: [show] when the canvas tool belongs in the row and [enabled] when it can open now, [isBase] when
+ * the selection is a base clip, [fill] when that clip fills the canvas, and [adjusting] while its handles show.
+ */
+data class CanvasToolState(
+    val show: Boolean = false,
+    val enabled: Boolean = false,
+    val isBase: Boolean = false,
+    val fill: Boolean = false,
+    val adjusting: Boolean = false,
 )
 
 /**
@@ -170,7 +195,7 @@ data class ToolActions(
  * [overlayOpacity] when the selection is an overlay or text, [showAddText] when the text tool belongs in the row and
  * [canAddText] when text can be added now, [isText] when the selection is text, [canAddAudio] when music can be added
  * now, [showExtract] when the selection is a video whose sound could be lifted and [canExtract] when that is possible
- * now, and [audio] when the selection plays sound.
+ * now, [audio] when the selection plays sound, and the [canvas] tools.
  */
 data class ToolAvailability(
     val hasSelection: Boolean = false,
@@ -186,6 +211,7 @@ data class ToolAvailability(
     val showExtract: Boolean = false,
     val canExtract: Boolean = false,
     val audio: ClipAudio? = null,
+    val canvas: CanvasToolState = CanvasToolState(),
 )
 
 /**

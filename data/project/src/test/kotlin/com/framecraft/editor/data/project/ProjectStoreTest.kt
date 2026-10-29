@@ -6,11 +6,13 @@ package com.framecraft.editor.data.project
 
 import com.framecraft.editor.domain.command.DeleteClip
 import com.framecraft.editor.domain.command.RenameProject
+import com.framecraft.editor.domain.model.CanvasSettings
 import com.framecraft.editor.domain.model.Clip
 import com.framecraft.editor.domain.model.MediaAsset
 import com.framecraft.editor.domain.model.MediaKind
 import com.framecraft.editor.domain.model.Project
 import com.framecraft.editor.domain.model.SourceFingerprint
+import com.framecraft.editor.domain.model.TextAnimationKind
 import com.framecraft.editor.domain.model.Track
 import com.framecraft.editor.domain.model.TrackKind
 import com.framecraft.editor.domain.time.FrameRate
@@ -182,7 +184,7 @@ class ProjectStoreTest {
         runBlocking {
             store().create(project).close()
             val snapshot = File(dir(), "snapshot.json")
-            val newer = snapshot.readText().replace("\"schemaVersion\":4", "\"schemaVersion\":99")
+            val newer = snapshot.readText().replace("\"schemaVersion\":5", "\"schemaVersion\":99")
             snapshot.writeText(newer)
             assertEquals(OpenProjectResult.TooNew(99), store().open(project.id))
             assertEquals(newer, snapshot.readText())
@@ -197,7 +199,7 @@ class ProjectStoreTest {
             snapshot.writeText(
                 snapshot
                     .readText()
-                    .replace("\"schemaVersion\":4", "\"schemaVersion\":0")
+                    .replace("\"schemaVersion\":5", "\"schemaVersion\":0")
                     .replace("\"name\":\"Trip\"", "\"title\":\"Trip\""),
             )
             val renameTitle =
@@ -211,10 +213,11 @@ class ProjectStoreTest {
                     /** Commands are unchanged between these versions. */
                     override fun migrateCommand(command: JsonObject) = command
                 }
-            val migrations = SchemaMigrations(listOf(renameTitle, Migration1To2, Migration2To3, Migration3To4))
+            val shipped = listOf(Migration1To2, Migration2To3, Migration3To4, Migration4To5)
+            val migrations = SchemaMigrations(listOf(renameTitle) + shipped)
             val opened = store(migrations).opened()
             assertEquals("Trip", opened.session.state.project.name)
-            assertTrue(snapshot.readText().contains("\"schemaVersion\":4"))
+            assertTrue(snapshot.readText().contains("\"schemaVersion\":5"))
         }
 
     /** A project and journal written verbatim in schema 1 open through the shipped chain and are saved as schema 4. */
@@ -235,7 +238,7 @@ class ProjectStoreTest {
                     .anchor,
             )
             opened.session.close()
-            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":4"))
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":5"))
         }
 
     /** A schema 2 project with an overlay and its journal open, replay, undo, and are saved as schema 4. */
@@ -256,7 +259,7 @@ class ProjectStoreTest {
             assertEquals("a", overlay.anchor?.parentClipId)
             assertTrue(overlay.hasDefaultAudio)
             opened.session.close()
-            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":4"))
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":5"))
         }
 
     /** A schema 3 project with extracted sound and its journal open, replay, undo, and are saved as schema 4. */
@@ -277,7 +280,27 @@ class ProjectStoreTest {
             assertEquals(500_000L, sound.fadeInMicros)
             assertNull(sound.text)
             opened.session.close()
-            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":4"))
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":5"))
+        }
+
+    /** A schema 4 project with a title and its journal open, replay, undo, and are saved as schema 5. */
+    @Test
+    fun schemaFourFixtureOpens() =
+        runBlocking {
+            dir().mkdirs()
+            File(dir(), "snapshot.json").writeText(SCHEMA_FOUR_SNAPSHOT)
+            File(dir(), "journal.jsonl").writeText(SCHEMA_FOUR_JOURNAL)
+            val opened = store().opened()
+            val reopened = opened.session.state.project
+            assertEquals(listOf("track"), reopened.tracks.map { it.id })
+            assertEquals(CanvasSettings(), reopened.canvas)
+            val restored = requireNotNull(opened.session.undo()).project
+            val title = restored.tracks.first().clips.single()
+            assertEquals("Hi there", title.text?.text)
+            assertEquals(TextAnimationKind.FADE, title.text?.animationIn?.kind)
+            assertNull(restored.tracks.last().clips.single().canvasPlacement)
+            opened.session.close()
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":5"))
         }
 
     /** A missing list summary is rebuilt; an unreadable project is listed as unreadable and refused. */
@@ -378,4 +401,29 @@ private val SCHEMA_THREE_JOURNAL =
         """{"seq":1,"atEpochMillis":2,"command":{"type":"setClipAudio","clipId":"s","volumePercent":50,""" +
             """"fadeInMicros":500000,"fadeOutMicros":0}}""",
         """{"seq":2,"atEpochMillis":3,"command":{"type":"removeAudioClip","clipId":"s"}}""",
+    ).joinToString(separator = "\n", postfix = "\n")
+
+/** A snapshot exactly as schema 4 wrote it: a title with a fade-in on a text lane above the base track. */
+private val SCHEMA_FOUR_SNAPSHOT =
+    """
+    {"baseSeq":0,"createdAtEpochMillis":1,"project":{"id":"project-1","name":"Trip",
+    "frameRate":{"numerator":30,"denominator":1},"assets":[{"id":"asset","uri":"content://media/asset",
+    "kind":"VIDEO","durationMicros":10000000,"width":1920,"height":1080,"rotationDegrees":0,"hasAudio":true,
+    "fingerprint":{"sizeBytes":1}},{"id":"text-asset","uri":"","kind":"TEXT","width":1,"height":1,
+    "rotationDegrees":0,"hasAudio":false,"fingerprint":{}}],"tracks":[
+    {"id":"titles","kind":"TEXT","magnetic":false,"clips":[
+    {"id":"t","assetId":"text-asset","startMicros":0,"trimStartMicros":0,"durationMicros":1000000,
+    "anchor":{"parentClipId":"a","offsetMicros":0},"overlayTransform":{},
+    "text":{"text":"Hi","animationIn":{"kind":"FADE","durationMicros":500000}}}]},
+    {"id":"track","kind":"VIDEO","magnetic":true,"clips":[
+    {"id":"a","assetId":"asset","startMicros":0,"trimStartMicros":0,"durationMicros":2000000}]}],
+    "schemaVersion":4}}
+    """.trimIndent()
+
+/** A journal exactly as schema 4 wrote it: new words for the title, then its removal. */
+private val SCHEMA_FOUR_JOURNAL =
+    listOf(
+        """{"seq":1,"atEpochMillis":2,"command":{"type":"setTextContent","clipId":"t",""" +
+            """"content":{"text":"Hi there","animationIn":{"kind":"FADE","durationMicros":500000}}}}""",
+        """{"seq":2,"atEpochMillis":3,"command":{"type":"removeTextClip","clipId":"t"}}""",
     ).joinToString(separator = "\n", postfix = "\n")

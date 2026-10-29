@@ -42,6 +42,20 @@ object OverlayGeometry {
     }
 
     /**
+     * Returns the on-screen size of a picture of aspect [pictureAspect] (width over height) at [scale] on a canvas of
+     * [canvas] pixels when scale 1 is the smallest size that covers the whole canvas.
+     */
+    fun fillBoxSize(
+        canvas: Size,
+        pictureAspect: Float,
+        scale: Float,
+    ): Size {
+        val canvasAspect = canvas.width / canvas.height
+        val fillWidth = if (pictureAspect >= canvasAspect) canvas.height * pictureAspect else canvas.width
+        return Size(fillWidth * scale, fillWidth / pictureAspect * scale)
+    }
+
+    /**
      * Returns the on-screen size of text at [scale] on a canvas of [canvas] pixels, where at scale 1 it takes
      * [widthFraction] of the canvas width and [heightFraction] of its height: text is drawn at its natural size.
      */

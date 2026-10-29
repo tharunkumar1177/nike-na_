@@ -3,6 +3,8 @@
  */
 package com.framecraft.editor.domain.export
 
+import com.framecraft.editor.domain.model.CanvasAspect
+import com.framecraft.editor.domain.model.CanvasSettings
 import com.framecraft.editor.domain.model.MediaAsset
 import com.framecraft.editor.domain.model.MediaKind
 import com.framecraft.editor.domain.model.Project
@@ -84,6 +86,18 @@ class ExportPlannerTest {
         assertEquals(720, odd.height)
         assertTrue(odd.width % 2 == 0)
         assertTrue(odd.width in 1280..1284)
+    }
+
+    /** A chosen canvas shape replaces the source shape, with the preset on the short side. */
+    @Test
+    fun canvasAspectSetsOutputShape() {
+        val landscape = project(video(1920, 1080))
+        val portrait = landscape.copy(canvas = CanvasSettings(CanvasAspect.PORTRAIT_9_16))
+        assertEquals(ExportSize(1080, 1920), ExportPlanner.outputSize(portrait, ExportResolution.FULL_HD_1080))
+        val square = landscape.copy(canvas = CanvasSettings(CanvasAspect.SQUARE))
+        assertEquals(ExportSize(720, 720), ExportPlanner.outputSize(square, ExportResolution.HD_720))
+        val classic = landscape.copy(canvas = CanvasSettings(CanvasAspect.PORTRAIT_4_5))
+        assertEquals(ExportSize(1080, 1350), ExportPlanner.outputSize(classic, ExportResolution.FULL_HD_1080))
     }
 
     /** Frame rates are the project rate plus standard rates strictly below it, fastest first. */

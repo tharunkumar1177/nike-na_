@@ -24,6 +24,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.framecraft.editor.R
+import com.framecraft.editor.domain.model.Clip
+import com.framecraft.editor.domain.model.Project
+import com.framecraft.editor.domain.model.TrackKind
 import com.framecraft.editor.domain.time.FrameRate
 import com.framecraft.editor.engine.PreviewSurface
 import com.framecraft.editor.engine.ProjectPreview
@@ -85,27 +88,33 @@ private fun ReadyEditor(
     val project = state.project
     val selectedTrack = project.tracks.firstOrNull { track -> track.clips.any { it.id == state.selectedClipId } }
     val selected = selectedTrack?.clips?.firstOrNull { it.id == state.selectedClipId }
-    val placed = selected?.takeIf { selectedTrack?.kind?.isPlaced == true }
+    val kind = selectedTrack?.kind
+    val importing = overlayBusy || audioBusy
     val position = previewState.positionMicros
     val export = rememberExportControls(exportViewModel, project)
-    val pickers =
-        MediaPickers(
-            overlay = rememberOverlayPicker(viewModel.overlays, preview),
-            audio = rememberAudioPicker(viewModel.audio, preview),
-            text = rememberTextEditing(viewModel),
-        )
+    val pickers = rememberMediaPickers(viewModel, preview)
+    val canvas = rememberCanvasEditing()
     TextEditHost(pickers.text, project)
+    CanvasSheetHost(canvas, project, viewModel::dispatch)
     EditorScreen(
         projectName = project.name,
         previewState = previewState,
         aspectRatio = canvasAspectRatio(project),
         canUndo = state.canUndo,
         canRedo = state.canRedo,
-        availability = toolAvailability(project, selected, selectedTrack?.kind, position, overlayBusy || audioBusy),
+        availability =
+            toolAvailability(project, selected, kind, position, importing)
+                .copy(canvas = canvasToolState(project, selected, kind, importing, canvas)),
         notices = EditorNotices(state.skippedCount, state.droppedEditCount, state.saveFailed, state.editRejected),
         actions = editorActions(viewModel, export.open),
         playback = playbackActions(preview, project.frameRate, position),
-        tools = toolActions(viewModel, selected, selectedTrack?.kind, position, pickers),
+        tools =
+            withCanvasActions(
+                toolActions(viewModel, selected, kind, position, pickers),
+                selected,
+                canvas,
+                viewModel::dispatch,
+            ),
         previewSurface = { surfaceModifier -> PreviewSurface(preview, surfaceModifier) },
         timeline = { timelineModifier ->
             TimelineStrip(
@@ -123,15 +132,40 @@ private fun ReadyEditor(
         },
         modifier = modifier,
         export = export.indicator,
-        overlayLayer =
-            placed
-                ?.takeIf { position >= it.startMicros && position < it.endMicros }
-                ?.let { clip ->
-                    overlayLayer(clip, project, viewModel::dispatch, haptics) {
-                        pickers.text.open(clip.id, TextSheetTab.STYLE)
-                    }
-                },
+        overlayLayer = selectionLayer(project, selected, kind, position, viewModel, canvas, pickers.text),
     )
+}
+
+/**
+ * Returns the preview handles for [selected] on a track of [kind] of [project] while the playhead at
+ * [positionMicros] is inside it: the overlay or text handles, or a base clip's placement handles while [canvas] has
+ * them showing. Edits go to [viewModel]; double-tapping text opens [text]. Null shows no handles.
+ */
+@Composable
+private fun selectionLayer(
+    project: Project,
+    selected: Clip?,
+    kind: TrackKind?,
+    positionMicros: Long,
+    viewModel: EditorViewModel,
+    canvas: CanvasEditing,
+    text: TextEditing,
+): (@Composable (Modifier) -> Unit)? {
+    val haptics = LocalHapticFeedback.current
+    val clip = selected?.takeIf { positionMicros >= it.startMicros && positionMicros < it.endMicros } ?: return null
+    return when {
+        kind?.isPlaced == true -> {
+            overlayLayer(clip, project, viewModel::dispatch, haptics) { text.open(clip.id, TextSheetTab.STYLE) }
+        }
+
+        kind == TrackKind.VIDEO && canvas.isAdjusting(clip.id) -> {
+            baseLayer(clip, project, viewModel::dispatch, haptics)
+        }
+
+        else -> {
+            null
+        }
+    }
 }
 
 /** Top bar and notice actions on [viewModel]; export opens the sheet through [onExport]. */

@@ -88,6 +88,18 @@ internal class MediaPickers(
     val text: TextEditing,
 )
 
+/** Returns the overlay and music pickers and the text sheet of [viewModel], adding at [preview]'s playhead. */
+@Composable
+internal fun rememberMediaPickers(
+    viewModel: EditorViewModel,
+    preview: ProjectPreview,
+): MediaPickers =
+    MediaPickers(
+        overlay = rememberOverlayPicker(viewModel.overlays, preview),
+        audio = rememberAudioPicker(viewModel.audio, preview),
+        text = rememberTextEditing(viewModel),
+    )
+
 /**
  * Returns which tools apply to [selected], which sits on a track of [selectedKind], at [positionMicros]. Overlays
  * can be added when the project has a base clip, and text when a text lane is free at the playhead too; the
@@ -220,12 +232,15 @@ private fun measureText(
     canvasAspect: Float,
 ): TextBox = TextLayouter.measure(content, (MEASURE_HEIGHT * canvasAspect).roundToInt(), MEASURE_HEIGHT)
 
-/** Returns the preview aspect ratio: the first base clip's, else the first overlay's, else the default. */
+/**
+ * Returns the preview aspect ratio: the chosen canvas shape, or for the original shape the first base clip's, else the
+ * first overlay's, else the default.
+ */
 internal fun canvasAspectRatio(project: Project): Float {
     val first =
         project.tracks
             .filter { it.kind == TrackKind.VIDEO || it.kind == TrackKind.OVERLAY }
             .sortedBy { it.kind != TrackKind.VIDEO }
             .firstNotNullOfOrNull { it.clips.firstOrNull() }
-    return first?.let { project.assetOf(it).displayAspectRatio } ?: DEFAULT_ASPECT_RATIO
+    return project.canvas.aspect.ratio ?: first?.let { project.assetOf(it).displayAspectRatio } ?: DEFAULT_ASPECT_RATIO
 }

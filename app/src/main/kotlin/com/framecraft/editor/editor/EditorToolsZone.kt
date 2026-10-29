@@ -36,12 +36,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.framecraft.editor.R
@@ -149,6 +151,11 @@ private fun ToolRow(
     tools: ToolActions,
     onOpen: (ToolPanel) -> Unit,
 ) {
+    val canvas = availability.canvas
+    if (canvas.isBase) {
+        ToolButton(if (canvas.fill) Tool.FILL else Tool.FIT, tools.onToggleFit, selected = canvas.fill)
+        ToolButton(Tool.ADJUST, tools.onToggleAdjust, selected = canvas.adjusting)
+    }
     if (availability.isText) {
         ToolButton(Tool.EDIT_TEXT, tools.onEditText)
         ToolButton(Tool.ANIMATE_TEXT, tools.onAnimateText)
@@ -164,6 +171,9 @@ private fun ToolRow(
     }
     if (!availability.hasSelection) {
         ToolButton(Tool.AUDIO, tools.onAddAudio, availability.canAddAudio)
+    }
+    if (canvas.show) {
+        ToolButton(Tool.CANVAS, tools.onOpenCanvas, canvas.enabled)
     }
     if (availability.showExtract) {
         ToolButton(Tool.EXTRACT, tools.onExtractAudio, availability.canExtract)
@@ -336,6 +346,28 @@ private enum class Tool(
     @param:StringRes val descriptionRes: Int,
     val tag: String,
 ) {
+    /** Switches the selected base clip, which fits the canvas, to fill it. */
+    FIT(
+        R.drawable.ic_fit_screen,
+        R.string.editor_tool_fit_fill,
+        R.string.editor_tool_fit_fill_description,
+        TOOL_FIT_FILL_TAG,
+    ),
+
+    /** Switches the selected base clip, which fills the canvas, to fit inside it. */
+    FILL(
+        R.drawable.ic_crop_free,
+        R.string.editor_tool_fit_fill,
+        R.string.editor_tool_fit_fill_description,
+        TOOL_FIT_FILL_TAG,
+    ),
+
+    /** Shows or hides the selected base clip's placement handles. */
+    ADJUST(R.drawable.ic_adjust, R.string.editor_tool_adjust, R.string.editor_tool_adjust_description, TOOL_ADJUST_TAG),
+
+    /** Opens the canvas sheet. */
+    CANVAS(R.drawable.ic_canvas, R.string.editor_tool_canvas, R.string.editor_tool_canvas_description, TOOL_CANVAS_TAG),
+
     /** Adds an overlay at the playhead. */
     OVERLAY(
         R.drawable.ic_overlay,
@@ -402,26 +434,35 @@ private enum class Tool(
     ),
 }
 
-/** 64dp button for [tool] with its icon over its label; dimmed and inert when not [enabled]. */
+/**
+ * 64dp button for [tool] with its icon over its label; dimmed and inert when not [enabled], and highlighted when a
+ * toggle tool is [selected].
+ */
 @Composable
 private fun ToolButton(
     tool: Tool,
     onClick: () -> Unit,
     enabled: Boolean = true,
+    selected: Boolean = false,
 ) {
     val description = stringResource(tool.descriptionRes)
+    val colors = MaterialTheme.colorScheme
     Column(
         modifier =
             Modifier
                 .testTag(tool.tag)
                 .size(TOOL_SIZE)
                 .alpha(if (enabled) 1f else DISABLED_ALPHA)
+                .background(if (selected) colors.primaryContainer else Color.Transparent, MaterialTheme.shapes.small)
                 .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-                .semantics(mergeDescendants = true) { contentDescription = description },
+                .semantics(mergeDescendants = true) {
+                    contentDescription = description
+                    this.selected = selected
+                },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        val color = MaterialTheme.colorScheme.onSurface
+        val color = if (selected) colors.onPrimaryContainer else colors.onSurface
         Icon(painter = painterResource(tool.iconRes), contentDescription = null, tint = color)
         Spacer(Modifier.height(Spacing.xs))
         Text(text = stringResource(tool.labelRes), style = MaterialTheme.typography.labelLarge, color = color)

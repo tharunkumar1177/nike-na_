@@ -17,7 +17,8 @@ const val UNITY_VOLUME_PERCENT: Int = 100
  * with another clip; [startMicros] then always equals the start the anchor resolves to. Overlay clips carry an
  * [overlayTransform]. [volumePercent] scales the clip's sound, where 0 mutes it; the sound rises from silence over
  * [fadeInMicros] and falls back to silence over the last [fadeOutMicros], and the two fades never overlap. Text clips
- * carry [text], whose animations each fit within the clip.
+ * carry [text], whose animations each fit within the clip. Base clips may carry a [canvasPlacement]; without one they
+ * fit the canvas, centered and upright.
  */
 @Serializable
 data class Clip(
@@ -32,6 +33,7 @@ data class Clip(
     val fadeInMicros: Long = 0,
     val fadeOutMicros: Long = 0,
     val text: TextContent? = null,
+    val canvasPlacement: CanvasPlacement? = null,
 ) {
     init {
         require(id.isNotBlank()) { "Clip id must not be blank" }
