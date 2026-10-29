@@ -4,11 +4,13 @@
 package com.framecraft.editor.export
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.framecraft.editor.domain.export.ExportPlanner
 import com.framecraft.editor.domain.export.ExportResolution
@@ -85,7 +87,11 @@ class ExportSheetContentTest {
         show(ExportState.Idle)
         composeRule.onNodeWithText("Match (30)").assertIsDisplayed()
         composeRule.onNodeWithText("720p").performClick()
-        composeRule.onNodeWithTag(EXPORT_START_TAG).performClick()
+        composeRule
+            .onNodeWithTag(EXPORT_START_TAG)
+            .performScrollTo()
+            .assertIsEnabled()
+            .performClick()
         assertEquals(listOf(form.settings.copy(resolution = ExportResolution.HD_720)), selections)
         assertEquals(listOf("start"), events)
     }
