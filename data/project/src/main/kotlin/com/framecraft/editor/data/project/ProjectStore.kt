@@ -5,6 +5,7 @@ package com.framecraft.editor.data.project
 
 import com.framecraft.editor.domain.command.EditCommand
 import com.framecraft.editor.domain.command.EditHistory
+import com.framecraft.editor.domain.export.ExportSettings
 import com.framecraft.editor.domain.model.Project
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
@@ -91,6 +92,23 @@ class ProjectStore(
         val applied = session?.dispatch(command) is DispatchResult.Applied
         session?.close()
         return applied
+    }
+
+    /** Returns the export settings last saved for [projectId], or null when there are none or they are unreadable. */
+    suspend fun readExportSettings(projectId: String): ExportSettings? =
+        withContext(ioDispatcher) { ExportSettingsFile(directoryOf(projectId).dir).read() }
+
+    /** Saves [settings] as the export settings of the existing project [projectId]. */
+    @Throws(IOException::class)
+    suspend fun writeExportSettings(
+        projectId: String,
+        settings: ExportSettings,
+    ) {
+        withContext(ioDispatcher) {
+            val directory = directoryOf(projectId)
+            if (!directory.exists()) throw IOException("No project $projectId")
+            ExportSettingsFile(directory.dir).write(settings)
+        }
     }
 
     /** Deletes project [projectId] and all its files; true if nothing remains. */

@@ -11,6 +11,7 @@ import java.io.File
  * - `journal.jsonl`: one [JournalRecord] per line, appended and synced per edit.
  * - `history.cursor`: [CursorDocument], replaced atomically.
  * - `meta.json`: [ProjectSummary] for the project list, rebuilt from the snapshot when missing.
+ * - `export-settings.json`: the last export settings, read and written by [ExportSettingsFile].
  * - `journal.corrupt-<millis>`: copies of journals whose unreadable tail was dropped, kept for diagnosis.
  */
 internal class ProjectDirectory(

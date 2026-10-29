@@ -22,7 +22,7 @@ The `:data:project` module saves every edit to a per-project journal before repo
 ### Project persistence and recovery
 
 - Projects live under `filesDir/projects/<id>`; ids must match `[A-Za-z0-9-]+` so an id can never escape the root.
-- Files per project: `snapshot.json` (base sequence number, creation time, project), `journal.jsonl` (one record per line: sequence number, time, command), `history.cursor` (the undo position), and `meta.json` (the list summary). A damaged journal is copied to `journal.corrupt-<millis>` before it is rewritten.
+- Files per project: `snapshot.json` (base sequence number, creation time, project), `journal.jsonl` (one record per line: sequence number, time, command), `history.cursor` (the undo position), `meta.json` (the list summary), and `export-settings.json` (the last export settings, written atomically outside the journal so they never enter undo history; a missing or corrupt file reads as none). A damaged journal is copied to `journal.corrupt-<millis>` before it is rewritten.
 - `ProjectSession` holds the in-memory history. A write that fails leaves the in-memory project and history unchanged; the next write rewrites the whole journal so disk and memory agree again.
 - Loading ignores journal records at or before the snapshot's base sequence number, so a journal left behind by an interrupted compaction never applies twice.
 - A torn or garbled line, a sequence gap, or an unknown command type drops that record and every later one; the session reports how many were dropped and the editor tells the user.
@@ -53,7 +53,8 @@ None
 
 ## Relevant implementation and tests
 
-- `data/project/src/main/kotlin/com/framecraft/editor/data/project/` — `ProjectStore`, `ProjectSession`, `ProjectLoader`, `ProjectDirectory`, `ProjectDocuments`, `DurableFiles`, `SchemaMigrations`.
+- `data/project/src/main/kotlin/com/framecraft/editor/data/project/` — `ProjectStore`, `ProjectSession`, `ProjectLoader`, `ProjectDirectory`, `ProjectDocuments`, `DurableFiles`, `SchemaMigrations`, `ExportSettingsFile`.
+- `data/project/src/test/kotlin/com/framecraft/editor/data/project/ExportSettingsStoreTest.kt` — export settings round trip outside history, missing and corrupt files, unknown project.
 - `data/project/src/test/kotlin/com/framecraft/editor/data/project/ProjectStoreTest.kt` — reopen after edits, undo across restart, redo truncation, torn tail, sequence gap, compaction floor, newer and older schemas, list rebuild and unreadable projects, change and delete, unsafe ids.
 
 ## Acceptance or verification criteria

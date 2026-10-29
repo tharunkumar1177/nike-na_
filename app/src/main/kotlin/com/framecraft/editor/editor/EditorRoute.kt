@@ -30,6 +30,7 @@ import com.framecraft.editor.domain.model.Clip
 import com.framecraft.editor.domain.time.FrameRate
 import com.framecraft.editor.engine.PreviewSurface
 import com.framecraft.editor.engine.ProjectPreview
+import com.framecraft.editor.export.ExportViewModel
 import com.framecraft.editor.timeline.ScrubCallbacks
 import com.framecraft.editor.timeline.TimelineStrip
 import com.framecraft.editor.ui.theme.Spacing
@@ -41,6 +42,7 @@ private const val DEFAULT_ASPECT_RATIO = 16f / 9f
 @Composable
 fun EditorRoute(
     viewModel: EditorViewModel,
+    exportViewModel: ExportViewModel,
     state: EditorState,
     modifier: Modifier = Modifier,
 ) {
@@ -67,7 +69,7 @@ fun EditorRoute(
         }
 
         is EditorState.Ready -> {
-            ReadyEditor(viewModel, state, modifier)
+            ReadyEditor(viewModel, exportViewModel, state, modifier)
         }
     }
 }
@@ -76,6 +78,7 @@ fun EditorRoute(
 @Composable
 private fun ReadyEditor(
     viewModel: EditorViewModel,
+    exportViewModel: ExportViewModel,
     state: EditorState.Ready,
     modifier: Modifier = Modifier,
 ) {
@@ -88,6 +91,7 @@ private fun ReadyEditor(
     val aspectRatio = clips.firstOrNull()?.let { project.assetOf(it).displayAspectRatio } ?: DEFAULT_ASPECT_RATIO
     val selected = clips.firstOrNull { it.id == state.selectedClipId }
     val position = previewState.positionMicros
+    val export = rememberExportControls(exportViewModel, project)
     EditorScreen(
         projectName = project.name,
         previewState = previewState,
@@ -100,7 +104,14 @@ private fun ReadyEditor(
                 canSplit = selected != null && SplitClip.isSplittable(selected, position, project.frameRate),
             ),
         notices = EditorNotices(state.skippedCount, state.droppedEditCount, state.saveFailed),
-        actions = EditorActions(viewModel::close, viewModel::undo, viewModel::redo, viewModel::acknowledge),
+        actions =
+            EditorActions(
+                onClose = viewModel::close,
+                onUndo = viewModel::undo,
+                onRedo = viewModel::redo,
+                onExport = export.open,
+                onNoticeShown = viewModel::acknowledge,
+            ),
         playback = playbackActions(preview, project.frameRate, position),
         tools = toolActions(viewModel, selected, position),
         previewSurface = { surfaceModifier -> PreviewSurface(preview, surfaceModifier) },
@@ -118,6 +129,7 @@ private fun ReadyEditor(
             )
         },
         modifier = modifier,
+        export = export.indicator,
     )
 }
 

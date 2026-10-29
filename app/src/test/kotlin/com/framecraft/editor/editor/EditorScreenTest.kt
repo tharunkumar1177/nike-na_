@@ -36,6 +36,7 @@ class EditorScreenTest {
             onClose = { events += "close" },
             onUndo = { events += "undo" },
             onRedo = { events += "redo" },
+            onExport = { events += "export" },
             onNoticeShown = { events += it.name },
         )
 
@@ -58,6 +59,7 @@ class EditorScreenTest {
         canUndo: Boolean = false,
         availability: ToolAvailability = ToolAvailability(),
         positionMicros: Long = 5_000_000L,
+        export: ExportIndicator = ExportIndicator(),
     ) {
         composeRule.setContent {
             FramecraftTheme {
@@ -79,6 +81,7 @@ class EditorScreenTest {
                     tools = tools,
                     previewSurface = { modifier -> Box(modifier) },
                     timeline = { modifier -> Box(modifier) },
+                    export = export,
                 )
             }
         }
@@ -149,6 +152,23 @@ class EditorScreenTest {
         composeRule.onNodeWithContentDescription("Split clip at playhead").assertIsEnabled().performClick()
         composeRule.onNodeWithContentDescription("Delete clip").assertIsDisplayed().performClick()
         assertEquals(listOf("split", "delete"), events)
+    }
+
+    /** The export action opens the export sheet. */
+    @Test
+    fun exportActionReports() {
+        showEditor()
+        composeRule.onNodeWithContentDescription("Export video").performClick()
+        assertEquals(listOf("export"), events)
+    }
+
+    /** While exporting, the export action shows progress and still reopens the sheet. */
+    @Test
+    fun exportShowsProgressWhileRunning() {
+        showEditor(export = ExportIndicator(exporting = true, percent = 45))
+        composeRule.onNodeWithContentDescription("Exporting, 45 percent complete").assertIsDisplayed()
+        composeRule.onNodeWithTag(EXPORT_TOP_ICON_TAG).performClick()
+        assertEquals(listOf("export"), events)
     }
 
     /** Split is shown but disabled when the playhead is not inside the selected clip. */

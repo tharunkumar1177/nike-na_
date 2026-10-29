@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -67,6 +68,18 @@ const val FRAME_BACK_TAG = "editor_frame_back"
 /** Test tag of the next frame action. */
 const val FRAME_FORWARD_TAG = "editor_frame_forward"
 
+/** Test tag of the export action in the top bar. */
+const val EXPORT_TOP_ICON_TAG = "export_top_icon"
+
+/** Size of the top bar's export progress ring. */
+private val EXPORT_RING_SIZE = 24.dp
+
+/** Stroke width of the top bar's export progress ring. */
+private val EXPORT_RING_STROKE = 3.dp
+
+/** Divides a percent into a 0 to 1 fraction. */
+private const val PERCENT_SCALE = 100f
+
 /** Opacity of a disabled tool. */
 private const val DISABLED_ALPHA = 0.38f
 
@@ -106,7 +119,14 @@ class EditorActions(
     val onClose: () -> Unit,
     val onUndo: () -> Unit,
     val onRedo: () -> Unit,
+    val onExport: () -> Unit,
     val onNoticeShown: (EditorNotice) -> Unit,
+)
+
+/** The top bar's export button: [percent] of a running export (null while preparing), shown when [exporting]. */
+data class ExportIndicator(
+    val exporting: Boolean = false,
+    val percent: Int? = null,
 )
 
 /** What the playback bar does. */
@@ -148,13 +168,14 @@ fun EditorScreen(
     previewSurface: @Composable (Modifier) -> Unit,
     timeline: @Composable (Modifier) -> Unit,
     modifier: Modifier = Modifier,
+    export: ExportIndicator = ExportIndicator(),
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     EditorSnackbars(snackbarHostState, notices, previewState.errorCode, actions.onNoticeShown)
     BackHandler(onBack = actions.onClose)
     Scaffold(
         modifier = modifier,
-        topBar = { EditorTopBar(projectName, canUndo, canRedo, actions) },
+        topBar = { EditorTopBar(projectName, canUndo, canRedo, export, actions) },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
@@ -166,13 +187,14 @@ fun EditorScreen(
     }
 }
 
-/** Back on the start edge, the project name, and undo and redo on the end edge. */
+/** Back on the start edge, the project name, and undo, redo, and export on the end edge. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditorTopBar(
     projectName: String,
     canUndo: Boolean,
     canRedo: Boolean,
+    export: ExportIndicator,
     actions: EditorActions,
 ) {
     TopAppBar(
@@ -192,8 +214,35 @@ private fun EditorTopBar(
             IconButton(onClick = actions.onRedo, enabled = canRedo, modifier = Modifier.testTag(REDO_TAG)) {
                 Icon(painterResource(R.drawable.ic_redo), contentDescription = stringResource(R.string.editor_redo))
             }
+            ExportButton(export, actions.onExport)
         },
     )
+}
+
+/** Export action; while an export runs it shows the progress ring and reopens the export sheet. */
+@Composable
+private fun ExportButton(
+    export: ExportIndicator,
+    onClick: () -> Unit,
+) {
+    IconButton(onClick = onClick, modifier = Modifier.testTag(EXPORT_TOP_ICON_TAG)) {
+        if (export.exporting) {
+            val percent = export.percent
+            val spoken = stringResource(R.string.export_progress_description, percent ?: 0)
+            val ringModifier = Modifier.size(EXPORT_RING_SIZE).semantics { contentDescription = spoken }
+            if (percent == null) {
+                CircularProgressIndicator(ringModifier, strokeWidth = EXPORT_RING_STROKE)
+            } else {
+                CircularProgressIndicator(
+                    progress = { percent / PERCENT_SCALE },
+                    modifier = ringModifier,
+                    strokeWidth = EXPORT_RING_STROKE,
+                )
+            }
+        } else {
+            Icon(painterResource(R.drawable.ic_export), stringResource(R.string.export_button_description))
+        }
+    }
 }
 
 /** Shows each pending notice once, then reports it shown; playback errors show whenever the code changes. */

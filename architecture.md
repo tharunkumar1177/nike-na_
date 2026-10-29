@@ -111,6 +111,7 @@ Feature modules never import Media3 types directly; they talk to engine interfac
 
 - Import uses Android photo picker and media store APIs and handles partial access (`READ_MEDIA_VISUAL_USER_SELECTED`) on Android 14 and later.
 - Loss of access to a referenced source is a recoverable state (offline clip with relink), never a crash or silent removal.
+- Exports are published to the shared `Movies/Framecraft` collection through `MediaStore` with `IS_PENDING`, so other apps never see a partial file and no storage permission is needed. Exported files are shared by content URI with a read grant.
 
 ### Threading
 
@@ -121,7 +122,7 @@ Feature modules never import Media3 types directly; they talk to engine interfac
 ### Error and recovery
 
 - Failures are typed results surfaced to the user with a cause and a next action; nothing fails silently.
-- Long-running export runs in a foreground service and reports progress, success, and failure through a notification and in-app state.
+- Long-running export runs in a foreground service and reports progress, success, and failure through a notification and in-app state. The service type is `mediaProcessing` on Android 15 and later and `dataSync` before it; when the system times the service out, the export is cancelled and reported as cancelled, never dropped silently.
 
 ## Verification boundaries
 

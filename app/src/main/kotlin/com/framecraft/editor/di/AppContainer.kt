@@ -9,6 +9,8 @@ import com.framecraft.editor.domain.model.IdGenerator
 import com.framecraft.editor.domain.model.UuidIdGenerator
 import com.framecraft.editor.engine.ClipThumbnails
 import com.framecraft.editor.engine.ProjectPreview
+import com.framecraft.editor.engine.export.ProjectExporter
+import com.framecraft.editor.export.ExportCoordinator
 import com.framecraft.editor.media.AndroidMediaImporter
 import com.framecraft.editor.media.MediaImporter
 import kotlinx.coroutines.Dispatchers
@@ -31,8 +33,14 @@ class AppContainer(
     val projectStore: ProjectStore =
         ProjectStore(File(appContext.filesDir, PROJECTS_DIRECTORY), Dispatchers.IO.limitedParallelism(1))
 
+    /** The single app-wide export, shared by the editor and the export service. */
+    val exportCoordinator: ExportCoordinator = ExportCoordinator(appContext)
+
     /** Creates a new preview player; the caller owns and must release it. */
     fun createPreview(): ProjectPreview = ProjectPreview(appContext)
+
+    /** Creates an exporter; the caller owns and must release it. */
+    fun createExporter(): ProjectExporter = ProjectExporter(appContext)
 
     /** Creates a thumbnail cache sized for timeline rows; the caller owns and must close it. */
     fun createThumbnails(): ClipThumbnails {

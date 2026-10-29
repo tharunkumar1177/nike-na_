@@ -5,11 +5,13 @@ package com.framecraft.editor.engine
 
 import androidx.annotation.OptIn
 import androidx.media3.common.C
+import androidx.media3.common.Effect
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
+import androidx.media3.transformer.Effects
 import com.framecraft.editor.domain.model.MediaKind
 import com.framecraft.editor.engine.plan.PlanSegment
 import com.framecraft.editor.engine.plan.PlaybackPlan
@@ -21,8 +23,14 @@ private const val MICROS_PER_MILLI = 1_000L
 /** Creates Media3 compositions. */
 @OptIn(markerClass = [UnstableApi::class])
 internal object CompositionFactory {
-    /** Returns a composition with one audio-and-video sequence per planned track. */
-    fun create(plan: PlaybackPlan): Composition {
+    /**
+     * Returns a composition with one audio-and-video sequence per planned track. Export passes [videoEffects]
+     * that apply to the whole output; the preview passes none.
+     */
+    fun create(
+        plan: PlaybackPlan,
+        videoEffects: List<Effect> = emptyList(),
+    ): Composition {
         val frameRate = (plan.frameRate.numerator.toDouble() / plan.frameRate.denominator).roundToInt()
         val sequences =
             plan.sequences.map { sequence ->
@@ -35,7 +43,10 @@ internal object CompositionFactory {
                 }
                 builder.build()
             }
-        return Composition.Builder(sequences).build()
+        return Composition
+            .Builder(sequences)
+            .setEffects(Effects(emptyList(), videoEffects))
+            .build()
     }
 
     /** Maps a media segment to an edited item, clipping videos and timing images. */
