@@ -395,8 +395,16 @@ class EditorScreenTest {
         val availability =
             ToolAvailability(hasSelection = true, canSplit = true, showLook = true, maskActive = true)
         showEditor(availability = availability)
-        composeRule.onNodeWithTag(TOOL_MASK_TAG).performScrollTo().assertIsSelected().performClick()
-        composeRule.onNodeWithTag(TOOL_CHROMA_TAG).performScrollTo().assertIsNotSelected().performClick()
+        composeRule
+            .onNodeWithTag(TOOL_MASK_TAG)
+            .performScrollTo()
+            .assertIsSelected()
+            .performClick()
+        composeRule
+            .onNodeWithTag(TOOL_CHROMA_TAG)
+            .performScrollTo()
+            .assertIsNotSelected()
+            .performClick()
         assertEquals(listOf("mask", "chroma"), events)
     }
 

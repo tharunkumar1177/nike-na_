@@ -412,7 +412,8 @@ class ProjectStoreTest {
             assertEquals(70, clips.first { it.id == "m" }.autoDuckPercent)
             assertTrue(clips.first { it.id == "v" }.voiceover)
             val restored = requireNotNull(opened.session.undo()).project
-            assertEquals(60, restored.tracks.flatMap { it.clips }.first { it.id == "m" }.autoDuckPercent)
+            val restoredMusic = restored.tracks.flatMap { it.clips }.single { it.id == "m" }
+            assertEquals(60, restoredMusic.autoDuckPercent)
             opened.session.close()
             assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":10"))
         }
