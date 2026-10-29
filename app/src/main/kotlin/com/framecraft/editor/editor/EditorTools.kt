@@ -79,16 +79,20 @@ internal fun rememberAudioPicker(
 }
 
 /**
- * What the add and text tools open: [overlay] picks photos and videos, [audio] picks sound files, and [text] holds
- * the text sheet.
+ * What the add, text, and speed tools open: [overlay] picks photos and videos, [audio] picks sound files, [text]
+ * holds the text sheet, and [speed] the speed sheet.
  */
 internal class MediaPickers(
     val overlay: () -> Unit,
     val audio: () -> Unit,
     val text: TextEditing,
+    val speed: SpeedEditing,
 )
 
-/** Returns the overlay and music pickers and the text sheet of [viewModel], adding at [preview]'s playhead. */
+/**
+ * Returns the overlay and music pickers, the text sheet, and the speed sheet of [viewModel], adding at [preview]'s
+ * playhead.
+ */
 @Composable
 internal fun rememberMediaPickers(
     viewModel: EditorViewModel,
@@ -98,6 +102,7 @@ internal fun rememberMediaPickers(
         overlay = rememberOverlayPicker(viewModel.overlays, preview),
         audio = rememberAudioPicker(viewModel.audio, preview),
         text = rememberTextEditing(viewModel),
+        speed = rememberSpeedEditing(),
     )
 
 /**
@@ -127,6 +132,7 @@ internal fun toolAvailability(
         isText = selectedKind == TrackKind.TEXT,
         canAddAudio = !importing,
         showExtract = isVideo,
+        showSpeed = isVideo,
         canExtract = isVideo && selected != null && AudioPlacement.canExtract(project, selected),
         audio =
             selected
@@ -137,8 +143,8 @@ internal fun toolAvailability(
 
 /**
  * Tools for the [selected] clip on a track of [selectedKind]: split at [positionMicros], delete, opacity, extract,
- * sound, and the text sheet, plus the add tools that open [pickers] or add text at [positionMicros]. The clip tools
- * do nothing without a selection.
+ * sound, the text sheet, and the speed sheet, plus the add tools that open [pickers] or add text at
+ * [positionMicros]. The clip tools do nothing without a selection.
  */
 internal fun toolActions(
     viewModel: EditorViewModel,
@@ -177,6 +183,7 @@ internal fun toolActions(
         },
         onEditText = { pickers.text.open(selected?.id, TextSheetTab.STYLE) },
         onAnimateText = { pickers.text.open(selected?.id, TextSheetTab.ANIMATION) },
+        onOpenSpeed = { pickers.speed.open(selected?.id) },
     )
 
 /** Returns the command that removes clip [clipId] from a track of [kind]. */

@@ -65,6 +65,7 @@ class EditorScreenTest {
             onOpenCanvas = { events += "canvas" },
             onToggleFit = { events += "fit" },
             onToggleAdjust = { events += "adjust" },
+            onOpenSpeed = { events += "speed" },
         )
 
     /** The tools of a selected video clip that plays at 80% for six seconds. */
@@ -340,5 +341,24 @@ class EditorScreenTest {
         composeRule.onAllNodesWithTag(TOOL_CANVAS_TAG).assertCountEquals(0)
         composeRule.onAllNodesWithTag(TOOL_FIT_FILL_TAG).assertCountEquals(0)
         composeRule.onAllNodesWithTag(TOOL_ADJUST_TAG).assertCountEquals(0)
+    }
+
+    /** A selected video offers Speed, which opens the speed sheet; other selections do not. */
+    @Test
+    fun speedToolForVideos() {
+        showEditor(availability = ToolAvailability(hasSelection = true, canSplit = true, showSpeed = true))
+        composeRule
+            .onNodeWithContentDescription("Adjust clip speed")
+            .performScrollTo()
+            .assertIsEnabled()
+            .performClick()
+        assertEquals(listOf("speed"), events)
+    }
+
+    /** Audio, text, and image selections have no Speed tool. */
+    @Test
+    fun noSpeedToolOtherwise() {
+        showEditor(availability = ToolAvailability(hasSelection = true, canSplit = true))
+        composeRule.onAllNodesWithTag(TOOL_SPEED_TAG).assertCountEquals(0)
     }
 }

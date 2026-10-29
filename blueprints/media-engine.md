@@ -48,6 +48,10 @@ The exporter writes `cache/exports/export.mp4`, then `GallerySaver` inserts a pe
 
 `ExportFailureMapper` maps Media3 error codes and causes to `ExportFailure`: a no-space cause anywhere in the chain is `STORAGE_FULL`; codes 3003 and 4003 are `UNSUPPORTED_CODEC`; the 2xxx family is `SOURCE_MISSING`; the remaining 3xxx codes are `DECODE_FAILED`; 4000 to 7999 is `ENCODE_FAILED`; anything else is `UNKNOWN`. Before starting, `ExportPrecheck` reports `NOTHING_TO_EXPORT` for an empty project, `UNSUPPORTED_CODEC` when no AVC encoder supports the size, and `STORAGE_FULL` when space is short. Cancelling after the copy deletes the published entry.
 
+### Speed
+
+- `PlanSegment.Media` carries `speed`, `sourceSpanMicros`, and `maintainPitch`. `CompositionFactory` clips each item to its source span and, for a sped clip, sets `SpeedParameters` from `SpeedProviders` and caps a sped-up picture at the project frame rate (`SpeedProvidersTest`, `PlaybackPlannerTest`). Details belong to [clip-speed](clip-speed.md).
+
 ## Related blueprints
 
 ### Required

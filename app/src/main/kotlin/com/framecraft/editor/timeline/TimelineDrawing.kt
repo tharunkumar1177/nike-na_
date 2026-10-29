@@ -235,7 +235,9 @@ fun DrawScope.drawTrack(
                         }
                     }
                 }
-                drawClipLabel(frame, TimelineGeometry.formatClipDuration(clip.durationMicros), left, width, top)
+                val duration = TimelineGeometry.formatClipDuration(clip.durationMicros)
+                val label = SpeedLabel.badgeOf(clip.speed)?.let { "$it  $duration" } ?: duration
+                drawClipLabel(frame, label, left, width, top)
                 val linkable = track.kind.isPlaced || (isAudio && clip.anchor != null)
                 if (linkable) drawLinkBadge(frame, clip, left, width, top)
             }

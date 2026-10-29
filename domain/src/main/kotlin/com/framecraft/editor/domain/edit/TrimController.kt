@@ -6,6 +6,7 @@ package com.framecraft.editor.domain.edit
 import com.framecraft.editor.domain.command.TrimClip
 import com.framecraft.editor.domain.model.Clip
 import com.framecraft.editor.domain.model.MediaAsset
+import com.framecraft.editor.domain.model.SpeedMap
 import com.framecraft.editor.domain.model.Track
 import com.framecraft.editor.domain.time.FrameRate
 
@@ -20,23 +21,26 @@ enum class TrimEdge {
 
 /**
  * New clip values for a trim in progress. [snappedMicros] is the snap target the moving edge landed on, or null
- * when it landed on a plain frame boundary.
+ * when it landed on a plain frame boundary. [sourceDurationMicros] is the source a sped clip reads, null at normal
+ * speed.
  */
 data class TrimProposal(
     val startMicros: Long,
     val trimStartMicros: Long,
     val durationMicros: Long,
     val snappedMicros: Long?,
+    val sourceDurationMicros: Long? = null,
 )
 
 /**
  * Maps drag distances on the [edge] handle of [clip] to proposals. On a magnetic track the clip's start never moves,
- * so dragging either handle changes where the clip ends; on other tracks the start handle moves the start.
+ * so dragging either handle changes where the clip ends; on other tracks the start handle moves the start. A sped
+ * clip trims its source and lasts however long its speed plays that source.
  */
 class TrimController private constructor(
     private val track: Track,
     private val clip: Clip,
-    private val sourceDurationMicros: Long?,
+    private val assetDurationMicros: Long?,
     private val frameRate: FrameRate,
     private val edge: TrimEdge,
 ) {
@@ -47,7 +51,10 @@ class TrimController private constructor(
     private val movesStart = edge == TrimEdge.START && !track.magnetic
 
     /** True for image clips, which have no source length or offset to trim. */
-    private val isImage = sourceDurationMicros == null
+    private val isImage = assetDurationMicros == null
+
+    /** Source offset just after the clip's last source frame, which start trims keep. */
+    private val sourceEndMicros = clip.trimStartMicros + clip.sourceSpanMicros
 
     /**
      * Returns the proposal for a drag of [deltaMicros] from where the gesture began. The moving edge snaps to the
@@ -71,7 +78,13 @@ class TrimController private constructor(
 
     /** Returns the command that applies [proposal]. */
     fun commandFor(proposal: TrimProposal): TrimClip =
-        TrimClip(clip.id, proposal.startMicros, proposal.trimStartMicros, proposal.durationMicros)
+        TrimClip(
+            clip.id,
+            proposal.startMicros,
+            proposal.trimStartMicros,
+            proposal.durationMicros,
+            sourceDurationMicros = proposal.sourceDurationMicros,
+        )
 
     /** Returns the moving edge's time before the drag. */
     private fun originalEdge(): Long = if (movesStart) clip.startMicros else clip.endMicros
@@ -84,45 +97,60 @@ class TrimController private constructor(
             else -> pinnedStartEndAt(edgeMicros)
         }
 
-    /** Moves the start of a clip on a free track, keeping its end. */
+    /** Moves the start of a clip on a free track, keeping its end and its last source frame. */
     private fun startAt(edgeMicros: Long): TrimProposal {
         val previousEnd = track.clips.lastOrNull { it.endMicros <= clip.startMicros }?.endMicros ?: 0L
-        val sourceStart = if (isImage) 0L else clip.startMicros - clip.trimStartMicros
-        val lowest = maxOf(previousEnd, sourceStart)
-        val start = edgeMicros.coerceIn(lowest, maxOf(lowest, clip.endMicros - minimumDurationMicros))
-        val trimStart = if (isImage) clip.trimStartMicros else clip.trimStartMicros + start - clip.startMicros
-        return TrimProposal(start, trimStart, clip.endMicros - start, snappedMicros = null)
+        val maxSpan = if (isImage) Long.MAX_VALUE else sourceEndMicros
+        val maximum = minOf(clip.endMicros - previousEnd, clip.durationAt(maxSpan, frameRate))
+        val wanted = durationWithin(clip.endMicros - edgeMicros, maximum)
+        val span = clip.spanFitting(wanted, maxSpan, maximum, frameRate)
+        val duration = clip.durationAt(span, frameRate)
+        return TrimProposal(
+            startMicros = clip.endMicros - duration,
+            trimStartMicros = if (isImage) clip.trimStartMicros else sourceEndMicros - span,
+            durationMicros = duration,
+            snappedMicros = null,
+            sourceDurationMicros = span.takeIf { clip.speed != null },
+        )
     }
 
     /** Moves the end of a clip, keeping its start and source offset. */
     private fun endAt(edgeMicros: Long): TrimProposal {
-        val sourceLimit = sourceDurationMicros?.let { it - clip.trimStartMicros } ?: Long.MAX_VALUE
+        val maxSpan = assetDurationMicros?.let { it - clip.trimStartMicros } ?: Long.MAX_VALUE
         val next = if (track.magnetic) null else track.clips.firstOrNull { it.startMicros >= clip.endMicros }
         val neighborLimit = next?.let { it.startMicros - clip.startMicros } ?: Long.MAX_VALUE
+        val maximum = minOf(clip.durationAt(maxSpan, frameRate), neighborLimit)
+        val wanted = durationWithin(edgeMicros - clip.startMicros, maximum)
+        val span = clip.spanFitting(wanted, maxSpan, maximum, frameRate)
         return TrimProposal(
             startMicros = clip.startMicros,
             trimStartMicros = clip.trimStartMicros,
-            durationMicros = durationEndingAt(edgeMicros, minOf(sourceLimit, neighborLimit)),
+            durationMicros = clip.durationAt(span, frameRate),
             snappedMicros = null,
+            sourceDurationMicros = span.takeIf { clip.speed != null },
         )
     }
 
     /** Trims the start of a clip on a magnetic track: the start stays, the source offset and the end move. */
     private fun pinnedStartEndAt(edgeMicros: Long): TrimProposal {
-        val maximum = if (isImage) Long.MAX_VALUE else clip.durationMicros + clip.trimStartMicros
-        val duration = durationEndingAt(edgeMicros, maximum)
-        val trimStart = if (isImage) clip.trimStartMicros else clip.trimStartMicros + clip.durationMicros - duration
-        return TrimProposal(clip.startMicros, trimStart, duration, snappedMicros = null)
+        val maxSpan = if (isImage) Long.MAX_VALUE else sourceEndMicros
+        val maximum = clip.durationAt(maxSpan, frameRate)
+        val wanted = durationWithin(edgeMicros - clip.startMicros, maximum)
+        val span = clip.spanFitting(wanted, maxSpan, maximum, frameRate)
+        return TrimProposal(
+            startMicros = clip.startMicros,
+            trimStartMicros = if (isImage) clip.trimStartMicros else sourceEndMicros - span,
+            durationMicros = clip.durationAt(span, frameRate),
+            snappedMicros = null,
+            sourceDurationMicros = span.takeIf { clip.speed != null },
+        )
     }
 
-    /** Returns the duration that ends the clip at [edgeMicros], kept between one frame and [maximumMicros]. */
-    private fun durationEndingAt(
-        edgeMicros: Long,
+    /** Returns [durationMicros] kept between one frame and [maximumMicros]. */
+    private fun durationWithin(
+        durationMicros: Long,
         maximumMicros: Long,
-    ): Long {
-        val upper = maxOf(minimumDurationMicros, maximumMicros)
-        return (edgeMicros - clip.startMicros).coerceIn(minimumDurationMicros, upper)
-    }
+    ): Long = durationMicros.coerceIn(minimumDurationMicros, maxOf(minimumDurationMicros, maximumMicros))
 
     /** Construction from model objects. */
     companion object {
@@ -135,4 +163,28 @@ class TrimController private constructor(
             edge: TrimEdge,
         ): TrimController = TrimController(track, clip, asset.durationMicros, frameRate, edge)
     }
+}
+
+/** Returns how long [spanMicros] of this clip's source plays at its speed in a project at [frameRate]. */
+private fun Clip.durationAt(
+    spanMicros: Long,
+    frameRate: FrameRate,
+): Long = SpeedMap.durationFor(speed, spanMicros, frameRate)
+
+/**
+ * Returns the source span, at most [maxSpanMicros], whose timeline length at this clip's speed is closest to
+ * [durationMicros] without passing [maxDurationMicros] and, where the source allows, lasting a frame of [frameRate].
+ * At normal speed the span is the duration.
+ */
+private fun Clip.spanFitting(
+    durationMicros: Long,
+    maxSpanMicros: Long,
+    maxDurationMicros: Long,
+    frameRate: FrameRate,
+): Long {
+    if (speed == null) return durationMicros
+    var span = SpeedMap.spanFor(speed, durationMicros, frameRate).coerceIn(1L, maxSpanMicros)
+    if (span > 1L && durationAt(span, frameRate) > maxDurationMicros) span--
+    if (span < maxSpanMicros && durationAt(span, frameRate) < frameRate.startOfFrame(1)) span++
+    return span
 }

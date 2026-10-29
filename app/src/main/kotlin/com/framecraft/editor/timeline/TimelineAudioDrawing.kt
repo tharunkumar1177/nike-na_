@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import com.framecraft.editor.domain.model.Clip
 import com.framecraft.editor.domain.model.Project
 import com.framecraft.editor.domain.model.TrackKind
+import com.framecraft.editor.domain.model.speedMap
 import com.framecraft.editor.domain.time.MICROS_PER_SECOND
 import com.framecraft.editor.engine.ThumbnailSource
 import com.framecraft.editor.engine.Waveform
@@ -72,9 +73,11 @@ private fun DrawScope.drawWaveform(
     val centerY = block.center.y
     var barX = max(block.left, 0f) + barWidth / 2f
     val end = min(block.right, size.width)
+    val speedMap = clip.speedMap(frame.project.frameRate)
     while (barX < end) {
         val offsetMicros = ((barX - block.left) / frame.pxPerSecond * MICROS_PER_SECOND).toLong()
-        val half = max(waveform.levelAt(clip.trimStartMicros + offsetMicros) * maxHalf, barWidth / 2f)
+        val sourceMicros = clip.trimStartMicros + (speedMap?.sourceAt(offsetMicros) ?: offsetMicros)
+        val half = max(waveform.levelAt(sourceMicros) * maxHalf, barWidth / 2f)
         drawLine(color, Offset(barX, centerY - half), Offset(barX, centerY + half), barWidth)
         barX += barWidth + metrics.waveBarGap
     }

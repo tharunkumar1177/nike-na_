@@ -175,6 +175,9 @@ private fun ToolRow(
     if (canvas.show) {
         ToolButton(Tool.CANVAS, tools.onOpenCanvas, canvas.enabled)
     }
+    if (availability.showSpeed) {
+        ToolButton(Tool.SPEED, tools.onOpenSpeed)
+    }
     if (availability.showExtract) {
         ToolButton(Tool.EXTRACT, tools.onExtractAudio, availability.canExtract)
     }
@@ -397,6 +400,9 @@ private enum class Tool(
 
     /** Adds music at the playhead. */
     AUDIO(R.drawable.ic_music, R.string.editor_tool_audio, R.string.editor_tool_audio_description, TOOL_AUDIO_TAG),
+
+    /** Opens the speed sheet for the selected video. */
+    SPEED(R.drawable.ic_speed, R.string.editor_tool_speed, R.string.editor_tool_speed_description, TOOL_SPEED_TAG),
 
     /** Lifts the selected video's sound onto an audio lane. */
     EXTRACT(

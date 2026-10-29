@@ -5,6 +5,7 @@ package com.framecraft.editor.timeline
 
 import com.framecraft.editor.domain.edit.TrimEdge
 import com.framecraft.editor.domain.model.Clip
+import com.framecraft.editor.domain.model.SpeedMap
 import com.framecraft.editor.domain.model.Track
 import com.framecraft.editor.domain.time.FrameRate
 import com.framecraft.editor.domain.time.MICROS_PER_SECOND
@@ -13,11 +14,15 @@ import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.roundToLong
 
-/** A clip's horizontal extent on screen and the source time at its left edge. */
+/**
+ * A clip's horizontal extent on screen and the source time at its left edge; [speedMap] maps its timeline offsets
+ * to source offsets when the clip is sped.
+ */
 data class ClipSpan(
     val leftPx: Float,
     val widthPx: Float,
     val sourceStartMicros: Long,
+    val speedMap: SpeedMap? = null,
 )
 
 /** One thumbnail slot inside a clip: its screen extent and the source time it shows. */
@@ -128,7 +133,7 @@ object TimelineGeometry {
         return (first..last).map { index ->
             val localLeft = index * tileWidthPx
             val offsetMicros = (localLeft / pxPerSecond * MICROS_PER_SECOND).toLong()
-            val source = span.sourceStartMicros + offsetMicros
+            val source = span.sourceStartMicros + (span.speedMap?.sourceAt(offsetMicros) ?: offsetMicros)
             ThumbnailTile(
                 leftPx = span.leftPx + localLeft,
                 widthPx = minOf(tileWidthPx, span.widthPx - localLeft),

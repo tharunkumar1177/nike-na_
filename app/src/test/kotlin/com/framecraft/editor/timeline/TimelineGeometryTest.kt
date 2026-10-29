@@ -5,6 +5,9 @@ package com.framecraft.editor.timeline
 
 import com.framecraft.editor.domain.edit.TrimEdge
 import com.framecraft.editor.domain.model.Clip
+import com.framecraft.editor.domain.model.ClipSpeed
+import com.framecraft.editor.domain.model.SpeedMap
+import com.framecraft.editor.domain.model.SpeedPreset
 import com.framecraft.editor.domain.model.Track
 import com.framecraft.editor.domain.model.TrackKind
 import com.framecraft.editor.domain.time.FrameRate
@@ -56,6 +59,25 @@ class TimelineGeometryTest {
         assertEquals(listOf(100f, 100f, 50f), tiles.map { it.widthPx })
         assertEquals(listOf(2_000_000L, 3_000_000L, 4_000_000L), tiles.map { it.sourceMicros })
         assertEquals(0, TimelineGeometry.thumbnailTiles(ClipSpan(1_200f, 100f, 0L), 100f, 100f, 1_000f).size)
+    }
+
+    /** A clip at double speed shows the source twice as far in under each tile. */
+    @Test
+    fun thumbnailTilesFollowSpeed() {
+        val map = SpeedMap.of(ClipSpeed.Constant(2_000), 6_000_000L, FrameRate.FPS_30)
+        val tiles = TimelineGeometry.thumbnailTiles(ClipSpan(0f, 300f, 1_000_000L, map), 100f, 100f, 1_000f)
+        assertEquals(listOf(1_000_000L, 3_000_000L, 5_000_000L), tiles.map { it.sourceMicros })
+    }
+
+    /** Speeds read as short text, with a range for curves and nothing at normal speed. */
+    @Test
+    fun speedLabels() {
+        assertEquals("2.0x", SpeedLabel.of(2_000))
+        assertEquals("0.25x", SpeedLabel.of(250))
+        assertEquals("1.5x", SpeedLabel.of(1_500))
+        assertEquals("10x", SpeedLabel.of(10_000))
+        assertNull(SpeedLabel.badgeOf(null))
+        assertEquals("0.4–4.0x", SpeedLabel.badgeOf(SpeedPreset.HERO.curve))
     }
 
     /** Rows are found below the ruler, and gaps between rows hit nothing. */

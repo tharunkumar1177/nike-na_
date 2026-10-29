@@ -5,9 +5,10 @@ package com.framecraft.editor.domain.model
 
 import com.framecraft.editor.domain.time.FrameRate
 import kotlinx.serialization.Serializable
+import kotlin.math.abs
 
 /** Schema version written by this build. */
-const val CURRENT_SCHEMA_VERSION: Int = 5
+const val CURRENT_SCHEMA_VERSION: Int = 6
 
 /** An immutable project snapshot. Construction fails if any cross-object invariant is broken. */
 @Serializable
@@ -46,8 +47,15 @@ data class Project(
         asset: MediaAsset,
     ) {
         asset.durationMicros?.let { sourceDuration ->
-            require(clip.trimStartMicros + clip.durationMicros <= sourceDuration) {
+            require(clip.trimStartMicros + clip.sourceSpanMicros <= sourceDuration) {
                 "Clip ${clip.id} reads past the end of asset ${asset.id}"
+            }
+        }
+        clip.speed?.let { speed ->
+            require(asset.isTimed) { "Clip ${clip.id} has a speed but no timed source" }
+            val expected = SpeedMap.durationFor(speed, clip.sourceSpanMicros, frameRate)
+            require(abs(expected - clip.durationMicros) < frameRate.startOfFrame(1)) {
+                "Clip ${clip.id} lasts ${clip.durationMicros} but its speed plays $expected"
             }
         }
         val suitsTrack =

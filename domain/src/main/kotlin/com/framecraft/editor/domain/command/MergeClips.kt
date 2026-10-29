@@ -5,6 +5,7 @@ package com.framecraft.editor.domain.command
 
 import com.framecraft.editor.domain.model.Clip
 import com.framecraft.editor.domain.model.ClipAnchor
+import com.framecraft.editor.domain.model.ClipSpeed
 import com.framecraft.editor.domain.model.Project
 import com.framecraft.editor.domain.model.TextAnimation
 import kotlinx.serialization.SerialName
@@ -16,7 +17,9 @@ import kotlinx.serialization.Serializable
  * have no fade at the join; otherwise the command is rejected. The merged clip takes the left fade-in and the right
  * fade-out unless [fadeInMicros] or [fadeOutMicros] override them. Text parts must show the same text and style with no
  * animation at the join; the merged clip enters like the left part and leaves like the right one unless [animationIn]
- * or [animationOut] override them. Clips anchored to the right part move their anchor to the merged clip.
+ * or [animationOut] override them. Clips anchored to the right part move their anchor to the merged clip. Parts must
+ * play at the same constant speed and pitch setting unless [speed] gives the merged clip's speed, as when undoing a
+ * split of a curve.
  */
 @Serializable
 @SerialName("mergeClips")
@@ -27,19 +30,24 @@ data class MergeClips(
     val fadeOutMicros: Long? = null,
     val animationIn: TextAnimation? = null,
     val animationOut: TextAnimation? = null,
+    val speed: ClipSpeed? = null,
 ) : EditCommand {
-    /** The inverse splits the merged clip where the right part began. */
+    /** The inverse splits the merged clip where the right part began, after the same source. */
     override fun applyTo(project: Project): CommandOutcome {
         val (track, left) = project.locate(leftClipId) ?: return clipNotFound(leftClipId)
         val right = track.clips.firstOrNull { it.id == rightClipId }
         return if (right == null) {
             clipNotFound(rightClipId)
         } else {
-            project.replacingTracks(SplitClip(leftClipId, left.endMicros, rightClipId)) {
+            project.replacingTracks(SplitClip(leftClipId, left.endMicros, rightClipId, left.sourceDurationMicros)) {
                 requireJoinable(left, right, project.assetOf(left).isTimed)
+                val mergedSpeed = speed ?: left.speed
                 val merged =
                     left.copy(
                         durationMicros = left.durationMicros + right.durationMicros,
+                        speed = mergedSpeed,
+                        sourceDurationMicros =
+                            (left.sourceSpanMicros + right.sourceSpanMicros).takeIf { mergedSpeed != null },
                         fadeInMicros = fadeInMicros ?: left.fadeInMicros,
                         fadeOutMicros = fadeOutMicros ?: right.fadeOutMicros,
                         text =
@@ -87,7 +95,7 @@ data class MergeClips(
     ) {
         require(left.assetId == right.assetId) { "Clips $leftClipId and $rightClipId use different assets" }
         require(left.endMicros == right.startMicros) { "Clips $leftClipId and $rightClipId do not touch" }
-        val expectedTrimStart = if (isTimed) left.trimStartMicros + left.durationMicros else left.trimStartMicros
+        val expectedTrimStart = if (isTimed) left.trimStartMicros + left.sourceSpanMicros else left.trimStartMicros
         require(right.trimStartMicros == expectedTrimStart) {
             "Clips $leftClipId and $rightClipId do not read the source continuously"
         }
@@ -104,5 +112,9 @@ data class MergeClips(
             "Clips $leftClipId and $rightClipId differ in text or animate at the join"
         }
         require(right.text?.animationIn == null) { "Clip $rightClipId animates in at the join" }
+        val sameSpeed = left.speed == right.speed && left.speed !is ClipSpeed.Curve
+        require((speed != null || sameSpeed) && left.maintainPitch == right.maintainPitch) {
+            "Clips $leftClipId and $rightClipId play at different speeds"
+        }
     }
 }
