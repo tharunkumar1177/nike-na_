@@ -33,7 +33,6 @@ import androidx.compose.ui.text.style.TextAlign
 import com.framecraft.editor.R
 import com.framecraft.editor.domain.export.ExportQuality
 import com.framecraft.editor.domain.export.ExportResolution
-import com.framecraft.editor.domain.export.ExportSettings
 import com.framecraft.editor.domain.time.FrameRate
 import com.framecraft.editor.engine.export.ExportState
 import com.framecraft.editor.ui.theme.Spacing
@@ -53,16 +52,6 @@ const val EXPORT_SHARE_TAG = "export_btn_share"
 
 /** Test tag of the play button. */
 const val EXPORT_PLAY_TAG = "export_btn_play"
-
-/** What the export sheet does: change settings, start, cancel, share or play the saved video, or close. */
-class ExportSheetActions(
-    val onSelect: (ExportSettings) -> Unit,
-    val onStart: () -> Unit,
-    val onCancel: () -> Unit,
-    val onShare: (String) -> Unit,
-    val onPlay: (String) -> Unit,
-    val onClose: () -> Unit,
-)
 
 /** Modal sheet for [state]; dismissing it while exporting leaves the export running. */
 @OptIn(ExperimentalMaterial3Api::class)
