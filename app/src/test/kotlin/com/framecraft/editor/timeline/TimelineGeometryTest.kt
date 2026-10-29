@@ -1,8 +1,9 @@
 /*
- * Unit tests for timeline geometry: conversions, visible range, zoom limits, and tick selection.
+ * Unit tests for timeline geometry: conversions, visible range, zoom limits, ticks, and trim handles.
  */
 package com.framecraft.editor.timeline
 
+import com.framecraft.editor.domain.edit.TrimEdge
 import com.framecraft.editor.domain.model.Clip
 import com.framecraft.editor.domain.model.Track
 import com.framecraft.editor.domain.model.TrackKind
@@ -90,5 +91,16 @@ class TimelineGeometryTest {
     @Test
     fun formatsClipDuration() {
         assertEquals("2.5s", TimelineGeometry.formatClipDuration(2_500_000L))
+    }
+
+    /** Trim handle zones are centered on the clip edges, and the closer edge wins on short clips. */
+    @Test
+    fun trimEdgeAtFindsClosestHandle() {
+        assertEquals(TrimEdge.START, TimelineGeometry.trimEdgeAt(90f, 100f, 400f, 48f))
+        assertEquals(TrimEdge.END, TimelineGeometry.trimEdgeAt(420f, 100f, 400f, 48f))
+        assertNull(TimelineGeometry.trimEdgeAt(250f, 100f, 400f, 48f))
+        assertNull(TimelineGeometry.trimEdgeAt(70f, 100f, 400f, 48f))
+        assertEquals(TrimEdge.START, TimelineGeometry.trimEdgeAt(105f, 100f, 120f, 48f))
+        assertEquals(TrimEdge.END, TimelineGeometry.trimEdgeAt(115f, 100f, 120f, 48f))
     }
 }

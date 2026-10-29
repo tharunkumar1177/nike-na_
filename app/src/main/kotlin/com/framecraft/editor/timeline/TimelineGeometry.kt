@@ -3,11 +3,13 @@
  */
 package com.framecraft.editor.timeline
 
+import com.framecraft.editor.domain.edit.TrimEdge
 import com.framecraft.editor.domain.model.Clip
 import com.framecraft.editor.domain.model.Track
 import com.framecraft.editor.domain.time.FrameRate
 import com.framecraft.editor.domain.time.MICROS_PER_SECOND
 import java.util.Locale
+import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.roundToLong
 
@@ -156,6 +158,25 @@ object TimelineGeometry {
         track: Track,
         micros: Long,
     ): Clip? = track.clips.firstOrNull { micros >= it.startMicros && micros < it.endMicros }
+
+    /**
+     * Returns the trim handle of a clip drawn from [leftPx] to [rightPx] whose touch zone, [zonePx] wide and
+     * centered on the clip edge, contains [x]; the closer edge wins when the zones overlap.
+     */
+    fun trimEdgeAt(
+        x: Float,
+        leftPx: Float,
+        rightPx: Float,
+        zonePx: Float,
+    ): TrimEdge? {
+        val toStart = abs(x - leftPx)
+        val toEnd = abs(x - rightPx)
+        return when {
+            minOf(toStart, toEnd) > zonePx / 2f -> null
+            toStart < toEnd -> TrimEdge.START
+            else -> TrimEdge.END
+        }
+    }
 
     /** Formats a clip duration with one decimal, for example "2.5s". */
     fun formatClipDuration(durationMicros: Long): String =

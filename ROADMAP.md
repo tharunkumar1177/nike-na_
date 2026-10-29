@@ -10,7 +10,7 @@ Ordered vertical slices. Each slice is user-visible, shipped on its own branch, 
 - [x] 2. **Import and play** — pick videos and photos (partial media access handled), build a project, preview it. UI: yes.
 - [x] 3. **See the timeline** — pinch-zoom timeline showing tracks, clips, and gaps with a playhead synced to preview. UI: yes.
 - [x] 4. **Never lose work** — project list, autosave via snapshot plus journal, crash recovery, persistent undo/redo buttons. UI: yes.
-- [ ] 5. **Basic edits** — trim handles, split at playhead, delete, reorder, frame-step nudge, snap toggle with haptics. UI: yes.
+- [x] 5. **Basic edits** — trim handles, split at playhead, delete, reorder, frame-step nudge, snap toggle with haptics. UI: yes.
 - [ ] 6. **Export** — resolution and frame-rate settings, foreground-service export, progress, success and failure states, share. UI: yes.
 
 ## Core editing

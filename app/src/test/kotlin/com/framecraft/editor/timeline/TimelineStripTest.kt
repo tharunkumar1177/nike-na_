@@ -1,19 +1,24 @@
 /*
- * JVM UI tests (Robolectric) for timeline scrubbing and zoom to fit.
+ * JVM UI tests (Robolectric) for timeline scrubbing, selection, trimming, and the zoom and snap controls.
  */
 package com.framecraft.editor.timeline
 
 import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.framecraft.editor.domain.command.EditCommand
+import com.framecraft.editor.domain.command.TrimClip
 import com.framecraft.editor.domain.model.MediaAsset
 import com.framecraft.editor.domain.model.MediaKind
 import com.framecraft.editor.domain.model.ProjectFactory
@@ -78,8 +83,10 @@ class TimelineStripTest {
             }
         }
 
-    /** Shows the strip with the playhead at zero. */
-    private fun showStrip() {
+    private val edits = mutableListOf<EditCommand>()
+
+    /** Shows the strip with the playhead at zero and [selectedClipId] selected. */
+    private fun showStrip(selectedClipId: String? = null) {
         composeRule.setContent {
             FramecraftTheme {
                 TimelineStrip(
@@ -92,11 +99,49 @@ class TimelineStripTest {
                             onSeek = { seeks += it },
                             onEnd = { events += "end" },
                         ),
-                    selectedClipId = null,
+                    selectedClipId = selectedClipId,
                     onClipSelected = { selections += it },
+                    onEdit = { edits += it },
+                    onHaptic = {},
                 )
             }
         }
+    }
+
+    /** Dragging the start handle of the selected clip saves exactly one trim that cuts its beginning. */
+    @Test
+    fun startHandleDragTrimsOnce() {
+        val track = project.tracks.single()
+        val clip = track.clips.single()
+        showStrip(selectedClipId = clip.id)
+        composeRule.onNodeWithTag(TIMELINE_TAG).performTouchInput {
+            down(Offset(width / 2f, 72.dp.toPx()))
+            moveBy(Offset(100.dp.toPx(), 0f))
+            up()
+        }
+        composeRule.waitForIdle()
+        val trim = edits.single() as TrimClip
+        assertEquals(clip.id, trim.clipId)
+        assertEquals(clip.startMicros, trim.startMicros)
+        assertTrue(trim.trimStartMicros > 0L)
+        assertEquals(clip.durationMicros - trim.trimStartMicros, trim.durationMicros)
+        assertTrue(selections.isEmpty())
+    }
+
+    /** Snapping starts on and turns off with its toggle. */
+    @Test
+    fun snapToggles() {
+        showStrip()
+        composeRule.onNodeWithTag(SNAP_TOGGLE_TAG).assertIsOn().performClick()
+        composeRule.onNodeWithTag(SNAP_TOGGLE_TAG).assertIsOff()
+    }
+
+    /** Zooming to the playhead starts off and turns on with its toggle. */
+    @Test
+    fun zoomToPlayheadToggles() {
+        showStrip()
+        composeRule.onNodeWithTag(ZOOM_PLAYHEAD_TAG).assertIsOff().performClick()
+        composeRule.onNodeWithTag(ZOOM_PLAYHEAD_TAG).assertIsOn()
     }
 
     /** Swiping left pauses, seeks forward to frame boundaries, then ends the scrub. */
