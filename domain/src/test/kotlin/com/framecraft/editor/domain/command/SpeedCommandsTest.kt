@@ -6,8 +6,8 @@ package com.framecraft.editor.domain.command
 
 import com.framecraft.editor.domain.edit.TrimController
 import com.framecraft.editor.domain.edit.TrimEdge
-import com.framecraft.editor.domain.model.ClipSpeed
 import com.framecraft.editor.domain.model.Clip
+import com.framecraft.editor.domain.model.ClipSpeed
 import com.framecraft.editor.domain.model.MediaAsset
 import com.framecraft.editor.domain.model.MediaKind
 import com.framecraft.editor.domain.model.Project

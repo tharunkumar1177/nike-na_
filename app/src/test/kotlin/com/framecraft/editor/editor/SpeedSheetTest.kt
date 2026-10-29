@@ -87,7 +87,11 @@ class SpeedSheetTest {
     fun curveAddsPointAtPlayhead() {
         showSheet(custom, positionMicros = 1_200_000L)
         composeRule.onNodeWithTag(SPEED_PRESET_TAG_PREFIX + "custom").assertIsSelected()
-        composeRule.onNodeWithText("Add point").performScrollTo().assertIsEnabled().performClick()
+        composeRule
+            .onNodeWithText("Add point")
+            .performScrollTo()
+            .assertIsEnabled()
+            .performClick()
         val added = changes.single().first as ClipSpeed.Curve
         assertEquals(6, added.points.size)
         assertEquals(30_000, added.points[2].position)
