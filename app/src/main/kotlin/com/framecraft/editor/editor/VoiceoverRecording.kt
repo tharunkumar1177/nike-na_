@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
 /** Seconds counted down before the microphone opens. */
@@ -92,7 +93,7 @@ class VoiceoverRecording(
     private var job: Job? = null
     private var take: CaptureTake? = null
     private var startMicros = 0L
-    private var started: TimeSource.TimeMark? = null
+    private var started: TimeMark? = null
 
     /** Where the recorder is now. */
     val phase: StateFlow<VoiceoverPhase> = mutablePhase.asStateFlow()

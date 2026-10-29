@@ -37,7 +37,6 @@ import com.framecraft.editor.domain.model.MAX_VOLUME_PERCENT
 import com.framecraft.editor.domain.model.Project
 import com.framecraft.editor.domain.model.TrackKind
 import com.framecraft.editor.domain.model.UNITY_VOLUME_PERCENT
-import com.framecraft.editor.domain.model.takesVolume
 import com.framecraft.editor.ui.theme.Spacing
 import kotlin.math.roundToInt
 

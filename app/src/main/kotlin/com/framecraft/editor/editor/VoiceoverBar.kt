@@ -106,7 +106,11 @@ internal fun rememberVoiceoverStarter(recording: VoiceoverRecording): VoiceoverS
     val starter = remember(recording) { VoiceoverStarter(recording) }
     val launcher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) recording.open() else starter.showRationale = true
+            if (granted) {
+                recording.open()
+            } else {
+                starter.showRationale = true
+            }
         }
     starter.start = {
         val permission = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)

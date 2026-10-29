@@ -3,10 +3,13 @@
  */
 package com.framecraft.editor.media
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.media.MediaMetadataRetriever
 import android.media.MediaRecorder
 import android.os.Build
+import androidx.core.content.ContextCompat
 import com.framecraft.editor.data.project.ProjectStore
 import com.framecraft.editor.domain.model.AUDIO_ASSET_SIDE
 import com.framecraft.editor.domain.model.IdGenerator
@@ -51,9 +54,14 @@ class MediaRecorderVoiceoverCapture(
         }
     }
 
-    /** Starts a mono AAC recording into [file]; a recorder that fails to start is released and the file deleted. */
+    /**
+     * Starts a mono AAC recording into [file]; without the microphone permission, or when the recorder fails to
+     * start, the recorder is released and the file deleted.
+     */
     @Suppress("TooGenericExceptionCaught")
     private fun start(file: File): CaptureStart {
+        val permission = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
+        if (permission != PackageManager.PERMISSION_GRANTED) return CaptureStart.Failed
         val recorder = newRecorder()
         return try {
             recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
