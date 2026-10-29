@@ -25,7 +25,8 @@ data class RemoveOverlayClip(
         } else {
             val asset = project.assetOf(clip)
             val restorations = restorationsFor(project.tracks, clipId)
-            val inverse = AddOverlayClip(track.id, clip, asset, restorations, project.tracks.indexOf(track))
+            val index = project.tracks.indexOf(track)
+            val inverse = AddOverlayClip(track.id, clip, asset, restorations, index, track.volumePercent)
             val shared = project.tracks.any { lane -> lane.clips.any { it.id != clipId && it.assetId == asset.id } }
             val assets = if (shared) project.assets else project.assets.filter { it.id != asset.id }
             val remaining = track.clips.filter { it.id != clipId }

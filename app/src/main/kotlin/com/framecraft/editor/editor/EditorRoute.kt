@@ -85,7 +85,7 @@ private fun ReadyEditor(
     val previewState by preview.state.collectAsStateWithLifecycle()
     val overlayBusy by viewModel.overlays.busy.collectAsStateWithLifecycle()
     val audioBusy by viewModel.audio.busy.collectAsStateWithLifecycle()
-    val haptics = LocalHapticFeedback.current
+    val voiceoverNotice by viewModel.voiceover.notice.collectAsStateWithLifecycle()
     val project = state.project
     val selectedTrack = project.tracks.firstOrNull { track -> track.clips.any { it.id == state.selectedClipId } }
     val selected = selectedTrack?.clips?.firstOrNull { it.id == state.selectedClipId }
@@ -105,7 +105,14 @@ private fun ReadyEditor(
         availability =
             toolAvailability(project, selected, kind, position, importing)
                 .copy(canvas = canvasToolState(project, selected, kind, importing, canvas)),
-        notices = EditorNotices(state.skippedCount, state.droppedEditCount, state.saveFailed, state.editRejected),
+        notices =
+            EditorNotices(
+                state.skippedCount,
+                state.droppedEditCount,
+                state.saveFailed,
+                state.editRejected,
+                voiceoverNotice,
+            ),
         actions = editorActions(viewModel, export.open),
         playback = playbackActions(preview, project.frameRate, position),
         tools =
@@ -116,10 +123,33 @@ private fun ReadyEditor(
                 viewModel::dispatch,
             ),
         previewSurface = { surfaceModifier -> PreviewSurface(preview, surfaceModifier) },
-        timeline = { timelineModifier ->
+        timeline = timelineSlot(viewModel, state, { previewState.positionMicros }, media, pickers.transition),
+        modifier = modifier,
+        export = export.indicator,
+        overlayLayer =
+            voiceoverLayer(pickers.voiceover, preview, project.id)
+                ?: selectionLayer(project, selected, kind, position, viewModel, canvas, pickers.text),
+    )
+}
+
+/**
+ * Returns the timeline of [state]'s project with the playhead at [positionMicros], drawing [media] and scrubbing
+ * [viewModel]'s preview; edits go to [viewModel] and a tapped cut opens [transition].
+ */
+private fun timelineSlot(
+    viewModel: EditorViewModel,
+    state: EditorState.Ready,
+    positionMicros: () -> Long,
+    media: TimelineMedia,
+    transition: TransitionEditing,
+): @Composable (Modifier) -> Unit =
+    { timelineModifier ->
+        val haptics = LocalHapticFeedback.current
+        val preview = viewModel.preview
+        if (preview != null) {
             TimelineStrip(
-                project = project,
-                positionMicros = { previewState.positionMicros },
+                project = state.project,
+                positionMicros = positionMicros,
                 thumbnails = media.thumbnails,
                 waveforms = media.waveforms,
                 callbacks = ScrubCallbacks(preview::beginScrub, preview::seekTo, preview::endScrub),
@@ -128,18 +158,15 @@ private fun ReadyEditor(
                 onEdit = viewModel::dispatch,
                 onHaptic = haptics::performHapticFeedback,
                 modifier = timelineModifier,
-                onCutSelected = pickers.transition::open,
+                onCutSelected = transition::open,
             )
-        },
-        modifier = modifier,
-        export = export.indicator,
-        overlayLayer = selectionLayer(project, selected, kind, position, viewModel, canvas, pickers.text),
-    )
-}
+        }
+    }
 
 /**
- * Shows whichever of the text, canvas, speed, transition, and look sheets is open over [project] with the playhead at
- * [positionMicros]; edits go to [dispatch] and the transition sheet moves the preview through [onSeek].
+ * Shows whichever of the text, canvas, speed, transition, look, and mixer sheets is open over [project] with the
+ * playhead at [positionMicros], and keeps the voiceover recorder in step with the screen; edits go to [dispatch]
+ * and the transition sheet moves the preview through [onSeek].
  */
 @Composable
 private fun EditorSheets(
@@ -155,6 +182,8 @@ private fun EditorSheets(
     SpeedSheetHost(pickers.speed, project, positionMicros, dispatch)
     TransitionSheetHost(pickers.transition, project, dispatch, onSeek)
     LookSheetHost(pickers.look, project, dispatch)
+    MixerSheetHost(pickers.mixer, project, dispatch)
+    VoiceoverHost(pickers.voiceover)
 }
 
 /**

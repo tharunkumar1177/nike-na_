@@ -127,17 +127,21 @@ enum class EditorNotice {
 
     /** An edit was refused because it would have broken the project. */
     EDIT_REJECTED,
+
+    /** A voiceover take finished with an outcome worth reporting. */
+    VOICEOVER,
 }
 
 /**
- * Notices waiting to be shown: [skippedCount] unreadable files, [droppedEditCount] lost edits, [saveFailed], and
- * [editRejected].
+ * Notices waiting to be shown: [skippedCount] unreadable files, [droppedEditCount] lost edits, [saveFailed],
+ * [editRejected], and the [voiceover] take outcome.
  */
 data class EditorNotices(
     val skippedCount: Int = 0,
     val droppedEditCount: Int = 0,
     val saveFailed: Boolean = false,
     val editRejected: Boolean = false,
+    val voiceover: VoiceoverNotice? = null,
 )
 
 /** What the editor's top bar and notices do. */
@@ -165,8 +169,8 @@ class PlaybackActions(
 /**
  * What the tools do: split and delete the selection, add an overlay, text, or music, save the selected overlay's or
  * text's opacity, edit or animate the selected text, extract the selected clip's audio, save its volume and fades,
- * open the canvas sheet, toggle the selected base clip's fit and its placement handles, and open the speed and look
- * sheets.
+ * open the canvas sheet, toggle the selected base clip's fit and its placement handles, open the speed and look
+ * sheets, open the mixer, and record a voiceover.
  */
 data class ToolActions(
     val onSplitClip: () -> Unit,
@@ -184,6 +188,8 @@ data class ToolActions(
     val onToggleAdjust: () -> Unit = {},
     val onOpenSpeed: () -> Unit = {},
     val onOpenLook: () -> Unit = {},
+    val onOpenMixer: () -> Unit = {},
+    val onRecordVoiceover: () -> Unit = {},
 )
 
 /**
@@ -205,7 +211,8 @@ data class CanvasToolState(
  * [canAddText] when text can be added now, [isText] when the selection is text, [canAddAudio] when music can be added
  * now, [showExtract] when the selection is a video whose sound could be lifted and [canExtract] when that is possible
  * now, [showSpeed] when the selection is a video whose speed can change, [showLook] when the selection is a picture
- * that can take a look, [audio] when the selection plays sound, and the [canvas] tools.
+ * that can take a look, [audio] when the selection plays sound, [canRecord] when a voiceover can start at the
+ * playhead, and the [canvas] tools.
  */
 data class ToolAvailability(
     val hasSelection: Boolean = false,
@@ -223,6 +230,7 @@ data class ToolAvailability(
     val showSpeed: Boolean = false,
     val showLook: Boolean = false,
     val audio: ClipAudio? = null,
+    val canRecord: Boolean = false,
     val canvas: CanvasToolState = CanvasToolState(),
 )
 
@@ -358,6 +366,12 @@ private fun EditorSnackbars(
         if (notices.editRejected) {
             snackbarHostState.showSnackbar(resources.getString(R.string.editor_edit_rejected))
             onShown(EditorNotice.EDIT_REJECTED)
+        }
+    }
+    LaunchedEffect(notices.voiceover) {
+        notices.voiceover?.let { notice ->
+            snackbarHostState.showSnackbar(resources.getString(voiceoverNoticeText(notice)))
+            onShown(EditorNotice.VOICEOVER)
         }
     }
     LaunchedEffect(errorCode) {

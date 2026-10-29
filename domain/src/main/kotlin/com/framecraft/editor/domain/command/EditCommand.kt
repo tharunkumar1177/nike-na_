@@ -89,6 +89,11 @@ sealed interface CommandRejection {
 
     /** The project has no picture clip to give a look. */
     data object NoLookTargets : CommandRejection
+
+    /** Track [trackId] holds text, which has no sound to set a volume for. */
+    data class TrackVolumeNotSupported(
+        val trackId: String,
+    ) : CommandRejection
 }
 
 /** A clip together with the track that holds it. */

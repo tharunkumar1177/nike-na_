@@ -76,6 +76,7 @@ The exporter writes `cache/exports/export.mp4`, then `GallerySaver` inserts a pe
 - `engine/media3/src/main/kotlin/com/framecraft/editor/engine/SolidPng.kt` — 1 x 1 PNG data URIs for solid backgrounds.
 - `engine/media3/src/main/kotlin/com/framecraft/editor/engine/ProjectPreview.kt`, `PreviewSurface.kt` — preview player (play, pause, seek, scrubbing mode) and its SurfaceView.
 - `engine/media3/src/main/kotlin/com/framecraft/editor/engine/AudioItemEffects.kt`, `GainEnvelope.kt`, `ClampingGainProcessor.kt`, `AudioWaveforms.kt`, `WaveformBucketer.kt` — per-clip sound chain and timeline waveforms; rules in [audio](audio.md).
+- `engine/media3/src/main/kotlin/com/framecraft/editor/engine/plan/AudioMix.kt` — lane volume and voiceover ducking folded into each segment when the plan is built; rules in [voiceover](voiceover.md).
 - `engine/media3/src/main/kotlin/com/framecraft/editor/engine/ClipThumbnails.kt` — timeline thumbnails via Media3 `FrameExtractor` (video) and `ImageDecoder` (images), cached in memory.
 - `engine/media3/src/main/kotlin/com/framecraft/editor/engine/export/` — `ProjectExporter`, `ExportState`, `ExportFailureMapper`, `ExportEffects`, `ExportPrecheck`, `GallerySaver`.
 - `domain/src/main/kotlin/com/framecraft/editor/domain/export/` — `ExportSettings`, `ExportPlanner` (offered resolutions and frame rates, defaults, output size, bitrate, size estimate).

@@ -7,13 +7,15 @@ import com.framecraft.editor.domain.model.Clip
 import com.framecraft.editor.domain.model.MediaKind
 import com.framecraft.editor.domain.model.Project
 import com.framecraft.editor.domain.model.TrackKind
+import com.framecraft.editor.domain.model.UNITY_VOLUME_PERCENT
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
  * Places audio [clip] on audio track [trackId] (created at [trackIndex], clamped, when missing) and mutes video clip
  * [videoClipId], so the sound plays once. The audio clip must read the video's asset, which must have sound. Each of
- * [anchorRestorations] re-attaches a clip that lost its anchor when the audio clip was removed.
+ * [anchorRestorations] re-attaches a clip that lost its anchor when the audio clip was removed. A created track plays
+ * at [trackVolumePercent].
  */
 @Serializable
 @SerialName("extractAudio")
@@ -23,6 +25,7 @@ data class ExtractAudio(
     val clip: Clip,
     val trackIndex: Int = Int.MAX_VALUE,
     val anchorRestorations: List<AnchorRestoration> = emptyList(),
+    val trackVolumePercent: Int = UNITY_VOLUME_PERCENT,
 ) : EditCommand {
     /** The inverse removes the audio clip and restores the video's previous volume. */
     override fun applyTo(project: Project): CommandOutcome {
@@ -35,7 +38,7 @@ data class ExtractAudio(
             project.replacingTracks(inverse) {
                 project.tracks
                     .mapClips { if (it.id == videoClipId) it.copy(volumePercent = 0) else it }
-                    .withLaneClip(TrackKind.AUDIO, trackId, clip, trackIndex)
+                    .withLaneClip(TrackKind.AUDIO, trackId, clip, trackIndex, trackVolumePercent)
                     .restoringAnchors(anchorRestorations)
             }
         }

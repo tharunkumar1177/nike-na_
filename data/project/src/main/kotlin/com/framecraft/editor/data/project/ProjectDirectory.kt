@@ -13,12 +13,16 @@ import java.io.File
  * - `meta.json`: [ProjectSummary] for the project list, rebuilt from the snapshot when missing.
  * - `export-settings.json`: the last export settings, read and written by [ExportSettingsFile].
  * - `journal.corrupt-<millis>`: copies of journals whose unreadable tail was dropped, kept for diagnosis.
+ * - `recordings/`: voiceover takes, swept by [RecordingSweep] when the project opens.
  */
 internal class ProjectDirectory(
     val dir: File,
 ) {
     /** The snapshot file. */
     val snapshotFile = File(dir, "snapshot.json")
+
+    /** The directory of voiceover takes. */
+    val recordingsDir = File(dir, ProjectStore.RECORDINGS_DIR_NAME)
 
     /** The journal file. */
     val journalFile = File(dir, "journal.jsonl")

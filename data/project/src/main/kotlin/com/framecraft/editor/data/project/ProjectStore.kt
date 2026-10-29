@@ -125,6 +125,7 @@ class ProjectStore(
     private fun openExisting(directory: ProjectDirectory): OpenProjectResult =
         when (val result = directory.load(migrations, clock())) {
             is LoadResult.Loaded -> {
+                RecordingSweep.sweep(directory)
                 val session = ProjectSession(directory, ioDispatcher, clock, result.project)
                 OpenProjectResult.Opened(session, result.project.droppedRecords)
             }
@@ -148,4 +149,9 @@ class ProjectStore(
             directory.writeMeta(summary)
             summary
         }
+
+    companion object {
+        /** Name of the directory inside a project's directory that holds its voiceover takes. */
+        const val RECORDINGS_DIR_NAME: String = "recordings"
+    }
 }

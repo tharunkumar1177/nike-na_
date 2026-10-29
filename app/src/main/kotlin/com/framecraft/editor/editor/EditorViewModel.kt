@@ -15,12 +15,14 @@ import com.framecraft.editor.data.project.ProjectStore
 import com.framecraft.editor.data.project.SessionState
 import com.framecraft.editor.di.AppContainer
 import com.framecraft.editor.domain.command.EditCommand
+import com.framecraft.editor.domain.edit.AudioPlacement
 import com.framecraft.editor.domain.model.IdGenerator
 import com.framecraft.editor.domain.model.Project
 import com.framecraft.editor.domain.model.ProjectFactory
 import com.framecraft.editor.engine.ProjectPreview
 import com.framecraft.editor.media.ImportResult
 import com.framecraft.editor.media.MediaImporter
+import com.framecraft.editor.media.VoiceoverCapture
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -77,6 +79,16 @@ sealed interface EditorState {
 }
 
 /**
+ * What the editor creates for each open project through [createPreview] and [createMedia], and the microphone it
+ * records voiceovers with through [voiceoverCapture].
+ */
+class EditorResources(
+    val createPreview: () -> ProjectPreview,
+    val createMedia: () -> TimelineMedia,
+    val voiceoverCapture: VoiceoverCapture,
+)
+
+/**
  * Holds the open project, its saving session, and its preview across configuration changes. [idGenerator] also
  * makes the ids of clips that edits create.
  */
@@ -84,8 +96,7 @@ class EditorViewModel(
     private val importer: MediaImporter,
     val idGenerator: IdGenerator,
     private val store: ProjectStore,
-    private val previewFactory: () -> ProjectPreview,
-    private val mediaFactory: () -> TimelineMedia,
+    private val resources: EditorResources,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
     private val mutableState = MutableStateFlow<EditorState>(EditorState.Idle)
@@ -104,6 +115,15 @@ class EditorViewModel(
 
     /** Adds picked sound files to the open project as music. */
     val audio: AudioImport = AudioImport(viewModelScope, importer, idGenerator, ioDispatcher, mutableState, ::dispatch)
+
+    /** Records voiceover takes into the open project at the playhead they were started at. */
+    val voiceover: VoiceoverRecording =
+        VoiceoverRecording(viewModelScope, resources.voiceoverCapture, ioDispatcher) { asset, startMicros ->
+            val project = (mutableState.value as? EditorState.Ready)?.project
+            val command = project?.let { AudioPlacement.proposeTake(it, startMicros, asset, idGenerator) }
+            command?.let { dispatch(it, it.clip.id) }
+            command != null
+        }
 
     /** Timeline thumbnails and waveforms of the open project; non-null while the state is [EditorState.Ready]. */
     val media: TimelineMedia?
@@ -198,12 +218,14 @@ class EditorViewModel(
                 EditorNotice.DROPPED_EDITS -> ready.copy(droppedEditCount = 0)
                 EditorNotice.SAVE_FAILED -> ready.copy(saveFailed = false)
                 EditorNotice.EDIT_REJECTED -> ready.copy(editRejected = false)
+                EditorNotice.VOICEOVER -> ready.also { voiceover.acknowledge() }
             }
         }
     }
 
-    /** Closes the open project, already saved, and returns to the home screen. */
+    /** Closes the open project, already saved, and returns to the home screen; a running take is discarded. */
     fun close() {
+        voiceover.release()
         open?.let { closing ->
             closing.release()
             viewModelScope.launch { closing.closeSession() }
@@ -214,6 +236,7 @@ class EditorViewModel(
 
     /** Releases the preview and timeline media when the view model is destroyed; edits are already saved. */
     override fun onCleared() {
+        voiceover.release()
         open?.release()
     }
 
@@ -224,8 +247,8 @@ class EditorViewModel(
         droppedEditCount: Int,
     ) {
         val current = opened.state
-        val preview = previewFactory().also { it.setProject(current.project) }
-        open = OpenProject(opened, preview, mediaFactory())
+        val preview = resources.createPreview().also { it.setProject(current.project) }
+        open = OpenProject(opened, preview, resources.createMedia())
         mutableState.value =
             EditorState.Ready(
                 project = current.project,
@@ -270,8 +293,12 @@ class EditorViewModel(
                         importer = container.mediaImporter,
                         idGenerator = container.idGenerator,
                         store = container.projectStore,
-                        previewFactory = container::createPreview,
-                        mediaFactory = container::createTimelineMedia,
+                        resources =
+                            EditorResources(
+                                createPreview = container::createPreview,
+                                createMedia = container::createTimelineMedia,
+                                voiceoverCapture = container.voiceoverCapture,
+                            ),
                     )
                 }
             }

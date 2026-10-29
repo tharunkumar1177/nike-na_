@@ -86,8 +86,8 @@ data class MergeClips(
     }
 
     /**
-     * Throws unless [right] continues [left] in time, source, anchor, placement, sound, text, and look. Only [isTimed]
-     * clips advance their source offset.
+     * Throws unless [right] continues [left] in time, source, anchor, placement, sound, text, look, and ducking. Only
+     * [isTimed] clips advance their source offset.
      */
     private fun requireJoinable(
         left: Clip,
@@ -115,6 +115,9 @@ data class MergeClips(
         require(right.text?.animationIn == null) { "Clip $rightClipId animates in at the join" }
         require(left.outTransition == null) { "Clips $leftClipId and $rightClipId have a transition at the join" }
         require(left.look == right.look) { "Clips $leftClipId and $rightClipId have different looks" }
+        require(left.voiceover == right.voiceover && left.autoDuckPercent == right.autoDuckPercent) {
+            "Clips $leftClipId and $rightClipId duck differently"
+        }
         val sameSpeed = left.speed == right.speed && left.speed !is ClipSpeed.Curve
         require((speed != null || sameSpeed) && left.maintainPitch == right.maintainPitch) {
             "Clips $leftClipId and $rightClipId play at different speeds"

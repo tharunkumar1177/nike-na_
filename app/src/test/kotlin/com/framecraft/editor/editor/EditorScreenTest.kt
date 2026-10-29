@@ -58,7 +58,7 @@ class EditorScreenTest {
             onOpacityCommit = { events += "opacity $it" },
             onAddAudio = { events += "audio" },
             onExtractAudio = { events += "extract" },
-            onAudioCommit = { events += "volume ${it.volumePercent}" },
+            onAudioCommit = { events += "volume ${it.volumePercent} duck ${it.autoDuckPercent}" },
             onAddText = { events += "text" },
             onEditText = { events += "editText" },
             onAnimateText = { events += "animateText" },
@@ -67,6 +67,8 @@ class EditorScreenTest {
             onToggleAdjust = { events += "adjust" },
             onOpenSpeed = { events += "speed" },
             onOpenLook = { events += "look" },
+            onOpenMixer = { events += "mixer" },
+            onRecordVoiceover = { events += "voiceover" },
         )
 
     /** The tools of a selected video clip that plays at 80% for six seconds. */
@@ -268,7 +270,7 @@ class EditorScreenTest {
         composeRule.onNodeWithTag(VOLUME_SLIDER_TAG).assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Mute audio").performClick()
         composeRule.onNodeWithContentDescription("Unmute audio").performClick()
-        assertEquals(listOf("volume 0", "volume 80"), events)
+        assertEquals(listOf("volume 0 duck 0", "volume 80 duck 0"), events)
         composeRule.onNodeWithContentDescription("Back to tools").performClick()
         composeRule.onNodeWithTag(TOOL_VOLUME_TAG).assertExists()
     }
@@ -380,5 +382,51 @@ class EditorScreenTest {
     fun noLookToolOtherwise() {
         showEditor(availability = ToolAvailability(hasSelection = true, canSplit = true))
         composeRule.onAllNodesWithTag(TOOL_LOOK_TAG).assertCountEquals(0)
+    }
+
+    /** Without a selection Voiceover and Mixer are offered and report. */
+    @Test
+    fun voiceoverAndMixerWithoutSelection() {
+        showEditor(availability = ToolAvailability(canRecord = true))
+        composeRule
+            .onNodeWithTag(TOOL_VOICEOVER_TAG)
+            .performScrollTo()
+            .assertIsEnabled()
+            .performClick()
+        composeRule.onNodeWithTag(TOOL_MIXER_TAG).performScrollTo().performClick()
+        assertEquals(listOf("voiceover", "mixer"), events)
+    }
+
+    /** Voiceover is dimmed while every audio lane is busy at the playhead. */
+    @Test
+    fun voiceoverNeedsRoom() {
+        showEditor(availability = ToolAvailability(canRecord = false))
+        composeRule.onNodeWithTag(TOOL_VOICEOVER_TAG).performScrollTo().assertIsNotEnabled()
+    }
+
+    /** A selection offers neither Voiceover nor Mixer. */
+    @Test
+    fun selectionHidesRecorderTools() {
+        showEditor(availability = videoWithSound)
+        composeRule.onAllNodesWithTag(TOOL_VOICEOVER_TAG).assertCountEquals(0)
+        composeRule.onAllNodesWithTag(TOOL_MIXER_TAG).assertCountEquals(0)
+    }
+
+    /** A sound clip offers Duck, whose sheet turns ducking on at the default depth. */
+    @Test
+    fun duckToolOpensSheet() {
+        showEditor(availability = videoWithSound)
+        composeRule.onNodeWithTag(TOOL_DUCK_TAG).performScrollTo().performClick()
+        composeRule.onNodeWithTag(DUCK_SWITCH_TAG).performClick()
+        assertEquals(listOf("volume 80 duck $DEFAULT_DUCK_PERCENT"), events)
+    }
+
+    /** A voiceover clip has no Duck tool, since voiceovers are what others duck under. */
+    @Test
+    fun voiceoverClipHasNoDuckTool() {
+        val take = videoWithSound.copy(audio = videoWithSound.audio?.copy(voiceover = true))
+        showEditor(availability = take)
+        composeRule.onNodeWithTag(TOOL_FADE_TAG).performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithTag(TOOL_DUCK_TAG).assertCountEquals(0)
     }
 }

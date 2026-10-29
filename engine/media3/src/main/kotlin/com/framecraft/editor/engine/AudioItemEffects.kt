@@ -1,5 +1,5 @@
 /*
- * Builds the per-item sound chain: 16-bit samples, stereo channels, then the clip's volume and fades.
+ * Builds the per-item sound chain: 16-bit samples, stereo channels, then the clip's volume, fades, and ducking.
  */
 package com.framecraft.editor.engine
 
@@ -29,7 +29,13 @@ internal object AudioItemEffects {
      */
     fun processorsFor(segment: PlanSegment.Media): List<AudioProcessor> {
         val envelope =
-            GainEnvelope(segment.volumePercent, segment.fadeInMicros, segment.fadeOutMicros, segment.durationMicros)
+            GainEnvelope(
+                segment.volumePercent,
+                segment.fadeInMicros,
+                segment.fadeOutMicros,
+                segment.durationMicros,
+                segment.duckWindows,
+            )
         val gain = ClampingGainProcessor(envelope).takeUnless { envelope.isUnity }
         return listOfNotNull(ToInt16PcmAudioProcessor(), stereoMixer(), gain)
     }
