@@ -36,7 +36,7 @@ Versions are declared in `gradle/libs.versions.toml` and resolved in CI; the tab
 | Media engine | AndroidX Media3 1.11.1 (Transformer, Composition, CompositionPlayer) |
 | Dependency injection | Manual app container (Hilt deferred until the graph needs it) |
 | Serialization | kotlinx.serialization (JSON) |
-| Unit tests | JUnit 5 for pure Kotlin modules; Robolectric 4.17 with JUnit 4 for Android JVM tests |
+| Unit tests | JUnit Jupiter (JUnit 6 BOM) for pure Kotlin modules; Robolectric 4.17 with JUnit 4 for Android JVM tests |
 | Static analysis | ktlint (kotlinter 5.7.0), detekt 2.0.0-alpha.6, Android Lint |
 | SDK levels | minSdk 29, targetSdk 37 |
 
@@ -50,7 +50,7 @@ Dependencies point inward toward `:domain`. `:domain` has zero Android dependenc
 |---|---|---|
 | `:domain` | Project model, time math, anchoring and ripple rules, edit commands | Kotlin stdlib, kotlinx.serialization |
 | `:engine:media3` | Translating a project snapshot into a Media3 `Composition`; preview player; export | `:domain`, Media3 |
-| `:data:project` | Project document files, command journal, autosave, recovery | `:domain` |
+| `:data:project` | Project document files, command journal, autosave, recovery (pure JVM) | `:domain`, kotlinx.serialization, kotlinx.coroutines |
 | `:feature:*` | Compose screens and ViewModels (for example `:feature:timeline`, `:feature:import`) | `:domain`, engine and data interfaces |
 | `:app` | Application, Hilt graph, navigation, foreground services | All modules |
 
@@ -87,16 +87,17 @@ Feature modules never import Media3 types directly; they talk to engine interfac
 
 ### Edit commands and history
 
-- Every project mutation is an `EditCommand` that is pure: `apply(Project) → Project` plus an inverse. UI code never mutates the project directly.
+- Every project mutation is an `EditCommand` that is pure: `applyTo(Project)` returns the new project plus an inverse command. UI code never mutates the project directly.
 - Commands validate before applying and return a typed failure instead of throwing.
 - Undo/redo is a linear history over commands. Gesture-driven edits (a drag) coalesce into one command on gesture end.
 - History is persisted (see below), so undo works after a restart.
 
 ### Project persistence and recovery
 
-- Each project is a directory containing a versioned JSON snapshot and an append-only JSON-lines command journal.
-- Every applied command is appended and flushed before the UI reports it done. A periodic compaction writes a new snapshot atomically (write temp, fsync, rename) and truncates the journal.
-- Recovery on open: load the latest snapshot, replay the journal, and drop a torn final line.
+- Each project is a directory containing a versioned JSON snapshot, an append-only JSON-lines command journal with sequence numbers, a history cursor file, and a summary file that indexes the project list.
+- Every applied command is appended and flushed before the UI reports it done; the cursor is written after the journal. Whole-file writes are atomic (write temp, fsync, rename).
+- Compaction runs when the journal passes 400 records or 1 MB, and when a project closes. It folds records more than 100 behind the cursor into a new snapshot, so at least the latest 100 edits stay undoable.
+- Recovery on open: load the snapshot, replay journal records newer than the snapshot's base sequence number, and drop a torn or unreadable line together with everything after it, keeping a copy of the original journal.
 - Rationale versus Room: the project is a single aggregate tree; whole-document snapshots plus a journal give atomic saves, cheap duplication, and persistent undo without relational mapping.
 
 ### Engine translation
@@ -125,7 +126,7 @@ Feature modules never import Media3 types directly; they talk to engine interfac
 ## Verification boundaries
 
 - `:domain`: JUnit 5 unit tests for time math, commands, anchoring, ripple, and migrations.
-- `:data:project`: unit tests for journal append, compaction, torn-write recovery, and schema migration.
+- `:data:project`: JUnit unit tests for journal append, compaction, torn-write recovery, and schema migration.
 - `:engine:media3`: unit tests for snapshot-to-composition mapping; instrumented tests where a device is required.
 - UI: Compose UI tests for screen state and interactions.
 - GitHub Actions CI is the only build authority: ktlint, detekt, Android Lint, unit tests, and assemble must pass on every push.
