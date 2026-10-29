@@ -391,7 +391,8 @@ class ProjectStoreTest {
             assertTrue(clips.none { it.voiceover || it.autoDuckPercent != 0 })
             val restored = requireNotNull(opened.session.undo()).project
             val video = restored.tracks.first { it.kind == TrackKind.VIDEO }
-            assertEquals("noir", video.clips.single().look?.filterId)
+            val look = video.clips.single().look
+            assertEquals("noir", look?.filterId)
             opened.session.close()
             assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":9"))
         }

@@ -29,8 +29,14 @@ data class SetTrackVolumes(
         val missing = values.firstOrNull { it.trackId !in tracksById }
         val silent = values.firstOrNull { tracksById[it.trackId]?.kind?.takesVolume == false }
         return when {
-            missing != null -> CommandOutcome.Rejected(CommandRejection.TrackNotFound(missing.trackId))
-            silent != null -> CommandOutcome.Rejected(CommandRejection.TrackVolumeNotSupported(silent.trackId))
+            missing != null -> {
+                CommandOutcome.Rejected(CommandRejection.TrackNotFound(missing.trackId))
+            }
+
+            silent != null -> {
+                CommandOutcome.Rejected(CommandRejection.TrackVolumeNotSupported(silent.trackId))
+            }
+
             else -> {
                 val previous =
                     values.map { TrackVolumeValue(it.trackId, tracksById.getValue(it.trackId).volumePercent) }
