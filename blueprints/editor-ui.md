@@ -2,13 +2,13 @@
 
 ## Outcome or responsibility
 
-Own the editor screen: preview surface, timeline rendering, zoom and scrub, selection, precision controls (frame step, zoom to playhead, snap toggle with haptics), and the contextual tool bar.
+Own the editor screen: preview surface, timeline rendering, zoom and scrub, selection, precision controls (frame step, zoom to playhead, snap toggle with haptics), the contextual tool bar, and the export flow (settings sheet, progress, outcome, share, the export foreground service, and its notifications).
 
 ## Current verified status
 
 **Status:** Partial
 
-The home project list (open, rename, delete, unreadable rows), photo-picker import, the editor shell (preview, play and pause, frame step, timecode, undo and redo, save and recovery notices), the timeline (fixed center playhead, frame-snapped scrubbing, pinch zoom, zoom to fit, zoom to playhead, snap toggle, clip thumbnails, tap to select, trim handles, long-press reorder), and the Split and Delete tools are implemented and verified by CI Robolectric tests. Later tools (audio, text, canvas, speed, and the rest) follow in their slices.
+The home project list (open, rename, delete, unreadable rows), photo-picker import, the editor shell (preview, play and pause, frame step, timecode, undo and redo, save and recovery notices), the timeline (fixed center playhead, frame-snapped scrubbing, pinch zoom, zoom to fit, zoom to playhead, snap toggle, clip thumbnails, tap to select, trim handles, long-press reorder), the Split and Delete tools, and the export sheet (settings, progress, success with share and play, failure and cancel) are implemented and verified by CI Robolectric tests. The export service and notifications are implemented; the service lifecycle needs a device and is unverified. Later tools (audio, text, canvas, speed, and the rest) follow in their slices.
 
 ## Architecture dependencies
 
@@ -28,9 +28,11 @@ Every gesture that changes the project dispatches a command; the UI never edits 
 
 Trim and reorder drags preview locally: `TimelineGestures` applies the in-progress command to the shown project in memory and stores it in `TimelineState.preview`, without touching the view model or the player. When the finger lifts, one command is dispatched, and the preview stays (settling) until the saved project arrives or one second passes. The playhead does not follow a trimmed edge, because with a fixed center playhead the clip would scroll away from the finger. Snap and zoom to playhead are editing-session state in `TimelineState` and are not saved. Trim handles appear only on the selected clip; reorder works on magnetic tracks only. Frame step pauses and seeks one frame through `ProjectPreview.pause()` and `FrameRate.stepFrames`.
 
+The export button in the top bar opens a bottom sheet with resolution, frame rate, and quality choices and a size estimate. Starting an export saves the chosen settings and hands an `ExportRequest` to `ExportCoordinator`, which starts `ExportService`. While an export runs, the top-bar button shows a progress ring and the sheet can be closed; the sheet opens again by itself on success or failure. Success offers Share (system chooser with a read grant), Play, and Done. On Android 13 and later the app asks for notification permission before the first export; refusing it does not block the export.
+
 ### Threading
 
-Timeline drawing reads derived state so scrubbing does not recompose the whole screen.
+Timeline drawing reads derived state so scrubbing does not recompose the whole screen. `ExportCoordinator` is an app-scoped holder created in `AppContainer`; the service and the view model share export state through it on the main thread.
 
 ## Related blueprints
 
@@ -40,7 +42,8 @@ Timeline drawing reads derived state so scrubbing does not recompose the whole s
 
 ### Impact checks
 
-- [Media engine](media-engine.md) — when preview controls or playhead sync change.
+- [Media engine](media-engine.md) — when preview controls, playhead sync, or the export request and state change.
+- [Project persistence](project-persistence.md) — when saved export settings change.
 
 ## Relevant implementation and tests
 
@@ -48,7 +51,8 @@ Timeline drawing reads derived state so scrubbing does not recompose the whole s
 - `app/src/main/kotlin/com/framecraft/editor/media/` — `AndroidMediaImporter`, `VideoMetadataParser`.
 - `app/src/main/kotlin/com/framecraft/editor/editor/` — `EditorViewModel`, `OpenProject`, `EditorRoute`, `EditorScreen`.
 - `app/src/main/kotlin/com/framecraft/editor/timeline/` — `TimelineStrip` (canvas, controls, semantics), `TimelineGestures` (scrub, zoom, tap, trim, reorder, haptics), `TimelineGeometry` (time/pixel math, tick ladder, thumbnail tiling, hit testing), `TimelineDrawing`, `TimelineEditDrawing` (handles, floating clip, snap guide), `TimelineThumbnails`, `TimelineState`.
-- Tests: `app/src/test/kotlin/com/framecraft/editor/MainActivityTest.kt`, `home/HomeScreenTest.kt`, `home/EditedTimeTest.kt`, `editor/EditorScreenTest.kt`, `media/VideoMetadataParserTest.kt`, `timeline/TimelineGeometryTest.kt`, `timeline/TimelineStripTest.kt`.
+- `app/src/main/kotlin/com/framecraft/editor/export/` — `ExportSheet`, `ExportSheetActions`, `ExportResultContent`, `ExportViewModel`, `ExportCoordinator`, `ExportService`, `ExportNotifications`, `ExportIntents`; `editor/ExportControls.kt` wires the sheet into the editor.
+- Tests: `app/src/test/kotlin/com/framecraft/editor/MainActivityTest.kt`, `home/HomeScreenTest.kt`, `home/EditedTimeTest.kt`, `editor/EditorScreenTest.kt`, `media/VideoMetadataParserTest.kt`, `timeline/TimelineGeometryTest.kt`, `timeline/TimelineStripTest.kt`, `export/ExportSheetContentTest.kt`, `export/ExportCoordinatorTest.kt`.
 
 ## Acceptance or verification criteria
 
@@ -58,6 +62,8 @@ Timeline drawing reads derived state so scrubbing does not recompose the whole s
 - [x] The home list follows `assets/wireframes/home-projects.md`: rows open projects, rename rejects blank names, delete asks first, and unreadable projects offer delete only.
 - [x] Undo and redo are enabled only when available; tapping a clip selects it, tapping empty space clears the selection, and the Delete tool needs a selection.
 - [x] Basic edits follow `assets/wireframes/timeline-slice5.md`: dragging a trim handle saves exactly one trim, Split is enabled only when the playhead is inside the selected clip, frame-step buttons are disabled at the timeline bounds, and the snap and zoom-to-playhead toggles switch state.
+- [x] Export follows `assets/wireframes/export.md`: choices update the request, an empty project cannot export, progress and saving states show, success offers Share and Play, failures explain the cause, and the top-bar button shows progress while exporting.
+- [x] Export requests start the service once, cancelling before the service starts leaves nothing to run, and share and play intents carry the read grant (`ExportCoordinatorTest`).
 
 ## Remaining gaps and unknowns
 
@@ -70,3 +76,4 @@ Timeline drawing reads derived state so scrubbing does not recompose the whole s
 - `EditorViewModel` has no unit test because its preview player cannot run under Robolectric; save and restore are covered by `ProjectStoreTest`.
 - The save-failure and recovered-edits notices have no automated test.
 - The timeline does not scroll to bring a selected clip into view.
+- `ExportService` and `ExportNotifications` need a device and have no automated test; `ExportViewModel` has no unit test because of Robolectric main-dispatcher limits.
