@@ -116,7 +116,8 @@ private fun Modifier.maskGestures(
                 val pan = event.calculatePan()
                 val zoom = event.calculateZoom()
                 val turn = event.calculateRotation()
-                if (box != null && (pan != Offset.Zero || zoom != 1f || turn != 0f)) {
+                val moved = pan != Offset.Zero || zoom != 1f || turn != 0f
+                if (box != null && moved) {
                     shown = MaskGeometry.transformed(shown, box, pan, zoom, turn)
                     onChange(shown)
                     event.changes.forEach { it.consume() }
