@@ -18,7 +18,8 @@ import kotlinx.serialization.Serializable
  * anchored to the cut clip that start at or after the cut move their anchor to the right part. The left part keeps
  * the fade-in and the right part keeps the fade-out, each shortened to fit its part; a text clip's in and out
  * animations split the same way. A sped clip is cut where its speed plays the cut, or after [leftSourceMicros] of
- * source when given, and each part keeps the speeds of its own source.
+ * source when given, and each part keeps the speeds of its own source. The right part keeps the transition after the
+ * clip; the new cut has none.
  */
 @Serializable
 @SerialName("splitClip")
@@ -56,6 +57,7 @@ data class SplitClip(
                         text = clip.text?.copy(animationOut = null)?.fitted(leftDuration),
                         speed = clip.speed?.slice(clip.sourceSpanMicros, 0L, leftSource),
                         sourceDurationMicros = leftSource.takeIf { clip.speed != null },
+                        outTransition = null,
                     )
                 val right = rightPart(clip, leftDuration, leftSource, project.assetOf(clip).isTimed)
                 val parts = track.clips.flatMap { if (it.id == clipId) listOf(left, right) else listOf(it) }

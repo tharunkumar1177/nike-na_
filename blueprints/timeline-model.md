@@ -8,7 +8,7 @@ Own the pure Kotlin project model: tracks, clips, implicit gaps, magnetic tracks
 
 **Status:** Partial
 
-Time math (`FrameRate`, `Timecode`), the validated document model (`MediaAsset`, `Clip`, `Track`, `Project`, `ProjectFactory`), track kinds (`VIDEO`, `OVERLAY`, `AUDIO`, `TEXT`), clip volume and fades, clip text (see [text](text.md)), overlay placement (`OverlayTransform`), the project canvas (`CanvasSettings` with `CanvasAspect` and `CanvasBackground`) and base clip placement (`CanvasPlacement`, VIDEO clips only), and anchoring (`ClipAnchor`, `AnchorResolver`) are implemented and verified by CI unit tests. Speed and transitions are not built yet.
+Time math (`FrameRate`, `Timecode`), the validated document model (`MediaAsset`, `Clip`, `Track`, `Project`, `ProjectFactory`), track kinds (`VIDEO`, `OVERLAY`, `AUDIO`, `TEXT`), clip volume and fades, clip text (see [text](text.md)), overlay placement (`OverlayTransform`), the project canvas (`CanvasSettings` with `CanvasAspect` and `CanvasBackground`) and base clip placement (`CanvasPlacement`, VIDEO clips only), and anchoring (`ClipAnchor`, `AnchorResolver`) are implemented and verified by CI unit tests. Clip speed (see [clip-speed](clip-speed.md)) and outgoing transitions (see [transitions](transitions.md)) are clip fields under the same validation.
 
 ## Architecture dependencies
 
@@ -41,6 +41,10 @@ Clips on one track must not overlap. Magnetic tracks are kept gap-free by the co
 
 - A clip of a timed asset may carry `speed`, `sourceDurationMicros`, and `maintainPitch` (on by default); `sourceSpanMicros` is the source it reads. `Project` checks the source bounds against that span and the duration against `SpeedMap`, as [Clip speed and source mapping](../architecture.md#clip-speed-and-source-mapping) requires. The rules and commands belong to [clip-speed](clip-speed.md).
 
+### Clip transitions
+
+- A clip may carry `outTransition` (`ClipTransition`: kind and a positive length) into the next clip. Whether it plays is computed from the track by `TransitionGeometry`, never stored, so the field survives edits that separate the clips. The rules and commands belong to [transitions](transitions.md).
+
 ## Related blueprints
 
 ### Required
@@ -70,5 +74,3 @@ None
 - [x] A new project has the original aspect and a black background, and canvas placements off the base are rejected (`CanvasCommandsTest`).
 
 ## Remaining gaps and unknowns
-
-- Speed curves and transitions will extend clip fields; their shape is decided in their slices.

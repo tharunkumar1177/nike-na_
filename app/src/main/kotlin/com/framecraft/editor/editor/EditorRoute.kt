@@ -24,6 +24,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.framecraft.editor.R
+import com.framecraft.editor.domain.command.EditCommand
 import com.framecraft.editor.domain.model.Clip
 import com.framecraft.editor.domain.model.Project
 import com.framecraft.editor.domain.model.TrackKind
@@ -94,9 +95,7 @@ private fun ReadyEditor(
     val export = rememberExportControls(exportViewModel, project)
     val pickers = rememberMediaPickers(viewModel, preview)
     val canvas = rememberCanvasEditing()
-    TextEditHost(pickers.text, project)
-    CanvasSheetHost(canvas, project, viewModel::dispatch)
-    SpeedSheetHost(pickers.speed, project, position, viewModel::dispatch)
+    EditorSheets(pickers, canvas, project, position, viewModel::dispatch, preview::seekTo)
     EditorScreen(
         projectName = project.name,
         previewState = previewState,
@@ -129,12 +128,32 @@ private fun ReadyEditor(
                 onEdit = viewModel::dispatch,
                 onHaptic = haptics::performHapticFeedback,
                 modifier = timelineModifier,
+                onCutSelected = pickers.transition::open,
             )
         },
         modifier = modifier,
         export = export.indicator,
         overlayLayer = selectionLayer(project, selected, kind, position, viewModel, canvas, pickers.text),
     )
+}
+
+/**
+ * Shows whichever of the text, canvas, speed, and transition sheets is open over [project] with the playhead at
+ * [positionMicros]; edits go to [dispatch] and the transition sheet moves the preview through [onSeek].
+ */
+@Composable
+private fun EditorSheets(
+    pickers: MediaPickers,
+    canvas: CanvasEditing,
+    project: Project,
+    positionMicros: Long,
+    dispatch: (EditCommand) -> Unit,
+    onSeek: (Long) -> Unit,
+) {
+    TextEditHost(pickers.text, project)
+    CanvasSheetHost(canvas, project, dispatch)
+    SpeedSheetHost(pickers.speed, project, positionMicros, dispatch)
+    TransitionSheetHost(pickers.transition, project, dispatch, onSeek)
 }
 
 /**

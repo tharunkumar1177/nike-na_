@@ -79,19 +79,20 @@ internal fun rememberAudioPicker(
 }
 
 /**
- * What the add, text, and speed tools open: [overlay] picks photos and videos, [audio] picks sound files, [text]
- * holds the text sheet, and [speed] the speed sheet.
+ * What the add, text, and speed tools and the cut badges open: [overlay] picks photos and videos, [audio] picks sound
+ * files, [text] holds the text sheet, [speed] the speed sheet, and [transition] the transition sheet.
  */
 internal class MediaPickers(
     val overlay: () -> Unit,
     val audio: () -> Unit,
     val text: TextEditing,
     val speed: SpeedEditing,
+    val transition: TransitionEditing,
 )
 
 /**
- * Returns the overlay and music pickers, the text sheet, and the speed sheet of [viewModel], adding at [preview]'s
- * playhead.
+ * Returns the overlay and music pickers, the text sheet, the speed sheet, and the transition sheet of [viewModel],
+ * adding at [preview]'s playhead.
  */
 @Composable
 internal fun rememberMediaPickers(
@@ -103,6 +104,7 @@ internal fun rememberMediaPickers(
         audio = rememberAudioPicker(viewModel.audio, preview),
         text = rememberTextEditing(viewModel),
         speed = rememberSpeedEditing(),
+        transition = rememberTransitionEditing(),
     )
 
 /**

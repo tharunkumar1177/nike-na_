@@ -20,7 +20,7 @@ Ordered vertical slices. Each slice is user-visible, shipped on its own branch, 
 - [x] 9. **Text** — text clips with styles and in/out animations. UI: yes.
 - [x] 10. **Canvas** — project aspect ratio, clip fit/fill, position, scale, rotation. UI: yes.
 - [x] 11. **Speed** — constant speed and speed curves. UI: yes.
-- [ ] 12. **Transitions** — handle-consuming crossfades and a small transition set. UI: yes.
+- [x] 12. **Transitions** — handle-consuming crossfades and a small transition set. UI: yes.
 - [ ] 13. **Look** — filters and color adjustments. UI: yes.
 
 ## Differentiators

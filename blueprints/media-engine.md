@@ -52,6 +52,10 @@ The exporter writes `cache/exports/export.mp4`, then `GallerySaver` inserts a pe
 
 - `PlanSegment.Media` carries `speed`, `sourceSpanMicros`, and `maintainPitch`. `CompositionFactory` clips each item to its source span and, for a sped clip, sets `SpeedParameters` from `SpeedProviders` and caps a sped-up picture at the project frame rate (`SpeedProvidersTest`, `PlaybackPlannerTest`). Details belong to [clip-speed](clip-speed.md).
 
+### Transitions
+
+- A base track with playing transitions becomes up to three sequences from `TransitionLanes`, registered as incoming lane, base, then backdrop; `CompositorInput.Incoming` and `CompositorInput.Backdrop` are shown only during their windows and moved by `TransitionMotion` (`TransitionPlanTest`, `TransitionMotionTest`). Details belong to [transitions](transitions.md).
+
 ## Related blueprints
 
 ### Required

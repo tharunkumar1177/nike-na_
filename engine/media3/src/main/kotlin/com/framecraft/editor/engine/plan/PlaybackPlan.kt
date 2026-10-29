@@ -13,6 +13,7 @@ import com.framecraft.editor.domain.model.Project
 import com.framecraft.editor.domain.model.TextContent
 import com.framecraft.editor.domain.model.Track
 import com.framecraft.editor.domain.model.TrackKind
+import com.framecraft.editor.domain.model.TransitionKind
 import com.framecraft.editor.domain.model.UNITY_VOLUME_PERCENT
 import com.framecraft.editor.domain.time.FrameRate
 
@@ -62,22 +63,49 @@ data class TextSpan(
     val content: TextContent,
 )
 
-/** Where a base clip sits on the canvas from [startMicros] until [endMicros] (exclusive), in timeline time. */
+/**
+ * Where a base clip sits on the canvas from [startMicros] until [endMicros] (exclusive), in timeline time. During a
+ * transition the clip is the [outgoing] side of that kind of transition.
+ */
 data class BaseSpan(
     val startMicros: Long,
     val endMicros: Long,
     val placement: CanvasPlacement,
+    val outgoing: TransitionKind? = null,
 )
+
+/** A transition of [kind] from [startMicros] until [endMicros] (exclusive), with its incoming clip at [placement]. */
+data class TransitionSpan(
+    val startMicros: Long,
+    val endMicros: Long,
+    val kind: TransitionKind,
+    val placement: CanvasPlacement,
+)
+
+/** What a picture sequence shows. */
+enum class SequenceRole {
+    /** A track's own clips. */
+    TRACK,
+
+    /** The incoming clip of each transition on the base track before it. */
+    INCOMING,
+
+    /** The black or white a fade transition on the base track before it passes through. */
+    BACKDROP,
+}
 
 /**
  * Segments of one track of [kind] in timeline order, starting at time zero; overlay tracks also carry their
- * [overlaySpans] and base tracks their [baseSpans].
+ * [overlaySpans] and base tracks their [baseSpans]. A sequence of another [role] serves the transitions of a base
+ * track during its [transitionSpans].
  */
 data class SequencePlan(
     val segments: List<PlanSegment>,
     val overlaySpans: List<OverlaySpan> = emptyList(),
     val kind: TrackKind = TrackKind.VIDEO,
     val baseSpans: List<BaseSpan> = emptyList(),
+    val role: SequenceRole = SequenceRole.TRACK,
+    val transitionSpans: List<TransitionSpan> = emptyList(),
 )
 
 /** What fills the canvas behind the base clips when it is not black. */
@@ -116,8 +144,9 @@ object PlaybackPlanner {
      * picture sequences over later ones, so overlays come before the base. Picture tracks that end before the latest
      * track are padded with a gap, because the compositor waits for a frame from every picture input; on the base
      * this shows black under music that runs past the video. Text tracks add no sequence but count toward that end;
-     * their spans run from the bottom lane up, so upper lanes draw on top. The picture is composited when there are
-     * overlays or the canvas or any base placement differs from the defaults.
+     * their spans run from the bottom lane up, so upper lanes draw on top. A base track that plays transitions brings
+     * its incoming lane just above it and its fade backdrop just below (see [TransitionLanes]). The picture is
+     * composited when there are overlays or transitions, or the canvas or any base placement differs from the defaults.
      */
     fun plan(project: Project): PlaybackPlan {
         val planned = project.tracks.filter { it.clips.isNotEmpty() }
@@ -125,7 +154,7 @@ object PlaybackPlanner {
         val base =
             planned
                 .filter { it.kind == TrackKind.VIDEO }
-                .map { SequencePlan(paddedSegmentsOf(project, it, end), baseSpans = baseSpansOf(it)) }
+                .flatMap { baseSequencesOf(project, it, end) }
         val overlays =
             planned
                 .filter { it.kind == TrackKind.OVERLAY }
@@ -140,16 +169,26 @@ object PlaybackPlanner {
                 .asReversed()
                 .flatMap(::textSpansOf)
         val placed = planned.any { track -> track.clips.any { it.canvasPlacement != null } }
-        val composited = overlays.isNotEmpty() || placed || project.canvas != CanvasSettings()
+        val transitions = base.any { it.role != SequenceRole.TRACK }
+        val composited = overlays.isNotEmpty() || placed || transitions || project.canvas != CanvasSettings()
         return PlaybackPlan(
             sequences = overlays + base + audio,
             frameRate = project.frameRate,
             textSpans = text,
             composited = composited,
             aspectRatio = project.canvas.aspect.ratio,
-            background = backgroundOf(project.canvas.background, base.firstOrNull()),
+            background = backgroundOf(project.canvas.background, base.firstOrNull { it.role == SequenceRole.TRACK }),
         )
     }
+
+    /** Returns the sequences of base [track] padded to [endMicros]: its transition lanes around it, or it alone. */
+    private fun baseSequencesOf(
+        project: Project,
+        track: Track,
+        endMicros: Long,
+    ): List<SequencePlan> =
+        TransitionLanes.sequencesOf(project, track, endMicros)
+            ?: listOf(SequencePlan(paddedSegmentsOf(project, track, endMicros), baseSpans = baseSpansOf(track)))
 
     /** Returns the plan for [background] behind [firstBase], or null for black or when there is nothing to blur. */
     private fun backgroundOf(

@@ -43,6 +43,10 @@ The commands `RenameProject`, `DeleteClip`, `AddClip`, `TrimClip`, `SplitClip`, 
 
 - `SetClipSpeed` changes a clip's speed with an exact inverse. `TrimClip` carries the sped clip's source length, `SplitClip` the left part's source (`leftSourceMicros`), and `MergeClips` the merged speed, so trims, splits, and merges of sped clips undo exactly; `TrimController` proposes source and duration through `SpeedMap`. Details belong to [clip-speed](clip-speed.md).
 
+### Transition editing
+
+- `SetTransition` and `ApplyTransitionToAll` invert through `SetTransitions`, which restores each clip's previous transition verbatim. `SplitClip` hands a transition to the right part and `MergeClips` keeps the right part's, so splits and merges undo exactly; no other command touches transitions (`TransitionCommandsTest`). Details belong to [transitions](transitions.md).
+
 ## Related blueprints
 
 ### Required

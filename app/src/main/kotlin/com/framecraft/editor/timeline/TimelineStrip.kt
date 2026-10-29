@@ -80,7 +80,7 @@ class ScrubCallbacks(
  * selects the clip under it, or clears the selection on empty space, through [onClipSelected]. Dragging a
  * handle of the selected clip trims it and holding a clip lifts it for reordering; each drag reports one
  * command to [onEdit] when the finger lifts. [onHaptic] plays snap and pickup feedback. Audio lanes show the loudness
- * of their sounds from [waveforms].
+ * of their sounds from [waveforms]. Tapping the badge on a video cut reports the clip before it to [onCutSelected].
  */
 @Composable
 fun TimelineStrip(
@@ -94,10 +94,11 @@ fun TimelineStrip(
     onEdit: (EditCommand) -> Unit,
     onHaptic: (HapticFeedbackType) -> Unit,
     modifier: Modifier = Modifier,
+    onCutSelected: (String) -> Unit = {},
 ) {
     val state = rememberTimelineState(project.id)
     val currentSelection by rememberUpdatedState(selectedClipId)
-    val edits = rememberEditCallbacks(onClipSelected, onEdit, onHaptic)
+    val edits = rememberEditCallbacks(onClipSelected, onEdit, onHaptic, onCutSelected)
     val pending = state.preview
     LaunchedEffect(pending) {
         if (pending?.settling == true) {
@@ -118,6 +119,7 @@ fun TimelineStrip(
             selectedClipId = selectedClipId,
             onSeek = callbacks.onSeek,
             onEdit = edits.onCommit,
+            onCut = edits.onCut,
             modifier =
                 Modifier.pointerInput(project) {
                     val context = TimelineGestureContext(state, project, edits) { currentSelection }
@@ -132,22 +134,24 @@ fun TimelineStrip(
     }
 }
 
-/** Remembers edit callbacks that always call the latest [onSelect], [onCommit], and [onHaptic]. */
+/** Remembers edit callbacks that always call the latest [onSelect], [onCommit], [onHaptic], and [onCut]. */
 @Composable
 private fun rememberEditCallbacks(
     onSelect: (String?) -> Unit,
     onCommit: (EditCommand) -> Unit,
     onHaptic: (HapticFeedbackType) -> Unit,
+    onCut: (String) -> Unit,
 ): TimelineEditCallbacks {
     val select by rememberUpdatedState(onSelect)
     val commit by rememberUpdatedState(onCommit)
     val haptic by rememberUpdatedState(onHaptic)
-    return remember { TimelineEditCallbacks({ select(it) }, { commit(it) }, { haptic(it) }) }
+    val cut by rememberUpdatedState(onCut)
+    return remember { TimelineEditCallbacks({ select(it) }, { commit(it) }, { haptic(it) }, { cut(it) }) }
 }
 
 /**
  * The drawn timeline: [preview] replaces [project] while a drag is in progress. TalkBack can nudge a selected overlay
- * through [onEdit].
+ * through [onEdit] and open the transition of each video cut through [onCut].
  */
 @Composable
 private fun TimelineCanvas(
@@ -159,6 +163,7 @@ private fun TimelineCanvas(
     selectedClipId: String?,
     onSeek: (Long) -> Unit,
     onEdit: (EditCommand) -> Unit,
+    onCut: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val style = rememberTimelineStyle()
@@ -166,7 +171,8 @@ private fun TimelineCanvas(
     val thumbnailVersion by sources.thumbnails.version.collectAsState()
     val waveformVersion by sources.waveforms.version.collectAsState()
     val shown = preview?.project ?: project
-    val nudges = overlayNudges(project, selectedClipId, onEdit)
+    val nudges = overlayNudges(project, selectedClipId, onEdit) + cutActions(resources, project, onCut)
+    val cuts = remember(shown) { TimelineCuts.of(shown) }
     Canvas(
         modifier
             .fillMaxSize()
@@ -189,6 +195,7 @@ private fun TimelineCanvas(
         shown.tracks.forEachIndexed { index, track ->
             drawTrack(frame, track, frame.metrics.rowTop(index), selectedClipId)
         }
+        if (preview == null) drawCutBadges(frame, cuts)
         drawSelection(frame, selectedClipId)
         if (preview?.floating == null) drawTrimHandles(frame, selectedClipId)
         drawFloatingClip(frame, preview?.floating)

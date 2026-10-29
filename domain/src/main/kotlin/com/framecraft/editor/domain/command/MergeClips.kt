@@ -19,7 +19,7 @@ import kotlinx.serialization.Serializable
  * animation at the join; the merged clip enters like the left part and leaves like the right one unless [animationIn]
  * or [animationOut] override them. Clips anchored to the right part move their anchor to the merged clip. Parts must
  * play at the same constant speed and pitch setting unless [speed] gives the merged clip's speed, as when undoing a
- * split of a curve.
+ * split of a curve. A transition at the join rejects the merge; the merged clip keeps the right part's transition.
  */
 @Serializable
 @SerialName("mergeClips")
@@ -50,6 +50,7 @@ data class MergeClips(
                             (left.sourceSpanMicros + right.sourceSpanMicros).takeIf { mergedSpeed != null },
                         fadeInMicros = fadeInMicros ?: left.fadeInMicros,
                         fadeOutMicros = fadeOutMicros ?: right.fadeOutMicros,
+                        outTransition = right.outTransition,
                         text =
                             left.text?.copy(
                                 animationIn = animationIn ?: left.text.animationIn,
@@ -112,6 +113,7 @@ data class MergeClips(
             "Clips $leftClipId and $rightClipId differ in text or animate at the join"
         }
         require(right.text?.animationIn == null) { "Clip $rightClipId animates in at the join" }
+        require(left.outTransition == null) { "Clips $leftClipId and $rightClipId have a transition at the join" }
         val sameSpeed = left.speed == right.speed && left.speed !is ClipSpeed.Curve
         require((speed != null || sameSpeed) && left.maintainPitch == right.maintainPitch) {
             "Clips $leftClipId and $rightClipId play at different speeds"

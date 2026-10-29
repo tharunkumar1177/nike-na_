@@ -29,11 +29,15 @@ import com.framecraft.editor.domain.time.MICROS_PER_SECOND
 import kotlin.math.abs
 import kotlin.math.roundToLong
 
-/** What timeline edits report: tap selection [onSelect], one saved edit per drag [onCommit], and [onHaptic]. */
+/**
+ * What timeline edits report: tap selection [onSelect], one saved edit per drag [onCommit], [onHaptic], and a tap on
+ * the badge of the cut after clip [onCut].
+ */
 class TimelineEditCallbacks(
     val onSelect: (String?) -> Unit,
     val onCommit: (EditCommand) -> Unit,
     val onHaptic: (HapticFeedbackType) -> Unit,
+    val onCut: (String) -> Unit = {},
 )
 
 /** A clip on row [trackIndex] of the timeline. */
@@ -120,7 +124,8 @@ private suspend fun AwaitPointerEventScope.holdOrScrub(
     scrub: ScrubCallbacks,
 ) {
     val hit = clipAt(context, down.position)
-    val target = hit?.takeIf { it.track.magnetic }
+    val cut = cutAt(context, down.position)
+    val target = hit?.takeIf { it.track.magnetic && cut == null }
     val hold = if (target == null) Hold.MOVED else awaitHold(down)
     when {
         hit != null && hit.track.kind.isPlaced -> {
@@ -137,7 +142,11 @@ private suspend fun AwaitPointerEventScope.holdOrScrub(
 
         else -> {
             val tapped = scrubLoop(context, scrub)
-            if (tapped && target == null) context.edits.onSelect(hit?.clip?.id)
+            if (tapped && cut != null) {
+                context.edits.onCut(cut.left.id)
+            } else if (tapped && target == null) {
+                context.edits.onSelect(hit?.clip?.id)
+            }
         }
     }
 }

@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
 import kotlin.math.abs
 
 /** Schema version written by this build. */
-const val CURRENT_SCHEMA_VERSION: Int = 6
+const val CURRENT_SCHEMA_VERSION: Int = 7
 
 /** An immutable project snapshot. Construction fails if any cross-object invariant is broken. */
 @Serializable

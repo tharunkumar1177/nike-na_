@@ -61,6 +61,21 @@ sealed interface CommandRejection {
     data class SpeedNotSupported(
         val clipId: String,
     ) : CommandRejection
+
+    /** Clip or track [id] is not on a video track, the only kind that plays transitions. */
+    data class TransitionNotSupported(
+        val id: String,
+    ) : CommandRejection
+
+    /** Clip [clipId] ends where no other clip starts, so it has no cut to transition at. */
+    data class NotButted(
+        val clipId: String,
+    ) : CommandRejection
+
+    /** The cut allows at most [maxMicros] of transition, under the shortest a transition may last. */
+    data class TransitionTooShort(
+        val maxMicros: Long,
+    ) : CommandRejection
 }
 
 /** A clip together with the track that holds it. */
