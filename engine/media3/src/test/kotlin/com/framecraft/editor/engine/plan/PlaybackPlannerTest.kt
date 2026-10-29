@@ -218,12 +218,10 @@ class PlaybackPlannerTest {
         val placedTrack = track.copy(clips = listOf(first) + track.clips.drop(1))
         val placed = PlaybackPlanner.plan(plain.copy(tracks = listOf(placedTrack)))
         assertTrue(placed.composited)
-        val span =
-            placed.sequences
-                .single()
-                .baseSpans
-                .single()
-        assertEquals(BaseSpan(0, 2_000_000, filled), span)
+        assertEquals(
+            listOf(BaseSpan(0, 2_000_000, filled), BaseSpan(2_000_000, 3_000_000, CanvasPlacement())),
+            placed.sequences.single().baseSpans,
+        )
     }
 
     /** A solid background plans its color and a blur copies the first base track's segments and spans. */

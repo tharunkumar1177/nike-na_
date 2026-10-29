@@ -33,7 +33,8 @@ class CanvasLayoutTest {
         assertEquals(0.5625f, CanvasLayout.fitFactor(CanvasFit.FIT, portrait, landscape), 1e-4f)
         assertEquals(1.7778f, CanvasLayout.fitFactor(CanvasFit.FILL, portrait, landscape), 1e-4f)
         assertEquals(1f, CanvasLayout.fitFactor(CanvasFit.FIT, landscape, landscape), 0f)
-        assertEquals(2f, CanvasLayout.fitFactor(CanvasFit.FILL, PixelSize(400, 400), PixelSize(200, 100)), 0f)
+        assertEquals(4f, CanvasLayout.fitFactor(CanvasFit.FILL, PixelSize(400, 400), PixelSize(200, 100)), 0f)
+        assertEquals(2f, CanvasLayout.fitFactor(CanvasFit.FIT, PixelSize(400, 400), PixelSize(200, 100)), 0f)
     }
 
     /** Inputs run clock, overlays, base, then the background; sound adds none. */
