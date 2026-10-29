@@ -69,7 +69,10 @@ fun ExportSheet(
     }
 }
 
-/** The sheet body for [state]: settings when idle, progress while exporting, then the outcome; it scrolls when short. */
+/**
+ * The sheet body for [state]: settings when idle, progress while exporting, then the outcome.
+ * It scrolls so the actions stay reachable on short screens.
+ */
 @Composable
 internal fun ExportSheetContent(
     form: ExportForm?,
