@@ -76,9 +76,11 @@ Feature modules never import Media3 types directly; they talk to engine interfac
 - A project is one immutable aggregate snapshot: `Project → Track[] → Clip[]`, plus project settings (aspect ratio, frame rate, canvas background).
 - There is **no privileged main track**. Any track may set `magnetic = true`, which closes gaps when clips are removed or trimmed on that track.
 - Gaps are **implicit**: a gap is any timeline span with no clip on a track. The domain never stores filler clips.
-- Each track has a kind: `VIDEO` (base video, drawn full frame) or `OVERLAY` (composited over the base). Only overlay clips carry a placement: center in normalized canvas units with y downward, scale relative to the largest size that fits inside the canvas, clockwise rotation, and opacity.
-- The canvas size and aspect ratio come from the first base clip, never from an overlay.
-- The document carries an integer `schemaVersion` (currently 2). Readers migrate older versions forward; they refuse newer versions with a visible error.
+- Each track has a kind: `VIDEO` (base video, drawn full frame), `OVERLAY` (composited over the base), or `AUDIO` (sound only, never drawn). Only overlay clips carry a placement: center in normalized canvas units with y downward, scale relative to the largest size that fits inside the canvas, clockwise rotation, and opacity. Only `VIDEO` tracks may be magnetic.
+- Media assets are `VIDEO`, `IMAGE`, or `AUDIO`. Picture tracks reject audio assets; audio tracks accept any asset with sound except images, so an extracted sound shares its video's asset.
+- Every clip carries a volume from 0 to 200 percent (100 is unchanged) and fade-in and fade-out lengths whose sum fits within the clip. Gain is the volume times linear fades from the clip's edges. Images keep the defaults.
+- The canvas size and aspect ratio come from the first base clip, never from an overlay or a sound.
+- The document carries an integer `schemaVersion` (currently 3). Readers migrate older versions forward; they refuse newer versions with a visible error.
 
 ### Anchoring and ripple
 
@@ -108,13 +110,13 @@ Feature modules never import Media3 types directly; they talk to engine interfac
 
 - The engine consumes immutable project snapshots only. It never writes back to the project.
 - The adapter maps each track to a Media3 `EditedMediaItemSequence` and pads implicit gaps with generated silent or transparent segments at preview and export time.
-- Base video sequences come first and overlay sequences after them. A compositor setting places each overlay frame from the clip covering its time; the first sequence sets the output size. Preview builds its player with a multiple-input video graph so the same composition renders on screen.
+- Base video sequences come first, overlay sequences after them, and audio sequences last. Every base sequence is padded to the end of the latest track so sound beyond the pictures still plays. Audio sequences carry only audio; a muted picture clip carries no audio, and every other clip's sound passes through per-clip processing (to 16-bit PCM, mixed to stereo, then the clip's gain with clamping). A compositor setting places each overlay frame from the clip covering its time; the first sequence sets the output size. Preview builds its player with a multiple-input video graph so the same composition renders on screen.
 - Transitions consume clip handles (overlapping source media); they never freeze frames.
 - Preview and export use the same translation so what you see is what you export.
 
 ### Media access
 
-- Import uses Android photo picker and media store APIs and handles partial access (`READ_MEDIA_VISUAL_USER_SELECTED`) on Android 14 and later.
+- Video and photo import uses Android photo picker and media store APIs and handles partial access (`READ_MEDIA_VISUAL_USER_SELECTED`) on Android 14 and later. Music is picked through the system document picker (`audio/*`), which needs no permission; the importer keeps a persistable read grant where the provider offers one.
 - Loss of access to a referenced source is a recoverable state (offline clip with relink), never a crash or silent removal.
 - Exports are published to the shared `Movies/Framecraft` collection through `MediaStore` with `IS_PENDING`, so other apps never see a partial file and no storage permission is needed. Exported files are shared by content URI with a read grant.
 

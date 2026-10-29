@@ -1,10 +1,11 @@
 /*
- * Canvas drawing for the timeline: ruler, clip rows with thumbnails, and the fixed center playhead.
+ * Canvas drawing for the timeline: ruler, clip rows with thumbnails or waveforms, and the fixed center playhead.
  */
 package com.framecraft.editor.timeline
 
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -29,7 +30,6 @@ import com.framecraft.editor.domain.model.Track
 import com.framecraft.editor.domain.model.TrackKind
 import com.framecraft.editor.domain.time.MICROS_PER_SECOND
 import com.framecraft.editor.domain.time.Timecode
-import com.framecraft.editor.engine.ThumbnailSource
 import kotlin.math.roundToInt
 
 /** Height of one track row. */
@@ -65,6 +65,7 @@ class TimelineStyle(
     val labelStyle: TextStyle,
     val brokenImage: Painter,
     val overlay: OverlayStyle,
+    val audio: AudioStyle,
 )
 
 /** Pixel sizes derived from the design's dp values for the current density. */
@@ -128,6 +129,12 @@ class TimelineMetrics(
     /** Size of the attached or free badge on overlay clips. */
     val badgeSize = with(scope) { 16.dp.toPx() }
 
+    /** Width of one waveform bar on audio clips. */
+    val waveBarWidth = with(scope) { 2.dp.toPx() }
+
+    /** Gap between waveform bars. */
+    val waveBarGap = with(scope) { 2.dp.toPx() }
+
     /** Returns the top edge of track row [index]. */
     fun rowTop(index: Int): Float = rulerHeight + rowGap + index * (rowHeight + rowGap)
 }
@@ -139,7 +146,7 @@ class TimelineFrame(
     val pxPerSecond: Float,
     val metrics: TimelineMetrics,
     val style: TimelineStyle,
-    val thumbnails: ThumbnailSource,
+    val sources: TimelineSources,
 )
 
 /** Returns the x position of [micros] in this frame. */
@@ -178,15 +185,17 @@ fun DrawScope.drawRuler(frame: TimelineFrame) {
     }
 }
 
-/** Draws the visible clips of [track] in the row starting at [top]. */
+/** Draws the visible clips of [track] in the row starting at [top]; the clip [selectedClipId] stands out. */
 fun DrawScope.drawTrack(
     frame: TimelineFrame,
     track: Track,
     top: Float,
+    selectedClipId: String?,
 ) {
     val metrics = frame.metrics
     val range = TimelineGeometry.visibleRange(frame.centerMicros, frame.pxPerSecond, size.width)
     val isOverlay = track.kind == TrackKind.OVERLAY
+    val isAudio = track.kind == TrackKind.AUDIO
     val fill = if (isOverlay) frame.style.overlay.clip else frame.style.colors.clip
     track.clips
         .filter { it.endMicros >= range.first && it.startMicros <= range.last }
@@ -203,11 +212,16 @@ fun DrawScope.drawTrack(
                         cornerRadius = CornerRadius(metrics.clipCorner),
                     )
                 clipPath(Path().apply { addRoundRect(block) }) {
-                    drawRect(color = fill, topLeft = Offset(left, top), size = block.size())
-                    drawThumbnails(frame, clip, top)
+                    if (isAudio) {
+                        val bounds = Rect(left, top, block.right, block.bottom)
+                        drawAudioClip(frame, clip, bounds, selected = clip.id == selectedClipId)
+                    } else {
+                        drawRect(color = fill, topLeft = Offset(left, top), size = block.size())
+                        drawThumbnails(frame, clip, top)
+                    }
                 }
                 drawClipLabel(frame, TimelineGeometry.formatClipDuration(clip.durationMicros), left, width, top)
-                if (isOverlay) drawOverlayBadge(frame, clip, left, width, top)
+                if (isOverlay || (isAudio && clip.anchor != null)) drawLinkBadge(frame, clip, left, width, top)
             }
         }
 }
@@ -225,7 +239,7 @@ private fun DrawScope.drawThumbnails(
     val viewport = TimelineViewport(frame.centerMicros, frame.pxPerSecond, size.width, metrics.rowHeight)
     val tiles = clipThumbnails(frame.project, clip, viewport)
     tiles.forEach { (tile, key, fullWidth) ->
-        val bitmap = frame.thumbnails.get(key) ?: return@forEach
+        val bitmap = frame.sources.thumbnails.get(key) ?: return@forEach
         val sourceWidth = (bitmap.width * tile.widthPx / fullWidth).roundToInt().coerceIn(1, bitmap.width)
         drawImage(
             image = bitmap.asImageBitmap(),
@@ -235,7 +249,7 @@ private fun DrawScope.drawThumbnails(
             dstSize = IntSize(tile.widthPx.roundToInt(), metrics.rowHeight.roundToInt()),
         )
     }
-    val failedTile = tiles.firstOrNull { frame.thumbnails.hasFailed(it.key) }?.tile
+    val failedTile = tiles.firstOrNull { frame.sources.thumbnails.hasFailed(it.key) }?.tile
     if (failedTile != null) {
         val iconLeft = failedTile.leftPx + (failedTile.widthPx - metrics.iconSize) / 2f
         val iconTop = top + (metrics.rowHeight - metrics.iconSize) / 2f
@@ -278,10 +292,10 @@ private fun DrawScope.drawClipLabel(
 }
 
 /**
- * Draws a link badge on a scrim at the bottom-left corner of overlay [clip], spanning [clipLeft] to [clipLeft] +
- * [clipWidth]: linked when it is attached to a base clip, broken when it is free. Too narrow a clip gets none.
+ * Draws a link badge on a scrim at the bottom-left corner of [clip], spanning [clipLeft] to [clipLeft] + [clipWidth]:
+ * linked when it is attached to a base clip, broken when it is free. Too narrow a clip gets none.
  */
-private fun DrawScope.drawOverlayBadge(
+private fun DrawScope.drawLinkBadge(
     frame: TimelineFrame,
     clip: Clip,
     clipLeft: Float,

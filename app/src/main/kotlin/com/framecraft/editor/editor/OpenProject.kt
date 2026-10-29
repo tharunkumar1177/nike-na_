@@ -1,21 +1,20 @@
 /*
- * One open project: its saving session, preview player, and thumbnails, edited one change at a time.
+ * One open project: its saving session, preview player, and timeline media, edited one change at a time.
  */
 package com.framecraft.editor.editor
 
 import com.framecraft.editor.data.project.ProjectSession
 import com.framecraft.editor.data.project.SessionState
-import com.framecraft.editor.engine.ClipThumbnails
 import com.framecraft.editor.engine.ProjectPreview
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.IOException
 
-/** Owns [session] together with the [preview] and [thumbnails] built for it. */
+/** Owns [session] together with the [preview] and timeline [media] built for it. */
 internal class OpenProject(
     private val session: ProjectSession,
     val preview: ProjectPreview,
-    val thumbnails: ClipThumbnails,
+    val media: TimelineMedia,
 ) {
     private val editLock = Mutex()
 
@@ -36,9 +35,9 @@ internal class OpenProject(
         }
     }
 
-    /** Releases the preview player and thumbnails. */
+    /** Releases the preview player and timeline media. */
     fun release() {
         preview.release()
-        thumbnails.close()
+        media.close()
     }
 }

@@ -8,7 +8,7 @@ Own edit commands and linear undo/redo: every user edit becomes a validated, inv
 
 **Status:** Implemented
 
-The commands `RenameProject`, `DeleteClip`, `AddClip`, `TrimClip`, `SplitClip`, `MergeClips`, and `MoveClip` and the `EditHistory` stack are implemented in `:domain` and verified by `EditCommandTest`, `ClipEditCommandsTest`, and `EditHistoryTest`. The overlay commands `AddOverlayClip`, `RemoveOverlayClip`, `MoveOverlay`, `SetOverlayTransform`, and `ReanchorOverlay`, and the anchor ripple of the clip commands, are verified by `OverlayCommandsTest`. The drag rules in `domain/edit` (`TrimController`, `SnapPoints`, `ReorderSlots`, `OverlayPlacement`) are verified by `EditGesturesTest` and `OverlayPlacementTest`. Persistent undo is verified by `ProjectStoreTest`.
+The commands `RenameProject`, `DeleteClip`, `AddClip`, `TrimClip`, `SplitClip`, `MergeClips`, and `MoveClip` and the `EditHistory` stack are implemented in `:domain` and verified by `EditCommandTest`, `ClipEditCommandsTest`, and `EditHistoryTest`. The overlay commands `AddOverlayClip`, `RemoveOverlayClip`, `MoveOverlay`, `SetOverlayTransform`, and `ReanchorOverlay`, and the anchor ripple of the clip commands, are verified by `OverlayCommandsTest`. The audio commands `AddAudioClip`, `RemoveAudioClip`, `ExtractAudio`, and `SetClipAudio`, and fade handling in trim, split, and merge, are verified by `AudioCommandsTest`; their rules live in [audio](audio.md). The drag rules in `domain/edit` (`TrimController`, `SnapPoints`, `ReorderSlots`, `OverlayPlacement`, `AudioPlacement`) are verified by `EditGesturesTest`, `OverlayPlacementTest`, and `AudioPlacementTest`. Persistent undo is verified by `ProjectStoreTest`.
 
 ## Architecture dependencies
 
@@ -30,6 +30,7 @@ The commands `RenameProject`, `DeleteClip`, `AddClip`, `TrimClip`, `SplitClip`, 
 - `TrimClip` and `MoveClip` shift an anchored clip's offset by its start change. `DeleteClip` and `RemoveOverlayClip` free the children of the removed clip and their inverses carry `AnchorRestoration`s that re-attach them. `SplitClip` re-anchors children at or after the cut to the right part; `MergeClips` re-anchors them back and only joins parts with matching anchors and placements.
 - `AddOverlayClip` adds the asset when missing and creates the overlay track at the front of the track list (drawn above the base); `RemoveOverlayClip` drops an emptied track and an asset no other clip uses. `MoveOverlay` sets the anchor (or none) and start together; `ReanchorOverlay` changes the parent and keeps the position; `SetOverlayTransform` changes placement only.
 - A drag produces exactly one command when the finger lifts; `TrimController` turns a drag delta into a frame-aligned, clamped, optionally snapped `TrimClip`, `ReorderSlots` lists where a lifted clip can land, and `OverlayPlacement.drag` turns an overlay drag into a snapped `MoveOverlay` attached to the base clip under its new start.
+- `TrimClip` and `MergeClips` carry optional fade lengths, so the inverses of trims and splits restore the exact fades; records without them, including older journals, use the default rule (a trim shortens fades to fit, a merge takes the left fade-in and the right fade-out).
 - A new command after undo discards the redo branch.
 
 ### Project persistence and recovery
@@ -49,9 +50,9 @@ The commands `RenameProject`, `DeleteClip`, `AddClip`, `TrimClip`, `SplitClip`, 
 
 ## Relevant implementation and tests
 
-- `domain/src/main/kotlin/com/framecraft/editor/domain/command/` — `EditCommand`, `RenameProject`, `DeleteClip`, `AddClip`, `TrimClip`, `SplitClip`, `MergeClips`, `MoveClip`, `AddOverlayClip`, `RemoveOverlayClip`, `MoveOverlay`, `SetOverlayTransform`, `ReanchorOverlay`, `AnchorRestoration`, `EditHistory`.
-- `domain/src/main/kotlin/com/framecraft/editor/domain/edit/` — `TrimController`, `SnapPoints`, `ReorderSlots`, `OverlayPlacement`.
-- `domain/src/test/kotlin/com/framecraft/editor/domain/command/` — `EditCommandTest`, `ClipEditCommandsTest`, `EditHistoryTest`, `OverlayCommandsTest`.
+- `domain/src/main/kotlin/com/framecraft/editor/domain/command/` — `EditCommand`, `RenameProject`, `DeleteClip`, `AddClip`, `TrimClip`, `SplitClip`, `MergeClips`, `MoveClip`, `AddOverlayClip`, `RemoveOverlayClip`, `MoveOverlay`, `SetOverlayTransform`, `ReanchorOverlay`, `AddAudioClip`, `RemoveAudioClip`, `ExtractAudio`, `SetClipAudio`, `AnchorRestoration`, `EditHistory`.
+- `domain/src/main/kotlin/com/framecraft/editor/domain/edit/` — `TrimController`, `SnapPoints`, `ReorderSlots`, `OverlayPlacement`, `AudioPlacement`.
+- `domain/src/test/kotlin/com/framecraft/editor/domain/command/` — `EditCommandTest`, `ClipEditCommandsTest`, `EditHistoryTest`, `OverlayCommandsTest`, `AudioCommandsTest`.
 - `domain/src/test/kotlin/com/framecraft/editor/domain/edit/EditGesturesTest.kt` — trim clamps, frame and target snapping, reorder slots.
 - `domain/src/test/kotlin/com/framecraft/editor/domain/edit/OverlayPlacementTest.kt` — overlay placement at the playhead, overlay drags, and overlay snap targets.
 - `data/project/src/test/kotlin/com/framecraft/editor/data/project/ProjectStoreTest.kt` — undo after restart.

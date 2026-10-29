@@ -13,6 +13,7 @@ import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
 import androidx.media3.transformer.Effects
 import com.framecraft.editor.domain.model.MediaKind
+import com.framecraft.editor.domain.model.TrackKind
 import com.framecraft.editor.engine.plan.PlanSegment
 import com.framecraft.editor.engine.plan.PlaybackPlan
 import kotlin.math.roundToInt
@@ -20,13 +21,19 @@ import kotlin.math.roundToInt
 /** Microseconds in a millisecond. */
 private const val MICROS_PER_MILLI = 1_000L
 
+/** Track types of a sound-only sequence. */
+private val AUDIO_TRACKS = setOf(C.TRACK_TYPE_AUDIO)
+
+/** Track types of a picture sequence, which also carries sound. */
+private val AUDIO_VIDEO_TRACKS = setOf(C.TRACK_TYPE_AUDIO, C.TRACK_TYPE_VIDEO)
+
 /** Creates Media3 compositions. */
 @OptIn(markerClass = [UnstableApi::class])
 internal object CompositionFactory {
     /**
-     * Returns a composition with one audio-and-video sequence per planned track, with overlay sequences placed by
-     * [OverlayCompositorSettings]. Export passes [videoEffects] that apply to the whole output; the preview passes
-     * none.
+     * Returns a composition with one sequence per planned track: audio-and-video for picture tracks and audio only
+     * for sound tracks, with overlay sequences placed by [OverlayCompositorSettings]. Export passes [videoEffects]
+     * that apply to the whole output; the preview passes none.
      */
     fun create(
         plan: PlaybackPlan,
@@ -35,56 +42,82 @@ internal object CompositionFactory {
         val frameRate = (plan.frameRate.numerator.toDouble() / plan.frameRate.denominator).roundToInt()
         val sequences =
             plan.sequences.map { sequence ->
-                val builder = EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_AUDIO, C.TRACK_TYPE_VIDEO))
+                val audioOnly = sequence.kind == TrackKind.AUDIO
+                val trackTypes = if (audioOnly) AUDIO_TRACKS else AUDIO_VIDEO_TRACKS
+                val builder = EditedMediaItemSequence.Builder(trackTypes)
                 sequence.segments.forEach { segment ->
                     when (segment) {
                         is PlanSegment.Gap -> builder.addGap(segment.durationMicros)
-                        is PlanSegment.Media -> builder.addItem(editedItem(segment, frameRate))
+                        is PlanSegment.Media -> builder.addItem(editedItem(segment, frameRate, audioOnly))
                     }
                 }
                 builder.build()
             }
         val builder = Composition.Builder(sequences).setEffects(Effects(emptyList(), videoEffects))
-        if (plan.sequences.size > 1) {
+        if (plan.sequences.any { it.kind == TrackKind.OVERLAY }) {
             builder.setVideoCompositorSettings(OverlayCompositorSettings(plan.sequences.map { it.overlaySpans }))
         }
         return builder.build()
     }
 
-    /** Maps a media segment to an edited item, clipping videos and timing images. */
+    /** Maps a media segment to an edited item; [audioOnly] items keep only their sound. */
     private fun editedItem(
         segment: PlanSegment.Media,
         frameRate: Int,
+        audioOnly: Boolean,
     ): EditedMediaItem =
         when (segment.kind) {
-            MediaKind.VIDEO -> {
-                val clipping =
-                    MediaItem.ClippingConfiguration
-                        .Builder()
-                        .setStartPositionUs(segment.sourceStartMicros)
-                        .setEndPositionUs(segment.sourceStartMicros + segment.durationMicros)
-                        .build()
-                val item =
-                    MediaItem
-                        .Builder()
-                        .setUri(segment.uri)
-                        .setClippingConfiguration(clipping)
-                        .build()
-                EditedMediaItem.Builder(item).setDurationUs(segment.sourceDurationMicros).build()
-            }
-
-            MediaKind.IMAGE -> {
-                val item =
-                    MediaItem
-                        .Builder()
-                        .setUri(segment.uri)
-                        .setImageDurationMs(segment.durationMicros / MICROS_PER_MILLI)
-                        .build()
-                EditedMediaItem
-                    .Builder(item)
-                    .setDurationUs(segment.durationMicros)
-                    .setFrameRate(frameRate)
-                    .build()
-            }
+            MediaKind.IMAGE -> imageItem(segment, frameRate)
+            MediaKind.VIDEO, MediaKind.AUDIO -> clippedItem(segment, audioOnly || segment.kind == MediaKind.AUDIO)
         }
+
+    /**
+     * Returns the clipped source of [segment] with its sound chain. A muted picture item drops its sound; a
+     * [soundOnly] item drops its picture and keeps its sound, silenced by the gain envelope when muted.
+     */
+    private fun clippedItem(
+        segment: PlanSegment.Media,
+        soundOnly: Boolean,
+    ): EditedMediaItem {
+        val clipping =
+            MediaItem.ClippingConfiguration
+                .Builder()
+                .setStartPositionUs(segment.sourceStartMicros)
+                .setEndPositionUs(segment.sourceStartMicros + segment.durationMicros)
+                .build()
+        val item =
+            MediaItem
+                .Builder()
+                .setUri(segment.uri)
+                .setClippingConfiguration(clipping)
+                .build()
+        val builder = EditedMediaItem.Builder(item).setDurationUs(segment.sourceDurationMicros)
+        if (!soundOnly && segment.volumePercent == 0) {
+            builder.setRemoveAudio(true)
+        } else {
+            builder.setEffects(Effects(AudioItemEffects.processorsFor(segment), emptyList()))
+        }
+        if (soundOnly) {
+            builder.setRemoveVideo(true)
+        }
+        return builder.build()
+    }
+
+    /** Returns [segment] as a still image shown for its duration at [frameRate]. */
+    private fun imageItem(
+        segment: PlanSegment.Media,
+        frameRate: Int,
+    ): EditedMediaItem {
+        val item =
+            MediaItem
+                .Builder()
+                .setUri(segment.uri)
+                .setImageDurationMs(segment.durationMicros / MICROS_PER_MILLI)
+                .build()
+        return EditedMediaItem
+            .Builder(item)
+            .setDurationUs(segment.durationMicros)
+            .setFrameRate(frameRate)
+            .build()
+    }
 }

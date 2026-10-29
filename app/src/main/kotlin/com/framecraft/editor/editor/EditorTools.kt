@@ -13,14 +13,22 @@ import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import com.framecraft.editor.domain.command.DeleteClip
 import com.framecraft.editor.domain.command.EditCommand
+import com.framecraft.editor.domain.command.RemoveAudioClip
 import com.framecraft.editor.domain.command.RemoveOverlayClip
+import com.framecraft.editor.domain.command.SetClipAudio
 import com.framecraft.editor.domain.command.SetOverlayTransform
 import com.framecraft.editor.domain.command.SplitClip
+import com.framecraft.editor.domain.edit.AudioPlacement
 import com.framecraft.editor.domain.edit.OverlayPlacement
 import com.framecraft.editor.domain.model.Clip
+import com.framecraft.editor.domain.model.MediaKind
 import com.framecraft.editor.domain.model.OverlayTransform
 import com.framecraft.editor.domain.model.Project
+import com.framecraft.editor.domain.model.TrackKind
 import com.framecraft.editor.engine.ProjectPreview
+
+/** MIME types the music picker offers. */
+private const val AUDIO_MIME_TYPES = "audio/*"
 
 /**
  * Returns an action that opens the photo and video picker and adds the picked item through [overlays] at
@@ -39,49 +47,106 @@ internal fun rememberOverlayPicker(
 }
 
 /**
- * Returns which tools apply to [selected], which is the [overlay] clip when an overlay is selected, at
- * [positionMicros]. Overlays can be added when the project has a base clip and no pick is still [overlayBusy].
+ * Returns an action that opens the document picker for sound files and adds the picked file through [audio] at
+ * [preview]'s playhead when it returns. The importer keeps a persistable read grant so the project can reopen it.
+ */
+@Composable
+internal fun rememberAudioPicker(
+    audio: AudioImport,
+    preview: ProjectPreview,
+): () -> Unit {
+    val launcher =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            uri?.let { audio.add(it.toString(), preview.state.value.positionMicros) }
+        }
+    return { launcher.launch(arrayOf(AUDIO_MIME_TYPES)) }
+}
+
+/** The media pickers the add tools open: [overlay] for photos and videos and [audio] for sound files. */
+internal class MediaPickers(
+    val overlay: () -> Unit,
+    val audio: () -> Unit,
+)
+
+/**
+ * Returns which tools apply to [selected], which sits on a track of [selectedKind], at [positionMicros]. Overlays
+ * can be added when the project has a base clip, and both add tools wait while a pick is still [importing].
  */
 internal fun toolAvailability(
     project: Project,
     selected: Clip?,
-    overlay: Clip?,
+    selectedKind: TrackKind?,
     positionMicros: Long,
-    overlayBusy: Boolean,
-): ToolAvailability =
-    ToolAvailability(
+    importing: Boolean,
+): ToolAvailability {
+    val asset = selected?.let(project::assetOf)
+    val overlay = selected?.takeIf { selectedKind == TrackKind.OVERLAY }
+    val isVideo = asset?.kind == MediaKind.VIDEO && selectedKind != TrackKind.AUDIO
+    return ToolAvailability(
         hasSelection = selected != null,
         canSplit = selected != null && SplitClip.isSplittable(selected, positionMicros, project.frameRate),
-        canAddOverlay = !overlayBusy && OverlayPlacement.baseTrack(project) != null,
+        canAddOverlay = !importing && OverlayPlacement.baseTrack(project) != null,
         overlayOpacity = overlay?.let { (it.overlayTransform ?: OverlayTransform()).opacity },
+        selectedClipId = selected?.id,
+        showAddOverlay = selectedKind != TrackKind.AUDIO,
+        canAddAudio = !importing,
+        showExtract = isVideo,
+        canExtract = isVideo && selected != null && AudioPlacement.canExtract(project, selected),
+        audio =
+            selected
+                ?.takeIf { asset?.hasAudio == true }
+                ?.let { ClipAudio(it.volumePercent, it.fadeInMicros, it.fadeOutMicros, it.durationMicros) },
     )
+}
 
 /**
- * Split at [positionMicros], delete, and opacity for the [selected] clip, which is an overlay when [isOverlay], and
- * [onAddOverlay] to pick overlay media. The clip tools do nothing without a selection.
+ * Tools for the [selected] clip on a track of [selectedKind]: split at [positionMicros], delete, opacity, extract,
+ * and sound, plus the add tools that open [pickers]. The clip tools do nothing without a selection.
  */
 internal fun toolActions(
     viewModel: EditorViewModel,
     selected: Clip?,
-    isOverlay: Boolean,
+    selectedKind: TrackKind?,
     positionMicros: Long,
-    onAddOverlay: () -> Unit,
+    pickers: MediaPickers,
 ): ToolActions =
     ToolActions(
         onSplitClip = {
             selected?.let { viewModel.dispatch(SplitClip(it.id, positionMicros, viewModel.idGenerator.next())) }
         },
-        onDeleteClip = {
-            selected?.let { viewModel.dispatch(if (isOverlay) RemoveOverlayClip(it.id) else DeleteClip(it.id)) }
-        },
-        onAddOverlay = onAddOverlay,
+        onDeleteClip = { selected?.let { viewModel.dispatch(deleteCommand(it.id, selectedKind)) } },
+        onAddOverlay = pickers.overlay,
         onOpacityCommit = { opacity ->
             selected?.let { clip ->
                 val transform = (clip.overlayTransform ?: OverlayTransform()).copy(opacity = opacity.coerceIn(0f, 1f))
                 viewModel.dispatch(SetOverlayTransform(clip.id, transform))
             }
         },
+        onAddAudio = pickers.audio,
+        onExtractAudio = {
+            val project = (viewModel.state.value as? EditorState.Ready)?.project
+            if (project != null && selected != null) {
+                val command = AudioPlacement.proposeExtract(project, selected.id, viewModel.idGenerator)
+                command?.let { viewModel.dispatch(it, it.clip.id) }
+            }
+        },
+        onAudioCommit = { audio ->
+            selected?.let {
+                viewModel.dispatch(SetClipAudio(it.id, audio.volumePercent, audio.fadeInMicros, audio.fadeOutMicros))
+            }
+        },
     )
+
+/** Returns the command that removes clip [clipId] from a track of [kind]. */
+private fun deleteCommand(
+    clipId: String,
+    kind: TrackKind?,
+): EditCommand =
+    when (kind) {
+        TrackKind.OVERLAY -> RemoveOverlayClip(clipId)
+        TrackKind.AUDIO -> RemoveAudioClip(clipId)
+        TrackKind.VIDEO, null -> DeleteClip(clipId)
+    }
 
 /**
  * Returns the handles layer for overlay [clip] of [project]; a finished gesture goes to [dispatch] as one placement

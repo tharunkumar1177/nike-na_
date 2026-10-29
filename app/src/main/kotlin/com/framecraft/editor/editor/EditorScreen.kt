@@ -4,10 +4,7 @@
 package com.framecraft.editor.editor
 
 import androidx.activity.compose.BackHandler
-import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -25,26 +22,20 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -53,7 +44,6 @@ import com.framecraft.editor.domain.time.Timecode
 import com.framecraft.editor.engine.PreviewState
 import com.framecraft.editor.ui.spokenDuration
 import com.framecraft.editor.ui.theme.Spacing
-import kotlin.math.roundToInt
 
 /** Test tag of the undo action. */
 const val UNDO_TAG = "editor_undo"
@@ -91,9 +81,6 @@ private val EXPORT_RING_STROKE = 3.dp
 /** Divides a percent into a 0 to 1 fraction. */
 private const val PERCENT_SCALE = 100f
 
-/** Opacity of a disabled tool. */
-private const val DISABLED_ALPHA = 0.38f
-
 /** Share of the editor height given to the preview. */
 private const val PREVIEW_WEIGHT = 0.45f
 
@@ -102,9 +89,6 @@ private const val TIMELINE_WEIGHT = 0.40f
 
 /** Share of the editor height reserved for the tool bar. */
 private const val TOOLS_WEIGHT = 0.15f
-
-/** Size of a tool button in the tools zone. */
-private val TOOL_SIZE = 64.dp
 
 /** One-shot notices the editor shows as snackbars. */
 enum class EditorNotice {
@@ -154,23 +138,38 @@ class PlaybackActions(
     val onFrameForward: () -> Unit,
 )
 
-/** What the tools do: split and delete the selection, add an overlay, and save the selected overlay's opacity. */
+/**
+ * What the tools do: split and delete the selection, add an overlay or music, save the selected overlay's opacity,
+ * extract the selected clip's audio, and save its volume and fades.
+ */
 class ToolActions(
     val onSplitClip: () -> Unit,
     val onDeleteClip: () -> Unit,
     val onAddOverlay: () -> Unit = {},
     val onOpacityCommit: (Float) -> Unit = {},
+    val onAddAudio: () -> Unit = {},
+    val onExtractAudio: () -> Unit = {},
+    val onAudioCommit: (ClipAudio) -> Unit = {},
 )
 
 /**
- * Which tools apply: [hasSelection] when a clip is selected, [canSplit] when the playhead is inside it,
- * [canAddOverlay] when an overlay can be added now, and [overlayOpacity] when the selection is an overlay.
+ * Which tools apply: [hasSelection] when clip [selectedClipId] is selected, [canSplit] when the playhead is inside
+ * it, [canAddOverlay] when an overlay can be added now, [showAddOverlay] when the overlay tool belongs in the row,
+ * [overlayOpacity] when the selection is an overlay, [canAddAudio] when music can be added now, [showExtract] when
+ * the selection is a video whose sound could be lifted and [canExtract] when that is possible now, and [audio] when
+ * the selection plays sound.
  */
 data class ToolAvailability(
     val hasSelection: Boolean = false,
     val canSplit: Boolean = false,
     val canAddOverlay: Boolean = false,
     val overlayOpacity: Float? = null,
+    val selectedClipId: String? = null,
+    val showAddOverlay: Boolean = true,
+    val canAddAudio: Boolean = false,
+    val showExtract: Boolean = false,
+    val canExtract: Boolean = false,
+    val audio: ClipAudio? = null,
 )
 
 /**
@@ -209,7 +208,7 @@ fun EditorScreen(
             PreviewArea(aspectRatio, previewSurface, overlayLayer)
             PlaybackBar(previewState, playback)
             timeline(Modifier.fillMaxWidth().weight(TIMELINE_WEIGHT))
-            ToolsZone(availability, tools)
+            ToolsZone(availability, tools, Modifier.fillMaxWidth().weight(TOOLS_WEIGHT))
         }
     }
 }
@@ -377,111 +376,5 @@ private fun PlaybackBar(
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.semantics { contentDescription = spokenProgress },
         )
-    }
-}
-
-/**
- * Contextual tools. Overlay shows when nothing or a base clip is selected; a selected overlay shows its opacity
- * slider instead. Split then Delete follow whenever a clip is selected.
- */
-@Composable
-private fun ColumnScope.ToolsZone(
-    availability: ToolAvailability,
-    tools: ToolActions,
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .weight(TOOLS_WEIGHT)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(horizontal = Spacing.md),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        val opacity = availability.overlayOpacity
-        if (opacity == null) {
-            ToolButton(
-                iconRes = R.drawable.ic_overlay,
-                label = stringResource(R.string.editor_tool_overlay),
-                description = stringResource(R.string.editor_tool_overlay_description),
-                onClick = tools.onAddOverlay,
-                enabled = availability.canAddOverlay,
-                modifier = Modifier.testTag(TOOL_OVERLAY_TAG),
-            )
-        } else {
-            OpacitySlider(opacity, tools.onOpacityCommit, Modifier.weight(1f))
-        }
-        if (availability.hasSelection) {
-            ToolButton(
-                iconRes = R.drawable.ic_content_cut,
-                label = stringResource(R.string.editor_tool_split),
-                description = stringResource(R.string.editor_tool_split_description),
-                onClick = tools.onSplitClip,
-                enabled = availability.canSplit,
-                modifier = Modifier.testTag(TOOL_SPLIT_TAG),
-            )
-            ToolButton(
-                iconRes = R.drawable.ic_delete,
-                label = stringResource(R.string.editor_tool_delete),
-                description = stringResource(R.string.editor_tool_delete_description),
-                onClick = tools.onDeleteClip,
-                modifier = Modifier.testTag(TOOL_DELETE_TAG),
-            )
-        }
-    }
-}
-
-/**
- * Labelled opacity slider for the selected overlay, starting at [opacity]. Dragging moves only the slider; the value
- * goes to [onCommit] once, when the drag ends.
- */
-@Composable
-private fun OpacitySlider(
-    opacity: Float,
-    onCommit: (Float) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    var draft by remember(opacity) { mutableFloatStateOf(opacity) }
-    val label = stringResource(R.string.editor_tool_opacity)
-    Column(modifier = modifier) {
-        Text(
-            text = stringResource(R.string.editor_opacity_value, (draft * PERCENT_SCALE).roundToInt()),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Slider(
-            value = draft,
-            onValueChange = { draft = it },
-            onValueChangeFinished = { onCommit(draft) },
-            modifier = Modifier.testTag(TOOL_OPACITY_TAG).semantics { contentDescription = label },
-        )
-    }
-}
-
-/** 64dp tool with an icon over a label, read by TalkBack as [description]; dimmed when not [enabled]. */
-@Composable
-private fun ToolButton(
-    @DrawableRes iconRes: Int,
-    label: String,
-    description: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-) {
-    Column(
-        modifier =
-            modifier
-                .size(TOOL_SIZE)
-                .alpha(if (enabled) 1f else DISABLED_ALPHA)
-                .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-                .semantics(mergeDescendants = true) { contentDescription = description },
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        val color = MaterialTheme.colorScheme.onSurface
-        Icon(painter = painterResource(iconRes), contentDescription = null, tint = color)
-        Spacer(Modifier.height(Spacing.xs))
-        Text(text = label, style = MaterialTheme.typography.labelLarge, color = color)
     }
 }

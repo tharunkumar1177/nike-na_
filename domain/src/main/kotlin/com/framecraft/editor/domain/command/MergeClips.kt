@@ -12,14 +12,18 @@ import kotlinx.serialization.Serializable
 
 /**
  * Joins clip [rightClipId] onto clip [leftClipId], which keeps its id. The clips must be on the same track, touch,
- * use the same asset, read the source continuously, and share their anchor parent and overlay placement; otherwise
- * the command is rejected. Clips anchored to the right part move their anchor to the merged clip.
+ * use the same asset, read the source continuously, share their anchor parent, overlay placement, and volume, and
+ * have no fade at the join; otherwise the command is rejected. The merged clip takes the left fade-in and the right
+ * fade-out unless [fadeInMicros] or [fadeOutMicros] override them. Clips anchored to the right part move their
+ * anchor to the merged clip.
  */
 @Serializable
 @SerialName("mergeClips")
 data class MergeClips(
     val leftClipId: String,
     val rightClipId: String,
+    val fadeInMicros: Long? = null,
+    val fadeOutMicros: Long? = null,
 ) : EditCommand {
     /** The inverse splits the merged clip where the right part began. */
     override fun applyTo(project: Project): CommandOutcome {
@@ -30,7 +34,12 @@ data class MergeClips(
         } else {
             project.replacingTracks(SplitClip(leftClipId, left.endMicros, rightClipId)) {
                 requireJoinable(left, right, project.assetOf(left).kind == MediaKind.IMAGE)
-                val merged = left.copy(durationMicros = left.durationMicros + right.durationMicros)
+                val merged =
+                    left.copy(
+                        durationMicros = left.durationMicros + right.durationMicros,
+                        fadeInMicros = fadeInMicros ?: left.fadeInMicros,
+                        fadeOutMicros = fadeOutMicros ?: right.fadeOutMicros,
+                    )
                 val joined =
                     track.copy(
                         clips =
@@ -59,7 +68,10 @@ data class MergeClips(
         }
     }
 
-    /** Throws unless [right] continues [left] in time, source, anchor, and placement; [isImage] has no offset. */
+    /**
+     * Throws unless [right] continues [left] in time, source, anchor, placement, and sound. [isImage] clips have no
+     * source offset.
+     */
     private fun requireJoinable(
         left: Clip,
         right: Clip,
@@ -76,6 +88,9 @@ data class MergeClips(
         }
         require(right.overlayTransform == left.overlayTransform) {
             "Clips $leftClipId and $rightClipId are placed differently"
+        }
+        require(right.volumePercent == left.volumePercent && left.fadeOutMicros == 0L && right.fadeInMicros == 0L) {
+            "Clips $leftClipId and $rightClipId differ in volume or fade at the join"
         }
     }
 }
