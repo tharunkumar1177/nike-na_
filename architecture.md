@@ -65,6 +65,13 @@ Feature modules never import Media3 types directly; they talk to engine interfac
 - A clip's timeline extent is `[startMicros, startMicros + durationMicros)`, half-open.
 - Source trim is `trimStartMicros` into the source media; `durationMicros` is the timeline duration after speed is applied.
 
+### Clip speed and source mapping
+
+- A clip at normal speed reads `durationMicros` of source. A sped clip stores its speed and the source it reads, `sourceDurationMicros`; the two are present together or not at all, and only clips of timed assets (video or audio) may carry them.
+- A speed is one constant (0.1x to 100x, in thousandths) or a curve (2 to 16 points from position 0 to the end of the source span, in hundred-thousandths, each 0.1x to 10x) drawn as straight lines between points. Positions are fractions of the clip's own source, so trimming a curve scales it.
+- `SpeedMap` is the one mapping between a clip's source offsets and its timeline offsets. A constant is one step; a curve is split into steps no longer than one project frame of source, each at the curve's speed at its middle. The timeline length is the floor of the sum of each step's source length over its speed, computed in the same order and precision as Media3's `SpeedProviderUtil`, so the engine plays a clip for exactly the duration the domain stores. A stored duration must agree with that length to within one frame.
+- Everything that maps timeline time into source time (cuts, trims, thumbnails, waveforms, the playhead in the curve editor) goes through `SpeedMap`; fades and text animations stay in timeline time.
+
 ### Identity and ownership
 
 - `Project`, `Track`, and `Clip` have stable string IDs (UUID v4) assigned at creation and never reused.
@@ -81,7 +88,7 @@ Feature modules never import Media3 types directly; they talk to engine interfac
 - A clip carries text exactly when it sits on a text track. Text content is the words (1 to 500 characters, never blank), a style whose size is a fraction of the canvas height so it looks the same at any resolution, and optional entrance and exit animations, each no longer than the clip.
 - Every clip carries a volume from 0 to 200 percent (100 is unchanged) and fade-in and fade-out lengths whose sum fits within the clip. Gain is the volume times linear fades from the clip's edges. Images and text keep the defaults, and neither has a source offset to trim.
 - The canvas aspect ratio is a project setting: original (the first base clip's displayed shape, the default) or a fixed ratio (9:16, 16:9, 1:1, 4:5, 4:3). Its pixel size keeps the first base clip's short side, never coming from an overlay, a sound, or text. Placements are normalized to the canvas, so changing the shape moves no clip. The background behind the base is black (default), one opaque color, or a blurred copy of the first base track.
-- The document carries an integer `schemaVersion` (currently 4). Readers migrate older versions forward; they refuse newer versions with a visible error.
+- The document carries an integer `schemaVersion` (currently 6). Readers migrate older versions forward; they refuse newer versions with a visible error.
 
 ### Anchoring and ripple
 
@@ -112,6 +119,7 @@ Feature modules never import Media3 types directly; they talk to engine interfac
 - The engine consumes immutable project snapshots only. It never writes back to the project.
 - The adapter maps each track to a Media3 `EditedMediaItemSequence` and pads implicit gaps with generated silent or transparent segments at preview and export time.
 - Media3 draws the first picture sequence on top and times every composed frame by it, so overlay sequences come first (top lane first), base video sequences after them, then the background sequence (a solid still, or the first base track reduced and blurred), and audio sequences last. The picture is composited when there are overlays, a fixed canvas shape, a background other than black, or any base placement; otherwise the base plays alone, as before. When composited, a hidden transparent clock sequence at the project frame rate goes before all of them, so frames keep that rate through gaps, and the multi-input composition tone-maps HDR to SDR in OpenGL because the compositor draws only SDR. Every picture sequence is padded to the end of the latest track, because the compositor waits for a frame from every picture input and sound beyond the pictures must still play. Audio sequences carry only audio; a muted picture clip carries no audio, and every other clip's sound passes through per-clip processing (to 16-bit PCM, mixed to stereo, then the clip's gain with clamping). A compositor setting sizes the canvas and places each overlay and base frame from the clip covering its time, stretches a solid background, fills the canvas with the blur, and hides any input no clip covers (Media3 fills sequence gaps with opaque black); the output takes the canvas shape around the first base sequence's short side. Preview builds its player with a multiple-input video graph so the same composition renders on screen.
+- A sped clip's item is clipped to its source span and given a Media3 speed provider built from its `SpeedMap` steps, with pitch kept when the clip asks; a sped-up picture is capped at the project frame rate. Gaps, stills, and the clock and background sequences never carry speed.
 - Text tracks add no sequence. Each text clip becomes a bitmap overlay in one overlay effect applied to the composed picture, before any export resizing, so preview and export draw it the same way; upper text lanes draw on top. Text tracks still count toward the padded end. A project with only text has nothing to export.
 - Transitions consume clip handles (overlapping source media); they never freeze frames.
 - Preview and export use the same translation so what you see is what you export.

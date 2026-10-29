@@ -18,7 +18,9 @@ const val UNITY_VOLUME_PERCENT: Int = 100
  * [overlayTransform]. [volumePercent] scales the clip's sound, where 0 mutes it; the sound rises from silence over
  * [fadeInMicros] and falls back to silence over the last [fadeOutMicros], and the two fades never overlap. Text clips
  * carry [text], whose animations each fit within the clip. Base clips may carry a [canvasPlacement]; without one they
- * fit the canvas, centered and upright.
+ * fit the canvas, centered and upright. A timed clip may play at a [speed]; it then reads [sourceDurationMicros] of
+ * source, and its sound keeps its pitch when [maintainPitch] is set. Without a speed the clip reads exactly its own
+ * duration of source.
  */
 @Serializable
 data class Clip(
@@ -34,6 +36,9 @@ data class Clip(
     val fadeOutMicros: Long = 0,
     val text: TextContent? = null,
     val canvasPlacement: CanvasPlacement? = null,
+    val speed: ClipSpeed? = null,
+    val sourceDurationMicros: Long? = null,
+    val maintainPitch: Boolean = true,
 ) {
     init {
         require(id.isNotBlank()) { "Clip id must not be blank" }
@@ -45,7 +50,15 @@ data class Clip(
         require(fadeInMicros + fadeOutMicros <= durationMicros) { "Clip $id has fades longer than the clip" }
         val animations = listOfNotNull(text?.animationIn, text?.animationOut)
         require(animations.all { it.durationMicros <= durationMicros }) { "Clip $id has an animation longer than it" }
+        require((speed == null) == (sourceDurationMicros == null)) {
+            "Clip $id needs a source length exactly when sped"
+        }
+        require(sourceDurationMicros == null || sourceDurationMicros > 0) { "Clip $id reads no source" }
     }
+
+    /** Length of source the clip reads: its own duration at normal speed. */
+    val sourceSpanMicros: Long
+        get() = sourceDurationMicros ?: durationMicros
 
     /** Exclusive end of the clip on the timeline. */
     val endMicros: Long

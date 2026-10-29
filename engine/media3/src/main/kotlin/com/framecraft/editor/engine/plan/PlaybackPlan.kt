@@ -6,6 +6,7 @@ package com.framecraft.editor.engine.plan
 import com.framecraft.editor.domain.model.CanvasBackground
 import com.framecraft.editor.domain.model.CanvasPlacement
 import com.framecraft.editor.domain.model.CanvasSettings
+import com.framecraft.editor.domain.model.ClipSpeed
 import com.framecraft.editor.domain.model.MediaKind
 import com.framecraft.editor.domain.model.OverlayTransform
 import com.framecraft.editor.domain.model.Project
@@ -21,8 +22,10 @@ sealed interface PlanSegment {
     val durationMicros: Long
 
     /**
-     * Plays [durationMicros] of [uri] starting at [sourceStartMicros]; [sourceDurationMicros] is the full source.
-     * Its sound plays at [volumePercent] (0 is silent) with fades of [fadeInMicros] and [fadeOutMicros].
+     * Plays [sourceSpanMicros] of [uri] starting at [sourceStartMicros] over [durationMicros] of timeline;
+     * [sourceDurationMicros] is the full source. The source plays at [speed], normal when null, keeping its pitch when
+     * [maintainPitch] is set. Its sound plays at [volumePercent] (0 is silent) with fades of [fadeInMicros] and
+     * [fadeOutMicros] in timeline time.
      */
     data class Media(
         val uri: String,
@@ -33,6 +36,9 @@ sealed interface PlanSegment {
         val volumePercent: Int = UNITY_VOLUME_PERCENT,
         val fadeInMicros: Long = 0,
         val fadeOutMicros: Long = 0,
+        val speed: ClipSpeed? = null,
+        val sourceSpanMicros: Long = durationMicros,
+        val maintainPitch: Boolean = true,
     ) : PlanSegment
 
     /** Empty timeline span: black frames and silence on the base sequence, hidden on overlay sequences. */
@@ -194,6 +200,9 @@ object PlaybackPlanner {
                     volumePercent = clip.volumePercent,
                     fadeInMicros = clip.fadeInMicros,
                     fadeOutMicros = clip.fadeOutMicros,
+                    speed = clip.speed,
+                    sourceSpanMicros = clip.sourceSpanMicros,
+                    maintainPitch = clip.maintainPitch,
                 )
             cursor = clip.endMicros
         }

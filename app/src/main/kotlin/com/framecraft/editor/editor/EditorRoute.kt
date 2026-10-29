@@ -96,6 +96,7 @@ private fun ReadyEditor(
     val canvas = rememberCanvasEditing()
     TextEditHost(pickers.text, project)
     CanvasSheetHost(canvas, project, viewModel::dispatch)
+    SpeedSheetHost(pickers.speed, project, position, viewModel::dispatch)
     EditorScreen(
         projectName = project.name,
         previewState = previewState,

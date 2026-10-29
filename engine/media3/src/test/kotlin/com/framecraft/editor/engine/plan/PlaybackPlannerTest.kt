@@ -10,6 +10,7 @@ import com.framecraft.editor.domain.model.CanvasPlacement
 import com.framecraft.editor.domain.model.CanvasSettings
 import com.framecraft.editor.domain.model.Clip
 import com.framecraft.editor.domain.model.ClipAnchor
+import com.framecraft.editor.domain.model.ClipSpeed
 import com.framecraft.editor.domain.model.MediaAsset
 import com.framecraft.editor.domain.model.MediaKind
 import com.framecraft.editor.domain.model.OverlayTransform
@@ -96,6 +97,34 @@ class PlaybackPlannerTest {
             listOf(1_000_000L to true, 1_000_000L to false, 2_000_000L to true, 1_000_000L to false),
             durations,
         )
+    }
+
+    /** A sped clip plays its source span over its timeline duration at its speed and pitch setting. */
+    @Test
+    fun carriesSpeed() {
+        val twice = ClipSpeed.Constant(2_000)
+        val sped =
+            Clip(
+                "a",
+                "v",
+                0,
+                1_000_000,
+                2_000_000,
+                speed = twice,
+                sourceDurationMicros = 4_000_000,
+                maintainPitch = false,
+            )
+        val media =
+            PlaybackPlanner
+                .plan(project(true, sped))
+                .sequences
+                .single()
+                .segments
+                .single() as PlanSegment.Media
+        assertEquals(twice, media.speed)
+        assertEquals(4_000_000L, media.sourceSpanMicros)
+        assertEquals(2_000_000L, media.durationMicros)
+        assertFalse(media.maintainPitch)
     }
 
     /** Empty tracks produce no sequences. */

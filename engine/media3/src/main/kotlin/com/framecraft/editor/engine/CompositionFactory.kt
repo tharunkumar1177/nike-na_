@@ -8,6 +8,8 @@ import androidx.media3.common.C
 import androidx.media3.common.Effect
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.SpeedParameters
+import androidx.media3.common.util.ExperimentalApi
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.GaussianBlur
 import androidx.media3.effect.OverlayEffect
@@ -17,7 +19,9 @@ import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
 import androidx.media3.transformer.Effects
 import com.framecraft.editor.domain.model.MediaKind
+import com.framecraft.editor.domain.model.NORMAL_SPEED_MILLI
 import com.framecraft.editor.domain.model.TrackKind
+import com.framecraft.editor.domain.time.FrameRate
 import com.framecraft.editor.engine.plan.BackgroundPlan
 import com.framecraft.editor.engine.plan.CanvasLayout
 import com.framecraft.editor.engine.plan.PlanSegment
@@ -45,7 +49,7 @@ private const val BLUR_HEIGHT_PIXELS = 360
 private const val BLUR_SIGMA = 12f
 
 /** Creates Media3 compositions. */
-@OptIn(markerClass = [UnstableApi::class])
+@OptIn(markerClass = [UnstableApi::class, ExperimentalApi::class])
 internal object CompositionFactory {
     /**
      * Returns a composition with one sequence per planned track: audio-and-video for picture tracks and audio only
@@ -62,13 +66,14 @@ internal object CompositionFactory {
         plan: PlaybackPlan,
         videoEffects: List<Effect> = emptyList(),
     ): Composition {
-        val frameRate = (plan.frameRate.numerator.toDouble() / plan.frameRate.denominator).roundToInt()
+        val frameRate = plan.frameRate
         val (sound, pictures) = plan.sequences.partition { it.kind == TrackKind.AUDIO }
         val durationMicros = plan.sequences.maxOfOrNull { sequence -> sequence.segments.sumOf { it.durationMicros } }
         val picture = pictures.map { sequenceOf(it, frameRate) }
         val pictureSequences =
             if (plan.composited && durationMicros != null) {
-                val clock = stillSequence(SolidPng.dataUri(TRANSPARENT_ARGB), durationMicros, frameRate)
+                val clockRate = framesPerSecond(frameRate)
+                val clock = stillSequence(SolidPng.dataUri(TRANSPARENT_ARGB), durationMicros, clockRate)
                 val background = plan.background?.let { backgroundSequence(it, durationMicros, frameRate) }
                 listOf(clock) + picture + listOfNotNull(background)
             } else {
@@ -86,15 +91,19 @@ internal object CompositionFactory {
         return builder.build()
     }
 
-    /** Returns the sequence that draws [background] for [durationMicros] at [frameRate]. */
+    /** Returns [frameRate] rounded to whole frames per second, as Media3 items take it. */
+    private fun framesPerSecond(frameRate: FrameRate): Int =
+        (frameRate.numerator.toDouble() / frameRate.denominator).roundToInt()
+
+    /** Returns the sequence that draws [background] for [durationMicros] in a project at [frameRate]. */
     private fun backgroundSequence(
         background: BackgroundPlan,
         durationMicros: Long,
-        frameRate: Int,
+        frameRate: FrameRate,
     ): EditedMediaItemSequence =
         when (background) {
             is BackgroundPlan.Solid -> {
-                stillSequence(SolidPng.dataUri(background.argb), durationMicros, frameRate)
+                stillSequence(SolidPng.dataUri(background.argb), durationMicros, framesPerSecond(frameRate))
             }
 
             is BackgroundPlan.Blur -> {
@@ -109,16 +118,16 @@ internal object CompositionFactory {
             }
         }
 
-    /** Returns the picture of [segment], silent, reduced, and blurred. */
+    /** Returns the picture of [segment], silent, reduced, and blurred, in a project at [frameRate]. */
     private fun blurredItem(
         segment: PlanSegment.Media,
-        frameRate: Int,
+        frameRate: FrameRate,
     ): EditedMediaItem {
         val picture =
             if (segment.kind == MediaKind.IMAGE) {
-                imageItem(segment, frameRate)
+                imageItem(segment, framesPerSecond(frameRate))
             } else {
-                clippedItem(segment, soundOnly = false)
+                clippedItem(segment, soundOnly = false, frameRate)
             }
         val blur = listOf(Presentation.createForHeight(BLUR_HEIGHT_PIXELS), GaussianBlur(BLUR_SIGMA))
         return picture
@@ -128,10 +137,10 @@ internal object CompositionFactory {
             .build()
     }
 
-    /** Maps [sequence] to a Media3 sequence whose stills run at [frameRate]. */
+    /** Maps [sequence] to a Media3 sequence for a project at [frameRate]. */
     private fun sequenceOf(
         sequence: SequencePlan,
-        frameRate: Int,
+        frameRate: FrameRate,
     ): EditedMediaItemSequence {
         val audioOnly = sequence.kind == TrackKind.AUDIO
         val builder = EditedMediaItemSequence.Builder(if (audioOnly) AUDIO_TRACKS else AUDIO_VIDEO_TRACKS)
@@ -144,11 +153,11 @@ internal object CompositionFactory {
         return builder.build()
     }
 
-    /** Returns a sequence of one PNG still at [uri] shown for [durationMicros] at [frameRate]. */
+    /** Returns a sequence of one PNG still at [uri] shown for [durationMicros] at [framesPerSecond]. */
     private fun stillSequence(
         uri: String,
         durationMicros: Long,
-        frameRate: Int,
+        framesPerSecond: Int,
     ): EditedMediaItemSequence {
         val item =
             MediaItem
@@ -161,36 +170,47 @@ internal object CompositionFactory {
             EditedMediaItem
                 .Builder(item)
                 .setDurationUs(durationMicros)
-                .setFrameRate(frameRate)
+                .setFrameRate(framesPerSecond)
                 .build()
         return EditedMediaItemSequence.Builder(AUDIO_VIDEO_TRACKS).addItem(still).build()
     }
 
-    /** Maps a media segment to an edited item; [audioOnly] items keep only their sound. */
+    /** Maps a media segment to an edited item in a project at [frameRate]; [audioOnly] items keep only their sound. */
     private fun editedItem(
         segment: PlanSegment.Media,
-        frameRate: Int,
+        frameRate: FrameRate,
         audioOnly: Boolean,
     ): EditedMediaItem =
         when (segment.kind) {
-            MediaKind.IMAGE -> imageItem(segment, frameRate)
-            MediaKind.VIDEO, MediaKind.AUDIO -> clippedItem(segment, audioOnly || segment.kind == MediaKind.AUDIO)
-            MediaKind.TEXT -> throw IllegalArgumentException("Text is drawn as an overlay, not played as media")
+            MediaKind.IMAGE -> {
+                imageItem(segment, framesPerSecond(frameRate))
+            }
+
+            MediaKind.VIDEO, MediaKind.AUDIO -> {
+                clippedItem(segment, audioOnly || segment.kind == MediaKind.AUDIO, frameRate)
+            }
+
+            MediaKind.TEXT -> {
+                throw IllegalArgumentException("Text is drawn as an overlay, not played as media")
+            }
         }
 
     /**
-     * Returns the clipped source of [segment] with its sound chain. A muted picture item drops its sound; a
-     * [soundOnly] item drops its picture and keeps its sound, silenced by the gain envelope when muted.
+     * Returns the clipped source of [segment] with its speed and sound chain, in a project at [frameRate]. A muted
+     * picture item drops its sound; a [soundOnly] item drops its picture and keeps its sound, silenced by the gain
+     * envelope when muted. A sped-up picture is capped at the project's frame rate so it drops frames instead of
+     * playing them faster.
      */
     private fun clippedItem(
         segment: PlanSegment.Media,
         soundOnly: Boolean,
+        frameRate: FrameRate,
     ): EditedMediaItem {
         val clipping =
             MediaItem.ClippingConfiguration
                 .Builder()
                 .setStartPositionUs(segment.sourceStartMicros)
-                .setEndPositionUs(segment.sourceStartMicros + segment.durationMicros)
+                .setEndPositionUs(segment.sourceStartMicros + segment.sourceSpanMicros)
                 .build()
         val item =
             MediaItem
@@ -207,13 +227,20 @@ internal object CompositionFactory {
         if (soundOnly) {
             builder.setRemoveVideo(true)
         }
+        segment.speed?.let { speed ->
+            val provider = SpeedProviders.of(speed, segment.sourceSpanMicros, frameRate)
+            builder.setSpeed(SpeedParameters(provider, segment.maintainPitch))
+            if (!soundOnly && speed.maxSpeedMilli > NORMAL_SPEED_MILLI) {
+                builder.setFrameRate(framesPerSecond(frameRate))
+            }
+        }
         return builder.build()
     }
 
-    /** Returns [segment] as a still image shown for its duration at [frameRate]. */
+    /** Returns [segment] as a still image shown for its duration at [framesPerSecond]. */
     private fun imageItem(
         segment: PlanSegment.Media,
-        frameRate: Int,
+        framesPerSecond: Int,
     ): EditedMediaItem {
         val item =
             MediaItem
@@ -224,7 +251,7 @@ internal object CompositionFactory {
         return EditedMediaItem
             .Builder(item)
             .setDurationUs(segment.durationMicros)
-            .setFrameRate(frameRate)
+            .setFrameRate(framesPerSecond)
             .build()
     }
 }

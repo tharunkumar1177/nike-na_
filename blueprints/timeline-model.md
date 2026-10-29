@@ -37,6 +37,10 @@ Clips on one track must not overlap. Magnetic tracks are kept gap-free by the co
 
 `AnchorResolver` is the single place that walks the anchor forest. Commands call `AnchorResolver.materialize` after editing tracks, so every stored start is already resolved and the timeline UI and the engine read `startMicros` directly; they cannot disagree. `Project` runs `AnchorResolver.validate` on construction, which rejects anchored clips on magnetic tracks, magnetic tracks that are not `VIDEO`, placements on non-overlay tracks, canvas placements off the `VIDEO` track, missing parents, cycles, negative starts, and stored starts that differ from their anchor.
 
+### Clip speed
+
+- A clip of a timed asset may carry `speed`, `sourceDurationMicros`, and `maintainPitch` (on by default); `sourceSpanMicros` is the source it reads. `Project` checks the source bounds against that span and the duration against `SpeedMap`, as [Clip speed and source mapping](../architecture.md#clip-speed-and-source-mapping) requires. The rules and commands belong to [clip-speed](clip-speed.md).
+
 ## Related blueprints
 
 ### Required

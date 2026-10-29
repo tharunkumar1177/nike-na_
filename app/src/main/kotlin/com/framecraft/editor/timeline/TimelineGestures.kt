@@ -206,7 +206,14 @@ private suspend fun AwaitPointerEventScope.trimDrag(
     val pxPerSecond = state.dpPerSecond.dp.toPx()
     val targets = if (state.snapEnabled) SnapPoints.of(target.track, state.centerMicros, clip) else emptyList()
     val threshold = (TimelineMetrics(this).snapThreshold / pxPerSecond * MICROS_PER_SECOND).roundToLong()
-    val unchanged = TrimClip(clip.id, clip.startMicros, clip.trimStartMicros, clip.durationMicros)
+    val unchanged =
+        TrimClip(
+            clip.id,
+            clip.startMicros,
+            clip.trimStartMicros,
+            clip.durationMicros,
+            sourceDurationMicros = clip.sourceDurationMicros,
+        )
     var command = unchanged
     var lastSnap: Long? = null
     var atMinimum = false

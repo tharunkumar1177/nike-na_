@@ -42,6 +42,10 @@ The export button in the top bar opens a bottom sheet with resolution, frame rat
 
 Timeline drawing reads derived state so scrubbing does not recompose the whole screen. `ExportCoordinator` is an app-scoped holder created in `AppContainer`; the service and the view model share export state through it on the main thread.
 
+### Speed tool
+
+- A selected video on the base or an overlay lane shows Speed, which opens the speed sheet (`SpeedSheet`, `SpeedCurveEditor`) per `assets/wireframes/speed-slice11.md` (`EditorScreenTest`, `SpeedSheetTest`). Sped clips' timeline labels start with their speed, and thumbnails and waveforms map through `SpeedMap` (`TimelineGeometryTest`). Details belong to [clip-speed](clip-speed.md).
+
 ## Related blueprints
 
 ### Required

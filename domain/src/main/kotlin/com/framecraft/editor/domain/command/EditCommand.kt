@@ -56,6 +56,11 @@ sealed interface CommandRejection {
     data class ClipTooShort(
         val minimumMicros: Long,
     ) : CommandRejection
+
+    /** Clip [clipId] shows a still image or text, which has no playback speed. */
+    data class SpeedNotSupported(
+        val clipId: String,
+    ) : CommandRejection
 }
 
 /** A clip together with the track that holds it. */

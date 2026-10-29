@@ -15,7 +15,8 @@ import kotlinx.serialization.Serializable
  * An anchored clip keeps its parent and its anchor offset moves with the start; clips anchored to moved clips follow.
  * [fadeInMicros] and [fadeOutMicros] set the fades when given; otherwise fades shrink to fit the new duration,
  * fade-in first. A text clip's animations take [animationInMicros] and [animationOutMicros] when given; otherwise each
- * shrinks to fit the new duration.
+ * shrinks to fit the new duration. A sped clip reads [sourceDurationMicros] of source, which it requires; a clip at
+ * normal speed must not carry one.
  */
 @Serializable
 @SerialName("trimClip")
@@ -28,6 +29,7 @@ data class TrimClip(
     val fadeOutMicros: Long? = null,
     val animationInMicros: Long? = null,
     val animationOutMicros: Long? = null,
+    val sourceDurationMicros: Long? = null,
 ) : EditCommand {
     /** The inverse restores the clip's previous start, source offset, duration, fades, and animations. */
     override fun applyTo(project: Project): CommandOutcome {
@@ -56,10 +58,14 @@ data class TrimClip(
                 clip.fadeOutMicros,
                 clip.text?.animationIn?.durationMicros,
                 clip.text?.animationOut?.durationMicros,
+                clip.sourceDurationMicros,
             )
         return project.replacingTrack(inverse) {
             require(project.assetOf(clip).isTimed || trimStartMicros == clip.trimStartMicros) {
                 "Clip $clipId has no source offset to trim"
+            }
+            require((clip.speed == null) == (sourceDurationMicros == null)) {
+                "Clip $clipId needs a source length exactly when sped"
             }
             val fadeIn = fadeInMicros ?: minOf(clip.fadeInMicros, durationMicros)
             val fadeOut = fadeOutMicros ?: minOf(clip.fadeOutMicros, (durationMicros - fadeIn).coerceAtLeast(0))
@@ -72,6 +78,7 @@ data class TrimClip(
                     fadeInMicros = fadeIn,
                     fadeOutMicros = fadeOut,
                     text = clip.text?.fitted(durationMicros, animationInMicros, animationOutMicros),
+                    sourceDurationMicros = sourceDurationMicros,
                 )
             val others = track.clips.filter { it.id != clipId }
             val delta = trimmed.endMicros - clip.endMicros

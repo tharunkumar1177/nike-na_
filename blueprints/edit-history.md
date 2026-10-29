@@ -39,6 +39,10 @@ The commands `RenameProject`, `DeleteClip`, `AddClip`, `TrimClip`, `SplitClip`, 
 - The undo position is saved in `history.cursor` next to the journal, so reopening restores undo and redo availability.
 - History depth: compaction keeps at least the latest 100 records behind the cursor; older edits fold into the snapshot and can no longer be undone.
 
+### Speed-aware editing
+
+- `SetClipSpeed` changes a clip's speed with an exact inverse. `TrimClip` carries the sped clip's source length, `SplitClip` the left part's source (`leftSourceMicros`), and `MergeClips` the merged speed, so trims, splits, and merges of sped clips undo exactly; `TrimController` proposes source and duration through `SpeedMap`. Details belong to [clip-speed](clip-speed.md).
+
 ## Related blueprints
 
 ### Required
