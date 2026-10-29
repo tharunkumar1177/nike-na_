@@ -59,14 +59,14 @@ class SchemaMigrations(
         val SHIPPED =
             SchemaMigrations(
                 listOf(
-                Migration1To2,
-                Migration2To3,
-                Migration3To4,
-                Migration4To5,
-                Migration5To6,
-                Migration6To7,
-                Migration7To8,
-            ),
+                    Migration1To2,
+                    Migration2To3,
+                    Migration3To4,
+                    Migration4To5,
+                    Migration5To6,
+                    Migration6To7,
+                    Migration7To8,
+                ),
             )
     }
 }

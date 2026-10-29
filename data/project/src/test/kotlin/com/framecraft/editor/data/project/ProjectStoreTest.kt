@@ -381,7 +381,8 @@ class ProjectStoreTest {
             File(dir(), "snapshot.json").writeText(SCHEMA_SEVEN_SNAPSHOT)
             File(dir(), "journal.jsonl").writeText(SCHEMA_SEVEN_JOURNAL)
             val opened = store().opened()
-            val clips = opened.session.state.project.tracks.single().clips
+            val project = opened.session.state.project
+            val clips = project.tracks.single().clips
             assertEquals(listOf("a", "a2", "b"), clips.map { it.id })
             assertNull(clips.first().outTransition)
             assertEquals(ClipTransition(TransitionKind.DISSOLVE, 1_000_000L), clips[1].outTransition)

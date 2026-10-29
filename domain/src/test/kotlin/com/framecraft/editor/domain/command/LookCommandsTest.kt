@@ -109,7 +109,8 @@ class LookCommandsTest {
         assertFalse(faded.isNeutral)
         assertFalse(faded.usesFilter)
         assertTrue(warm.usesFilter)
-        assertEquals(18, LookFilterCatalog.all.map { it.id }.toSet().size)
+        val ids = LookFilterCatalog.all.map { it.id }
+        assertEquals(18, ids.toSet().size)
     }
 
     /** Setting a look stores it, clearing and undo restore exactly, and a neutral look is stored as none. */
