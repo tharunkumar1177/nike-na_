@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -47,7 +48,6 @@ import com.framecraft.editor.R
 import com.framecraft.editor.domain.model.MAX_VOLUME_PERCENT
 import com.framecraft.editor.domain.model.UNITY_VOLUME_PERCENT
 import com.framecraft.editor.ui.theme.Spacing
-import java.util.Locale
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
@@ -300,9 +300,10 @@ private fun FadeSlider(
     val maxSeconds = maxMicros.coerceAtLeast(0L) / MICROS_PER_SECOND
     var draft by remember(valueMicros) { mutableFloatStateOf(valueMicros / MICROS_PER_SECOND) }
     val label = stringResource(labelRes)
+    val locale = LocalConfiguration.current.locales[0]
     Spacer(Modifier.height(Spacing.md))
     Text(
-        text = stringResource(R.string.editor_fade_value, label, String.format(Locale.getDefault(), "%.1f", draft)),
+        text = stringResource(R.string.editor_fade_value, label, String.format(locale, "%.1f", draft)),
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.onSurface,
     )
