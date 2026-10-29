@@ -204,14 +204,14 @@ class EditorScreenTest {
         composeRule.onNodeWithTag(TOOL_OVERLAY_TAG).assertIsNotEnabled()
     }
 
-    /** A selected overlay shows its opacity instead of the Overlay tool, alongside Split and Delete. */
+    /** A selected overlay shows its opacity instead of the Overlay tool, followed by Split and Delete in the row. */
     @Test
     fun selectedOverlayShowsOpacity() {
         showEditor(availability = ToolAvailability(hasSelection = true, canAddOverlay = true, overlayOpacity = 0.5f))
         composeRule.onAllNodesWithTag(TOOL_OVERLAY_TAG).assertCountEquals(0)
         composeRule.onNodeWithText("Opacity 50%").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Overlay opacity").assertIsDisplayed()
-        composeRule.onNodeWithTag(TOOL_DELETE_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(TOOL_DELETE_TAG).performScrollTo().assertIsDisplayed()
     }
 
     /** Split is shown but disabled when the playhead is not inside the selected clip. */
