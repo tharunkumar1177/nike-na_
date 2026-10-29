@@ -96,7 +96,11 @@ class TransitionSheetTest {
     @Test
     fun applyToAllSendsAndCounts() {
         showSheet(dissolve, applied = 3)
-        composeRule.onNodeWithTag(TRANSITION_APPLY_ALL_TAG).performScrollTo().assertIsEnabled().performClick()
+        composeRule
+            .onNodeWithTag(TRANSITION_APPLY_ALL_TAG)
+            .performScrollTo()
+            .assertIsEnabled()
+            .performClick()
         assertEquals(listOf(dissolve), appliedAll)
         composeRule.onNodeWithText("Applied to 3 cuts").assertIsDisplayed()
     }

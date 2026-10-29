@@ -57,7 +57,11 @@ data class TimelineCut(
 object TimelineCuts {
     /** Returns every cut between touching clips on the video tracks of [project], in row and time order. */
     fun of(project: Project): List<TimelineCut> {
-        val playing = project.tracks.flatMap { TransitionGeometry.cutsOf(project, it) }.map { it.left.id }.toSet()
+        val playing =
+            project.tracks
+                .flatMap { TransitionGeometry.cutsOf(project, it) }
+                .map { it.left.id }
+                .toSet()
         val minimum = TransitionGeometry.minimumMicros(project.frameRate)
         return project.tracks.flatMapIndexed { index, track ->
             if (track.kind != TrackKind.VIDEO) {
@@ -111,8 +115,9 @@ internal fun AwaitPointerEventScope.cutAt(
 ): TimelineCut? {
     val metrics = TimelineMetrics(this)
     val row = TimelineGeometry.rowAt(position.y, metrics.rulerHeight, metrics.rowHeight, metrics.rowGap)
-    val pxPerSecond = context.state.dpPerSecond.dp.toPx()
-    val time = TimelineGeometry.xToTime(position.x, context.state.centerMicros, pxPerSecond, size.width.toFloat())
+    val state = context.state
+    val pxPerSecond = state.dpPerSecond.dp.toPx()
+    val time = TimelineGeometry.xToTime(position.x, state.centerMicros, pxPerSecond, size.width.toFloat())
     val tolerance = (metrics.handleZone / 2 / pxPerSecond * MICROS_PER_SECOND).roundToLong()
     return row?.let { TimelineCuts.near(TimelineCuts.of(context.project), it, time, tolerance) }
 }

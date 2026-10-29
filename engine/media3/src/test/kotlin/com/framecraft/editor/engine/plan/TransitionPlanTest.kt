@@ -126,6 +126,7 @@ class TransitionPlanTest {
         val plan = PlaybackPlanner.plan(project(TransitionKind.DISSOLVE, rightTrimMicros = 0L))
         assertFalse(plan.composited)
         assertEquals(listOf(SequenceRole.TRACK), plan.sequences.map { it.role })
-        assertEquals(listOf(4_000_000L, 4_000_000L), plan.sequences.single().segments.map { it.durationMicros })
+        val segments = plan.sequences.single().segments
+        assertEquals(listOf(4_000_000L, 4_000_000L), segments.map { it.durationMicros })
     }
 }
