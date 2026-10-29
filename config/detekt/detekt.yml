@@ -12,5 +12,6 @@ complexity:
 style:
   MagicNumber:
     ignorePropertyDeclaration: true
+    ignoreEnums: true
     excludes:
       - '**/test/**'

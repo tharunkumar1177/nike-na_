@@ -3,6 +3,7 @@
  */
 package com.framecraft.editor.domain.export
 
+import com.framecraft.editor.domain.model.CanvasAspect
 import com.framecraft.editor.domain.model.MediaAsset
 import com.framecraft.editor.domain.model.Project
 import com.framecraft.editor.domain.model.Track
@@ -122,13 +123,18 @@ object ExportPlanner {
     }
 
     /**
-     * Returns the displayed size of the first base clip's source (overlays only when there is no base clip), or the
-     * default canvas when there is no picture clip. Sound and text tracks never set the canvas.
+     * Returns the canvas shape: the project's chosen aspect, or for the original shape the displayed size of the first
+     * base clip's source (overlays only when there is no base clip), or the default canvas when there is no picture
+     * clip. Sound and text tracks never set the canvas.
      */
     private fun canvasOf(project: Project): ExportSize {
+        val aspect = project.canvas.aspect
         val baseFirst = pictureTracks(project).sortedBy { it.kind != TrackKind.VIDEO }
         val first = baseFirst.firstNotNullOfOrNull { it.clips.firstOrNull() }
-        return first?.let { displayedSize(project.assetOf(it)) } ?: DEFAULT_CANVAS
+        return when {
+            aspect != CanvasAspect.ORIGINAL -> ExportSize(aspect.widthRatio, aspect.heightRatio)
+            else -> first?.let { displayedSize(project.assetOf(it)) } ?: DEFAULT_CANVAS
+        }
     }
 
     /** Returns the longest short side among pictures used by clips, or the default canvas's when there is none. */

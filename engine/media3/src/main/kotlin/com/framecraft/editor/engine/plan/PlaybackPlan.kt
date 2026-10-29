@@ -3,6 +3,9 @@
  */
 package com.framecraft.editor.engine.plan
 
+import com.framecraft.editor.domain.model.CanvasBackground
+import com.framecraft.editor.domain.model.CanvasPlacement
+import com.framecraft.editor.domain.model.CanvasSettings
 import com.framecraft.editor.domain.model.MediaKind
 import com.framecraft.editor.domain.model.OverlayTransform
 import com.framecraft.editor.domain.model.Project
@@ -53,21 +56,50 @@ data class TextSpan(
     val content: TextContent,
 )
 
+/** Where a base clip sits on the canvas from [startMicros] until [endMicros] (exclusive), in timeline time. */
+data class BaseSpan(
+    val startMicros: Long,
+    val endMicros: Long,
+    val placement: CanvasPlacement,
+)
+
 /**
  * Segments of one track of [kind] in timeline order, starting at time zero; overlay tracks also carry their
- * [overlaySpans].
+ * [overlaySpans] and base tracks their [baseSpans].
  */
 data class SequencePlan(
     val segments: List<PlanSegment>,
     val overlaySpans: List<OverlaySpan> = emptyList(),
     val kind: TrackKind = TrackKind.VIDEO,
+    val baseSpans: List<BaseSpan> = emptyList(),
 )
 
-/** Everything the engine needs to build a composition from a project; [textSpans] are drawn last on top. */
+/** What fills the canvas behind the base clips when it is not black. */
+sealed interface BackgroundPlan {
+    /** One opaque color, [argb]. */
+    data class Solid(
+        val argb: Int,
+    ) : BackgroundPlan
+
+    /** A blurred copy of the first base track: its padded [segments], shown during its clips' [spans]. */
+    data class Blur(
+        val segments: List<PlanSegment>,
+        val spans: List<BaseSpan>,
+    ) : BackgroundPlan
+}
+
+/**
+ * Everything the engine needs to build a composition from a project; [textSpans] are drawn last on top. When
+ * [composited], the picture goes through the compositor at the canvas shape [aspectRatio] (null keeps the first base
+ * clip's shape) over [background] (null is black).
+ */
 data class PlaybackPlan(
     val sequences: List<SequencePlan>,
     val frameRate: FrameRate,
     val textSpans: List<TextSpan> = emptyList(),
+    val composited: Boolean = false,
+    val aspectRatio: Float? = null,
+    val background: BackgroundPlan? = null,
 )
 
 /** Converts project snapshots into playback plans. */
@@ -78,7 +110,8 @@ object PlaybackPlanner {
      * picture sequences over later ones, so overlays come before the base. Picture tracks that end before the latest
      * track are padded with a gap, because the compositor waits for a frame from every picture input; on the base
      * this shows black under music that runs past the video. Text tracks add no sequence but count toward that end;
-     * their spans run from the bottom lane up, so upper lanes draw on top.
+     * their spans run from the bottom lane up, so upper lanes draw on top. The picture is composited when there are
+     * overlays or the canvas or any base placement differs from the defaults.
      */
     fun plan(project: Project): PlaybackPlan {
         val planned = project.tracks.filter { it.clips.isNotEmpty() }
@@ -86,7 +119,7 @@ object PlaybackPlanner {
         val base =
             planned
                 .filter { it.kind == TrackKind.VIDEO }
-                .map { SequencePlan(paddedSegmentsOf(project, it, end)) }
+                .map { SequencePlan(paddedSegmentsOf(project, it, end), baseSpans = baseSpansOf(it)) }
         val overlays =
             planned
                 .filter { it.kind == TrackKind.OVERLAY }
@@ -100,8 +133,34 @@ object PlaybackPlanner {
                 .filter { it.kind == TrackKind.TEXT }
                 .asReversed()
                 .flatMap(::textSpansOf)
-        return PlaybackPlan(sequences = overlays + base + audio, frameRate = project.frameRate, textSpans = text)
+        val placed = planned.any { track -> track.clips.any { it.canvasPlacement != null } }
+        val composited = overlays.isNotEmpty() || placed || project.canvas != CanvasSettings()
+        return PlaybackPlan(
+            sequences = overlays + base + audio,
+            frameRate = project.frameRate,
+            textSpans = text,
+            composited = composited,
+            aspectRatio = project.canvas.aspect.ratio,
+            background = backgroundOf(project.canvas.background, base.firstOrNull()),
+        )
     }
+
+    /** Returns the plan for [background] behind [firstBase], or null for black or when there is nothing to blur. */
+    private fun backgroundOf(
+        background: CanvasBackground,
+        firstBase: SequencePlan?,
+    ): BackgroundPlan? =
+        when (background) {
+            CanvasBackground.Black -> null
+            is CanvasBackground.Solid -> BackgroundPlan.Solid(background.argb)
+            CanvasBackground.Blur -> firstBase?.let { BackgroundPlan.Blur(it.segments, it.baseSpans) }
+        }
+
+    /** Returns the canvas placement of every clip on base [track], defaulting to fitted, centered, and upright. */
+    private fun baseSpansOf(track: Track): List<BaseSpan> =
+        track.clips.map { clip ->
+            BaseSpan(clip.startMicros, clip.endMicros, clip.canvasPlacement ?: CanvasPlacement())
+        }
 
     /** Returns the segments of [track] followed by a gap that runs it on to [endMicros]. */
     private fun paddedSegmentsOf(

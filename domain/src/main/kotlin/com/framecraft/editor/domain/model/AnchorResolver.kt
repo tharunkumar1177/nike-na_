@@ -24,7 +24,7 @@ object AnchorResolver {
     /**
      * Throws [IllegalArgumentException] unless anchors in [tracks] are consistent: every parent exists, anchors form
      * no cycle, anchored clips sit on non-magnetic tracks at their resolved start, only video tracks are magnetic,
-     * and only overlay and text tracks hold overlay transforms.
+     * only overlay and text tracks hold overlay transforms, and only base video tracks hold canvas placements.
      */
     fun validate(tracks: List<Track>) {
         tracks.forEach { track ->
@@ -35,6 +35,9 @@ object AnchorResolver {
                 }
                 require(clip.overlayTransform == null || track.kind.isPlaced) {
                     "Clip ${clip.id} has an overlay transform but sits on unplaced track ${track.id}"
+                }
+                require(clip.canvasPlacement == null || track.kind == TrackKind.VIDEO) {
+                    "Clip ${clip.id} has a canvas placement but sits off the base on track ${track.id}"
                 }
             }
         }

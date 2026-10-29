@@ -94,7 +94,7 @@ data class MergeClips(
         require(right.anchor == shiftedAnchor(left.anchor, left.durationMicros)) {
             "Clips $leftClipId and $rightClipId are anchored differently"
         }
-        require(right.overlayTransform == left.overlayTransform) {
+        require(right.overlayTransform == left.overlayTransform && right.canvasPlacement == left.canvasPlacement) {
             "Clips $leftClipId and $rightClipId are placed differently"
         }
         require(right.volumePercent == left.volumePercent && left.fadeOutMicros == 0L && right.fadeInMicros == 0L) {

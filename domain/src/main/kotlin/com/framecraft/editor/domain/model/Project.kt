@@ -7,7 +7,7 @@ import com.framecraft.editor.domain.time.FrameRate
 import kotlinx.serialization.Serializable
 
 /** Schema version written by this build. */
-const val CURRENT_SCHEMA_VERSION: Int = 4
+const val CURRENT_SCHEMA_VERSION: Int = 5
 
 /** An immutable project snapshot. Construction fails if any cross-object invariant is broken. */
 @Serializable
@@ -18,6 +18,7 @@ data class Project(
     val assets: List<MediaAsset>,
     val tracks: List<Track>,
     val schemaVersion: Int = CURRENT_SCHEMA_VERSION,
+    val canvas: CanvasSettings = CanvasSettings(),
 ) {
     init {
         require(id.isNotBlank()) { "Project id must not be blank" }

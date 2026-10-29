@@ -1,5 +1,5 @@
 /*
- * Unit tests for the preview overlay math: fitted size, screen center, gesture changes, and rotation snapping.
+ * Unit tests for the preview overlay math: fitted and filled size, center, gesture changes, and rotation snapping.
  */
 package com.framecraft.editor.editor
 
@@ -20,6 +20,14 @@ class OverlayGeometryTest {
         assertEquals(Size(1600f, 800f), OverlayGeometry.boxSize(canvas, 2f, 1f))
         assertEquals(Size(450f, 900f), OverlayGeometry.boxSize(canvas, 0.5f, 1f))
         assertEquals(Size(180f, 360f), OverlayGeometry.boxSize(canvas, 0.5f, 0.4f))
+    }
+
+    /** A wide picture fills the canvas height and a tall one its width, then both follow the scale. */
+    @Test
+    fun fillBoxCoversThenScales() {
+        assertEquals(Size(1800f, 900f), OverlayGeometry.fillBoxSize(canvas, 2f, 1f))
+        assertEquals(Size(1600f, 3200f), OverlayGeometry.fillBoxSize(canvas, 0.5f, 1f))
+        assertEquals(Size(800f, 1600f), OverlayGeometry.fillBoxSize(canvas, 0.5f, 0.5f))
     }
 
     /** Text keeps its natural share of the canvas at scale 1 and grows with the scale. */

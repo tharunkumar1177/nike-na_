@@ -9,14 +9,17 @@ import androidx.media3.common.Effect
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.effect.GaussianBlur
 import androidx.media3.effect.OverlayEffect
+import androidx.media3.effect.Presentation
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
 import androidx.media3.transformer.Effects
 import com.framecraft.editor.domain.model.MediaKind
 import com.framecraft.editor.domain.model.TrackKind
-import com.framecraft.editor.engine.plan.OverlaySpan
+import com.framecraft.editor.engine.plan.BackgroundPlan
+import com.framecraft.editor.engine.plan.CanvasLayout
 import com.framecraft.editor.engine.plan.PlanSegment
 import com.framecraft.editor.engine.plan.PlaybackPlan
 import com.framecraft.editor.engine.plan.SequencePlan
@@ -32,11 +35,14 @@ private val AUDIO_TRACKS = setOf(C.TRACK_TYPE_AUDIO)
 /** Track types of a picture sequence, which also carries sound. */
 private val AUDIO_VIDEO_TRACKS = setOf(C.TRACK_TYPE_AUDIO, C.TRACK_TYPE_VIDEO)
 
-/** A fully transparent 1 by 1 PNG, shown by the clock sequence. */
-private const val TRANSPARENT_PIXEL_URI =
-    "data:image/png;base64," +
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZ" +
-        "cwAADsMAAA7DAcdvqGQAAAALSURBVBhXY2AAAgAABQABqtXIUQAAAABJRU5ErkJggg=="
+/** Fully transparent black, shown by the clock sequence. */
+private const val TRANSPARENT_ARGB = 0
+
+/** Height the blurred background is reduced to before blurring, so the blur looks the same at any source size. */
+private const val BLUR_HEIGHT_PIXELS = 360
+
+/** Gaussian blur strength of the background, in pixels at [BLUR_HEIGHT_PIXELS]. */
+private const val BLUR_SIGMA = 12f
 
 /** Creates Media3 compositions. */
 @OptIn(markerClass = [UnstableApi::class])
@@ -46,35 +52,81 @@ internal object CompositionFactory {
      * for sound tracks. Text is drawn over the composed picture before [videoEffects], which export passes to apply
      * to the whole output; the preview passes none.
      *
-     * With overlays, Media3 composites the inputs and times every output frame by the first sequence, which it also
-     * draws on top. A hidden clock sequence of the project's frame rate goes first so output frames keep that rate
-     * through overlay gaps and overlay videos, and [OverlayCompositorSettings] places the overlays and takes the
-     * canvas from the first base sequence. HDR inputs are tone-mapped because the compositor draws only SDR.
+     * A composited plan goes through the Media3 compositor, which times every output frame by the first sequence and
+     * draws earlier sequences on top. A hidden clock sequence of the project's frame rate goes first so output frames
+     * keep that rate through gaps and overlay videos; the background, when not black, goes after the pictures and
+     * before the sound. [CanvasCompositorSettings] sizes the canvas and places every input. HDR inputs are tone-mapped
+     * because the compositor draws only SDR.
      */
     fun create(
         plan: PlaybackPlan,
         videoEffects: List<Effect> = emptyList(),
     ): Composition {
         val frameRate = (plan.frameRate.numerator.toDouble() / plan.frameRate.denominator).roundToInt()
-        val planned = plan.sequences.map { sequenceOf(it, frameRate) }
-        val composited = plan.sequences.any { it.kind == TrackKind.OVERLAY }
-        val sequences = if (composited) listOf(clockSequence(plan, frameRate)) + planned else planned
+        val (sound, pictures) = plan.sequences.partition { it.kind == TrackKind.AUDIO }
+        val durationMicros = plan.sequences.maxOfOrNull { sequence -> sequence.segments.sumOf { it.durationMicros } }
+        val picture = pictures.map { sequenceOf(it, frameRate) }
+        val pictureSequences =
+            if (plan.composited && durationMicros != null) {
+                val clock = stillSequence(SolidPng.dataUri(TRANSPARENT_ARGB), durationMicros, frameRate)
+                val background = plan.background?.let { backgroundSequence(it, durationMicros, frameRate) }
+                listOf(clock) + picture + listOfNotNull(background)
+            } else {
+                picture
+            }
+        val sequences = pictureSequences + sound.map { sequenceOf(it, frameRate) }
         val text: List<Effect> =
             if (plan.textSpans.isEmpty()) emptyList() else listOf(OverlayEffect(plan.textSpans.map(::TextOverlay)))
         val builder = Composition.Builder(sequences).setEffects(Effects(emptyList(), text + videoEffects))
-        if (composited) {
-            val spans = listOf(emptyList<OverlaySpan>()) + plan.sequences.map { it.placementSpans() }
-            val canvas = 1 + plan.sequences.indexOfFirst { it.kind == TrackKind.VIDEO }.coerceAtLeast(0)
+        if (plan.composited && durationMicros != null) {
             builder
-                .setVideoCompositorSettings(OverlayCompositorSettings(spans, canvas))
+                .setVideoCompositorSettings(CanvasCompositorSettings(CanvasLayout.inputsOf(plan), plan.aspectRatio))
                 .setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL)
         }
         return builder.build()
     }
 
-    /** Returns null for a base sequence, which fills the frame, and the clip placements of any other sequence. */
-    private fun SequencePlan.placementSpans(): List<OverlaySpan>? =
-        if (kind == TrackKind.OVERLAY) overlaySpans else null
+    /** Returns the sequence that draws [background] for [durationMicros] at [frameRate]. */
+    private fun backgroundSequence(
+        background: BackgroundPlan,
+        durationMicros: Long,
+        frameRate: Int,
+    ): EditedMediaItemSequence =
+        when (background) {
+            is BackgroundPlan.Solid -> {
+                stillSequence(SolidPng.dataUri(background.argb), durationMicros, frameRate)
+            }
+
+            is BackgroundPlan.Blur -> {
+                val builder = EditedMediaItemSequence.Builder(AUDIO_VIDEO_TRACKS)
+                background.segments.forEach { segment ->
+                    when (segment) {
+                        is PlanSegment.Gap -> builder.addGap(segment.durationMicros)
+                        is PlanSegment.Media -> builder.addItem(blurredItem(segment, frameRate))
+                    }
+                }
+                builder.build()
+            }
+        }
+
+    /** Returns the picture of [segment], silent, reduced, and blurred. */
+    private fun blurredItem(
+        segment: PlanSegment.Media,
+        frameRate: Int,
+    ): EditedMediaItem {
+        val picture =
+            if (segment.kind == MediaKind.IMAGE) {
+                imageItem(segment, frameRate)
+            } else {
+                clippedItem(segment, soundOnly = false)
+            }
+        val blur = listOf(Presentation.createForHeight(BLUR_HEIGHT_PIXELS), GaussianBlur(BLUR_SIGMA))
+        return picture
+            .buildUpon()
+            .setRemoveAudio(true)
+            .setEffects(Effects(emptyList(), blur))
+            .build()
+    }
 
     /** Maps [sequence] to a Media3 sequence whose stills run at [frameRate]. */
     private fun sequenceOf(
@@ -92,16 +144,16 @@ internal object CompositionFactory {
         return builder.build()
     }
 
-    /** Returns a transparent still at [frameRate] that lasts as long as the longest sequence of [plan]. */
-    private fun clockSequence(
-        plan: PlaybackPlan,
+    /** Returns a sequence of one PNG still at [uri] shown for [durationMicros] at [frameRate]. */
+    private fun stillSequence(
+        uri: String,
+        durationMicros: Long,
         frameRate: Int,
     ): EditedMediaItemSequence {
-        val durationMicros = plan.sequences.maxOf { sequence -> sequence.segments.sumOf { it.durationMicros } }
         val item =
             MediaItem
                 .Builder()
-                .setUri(TRANSPARENT_PIXEL_URI)
+                .setUri(uri)
                 .setMimeType(MimeTypes.IMAGE_PNG)
                 .setImageDurationMs(durationMicros / MICROS_PER_MILLI)
                 .build()
