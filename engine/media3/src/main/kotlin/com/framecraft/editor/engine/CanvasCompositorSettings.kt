@@ -11,7 +11,6 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.StaticOverlaySettings
 import com.framecraft.editor.domain.model.CanvasFit
 import com.framecraft.editor.domain.model.CanvasPlacement
-import com.framecraft.editor.domain.model.OverlayTransform
 import com.framecraft.editor.engine.plan.BaseSpan
 import com.framecraft.editor.engine.plan.CanvasLayout
 import com.framecraft.editor.engine.plan.CompositorInput
@@ -63,60 +62,49 @@ internal class CanvasCompositorSettings(
         presentationTimeUs: Long,
     ): OverlaySettings {
         val input = inputs.getOrNull(inputId) ?: return hidden
-        val settings =
-            when (input) {
-                CompositorInput.Clock -> {
-                    null
-                }
-
-                is CompositorInput.Overlay -> {
-                    val span = input.spans.showing(presentationTimeUs)
-                    span?.let { overlaySettings(it.transform, fit(inputId, CanvasFit.FIT)) }
-                }
-
-                is CompositorInput.Base -> {
-                    input.spans.at(presentationTimeUs)?.let { baseSettings(it, inputId, presentationTimeUs) }
-                }
-
-                CompositorInput.Solid -> {
-                    stretched(inputId)
-                }
-
-                is CompositorInput.Blur -> {
-                    input.spans.at(presentationTimeUs)?.let { movedSettings(BLUR_PLACEMENT, inputId, Motion()) }
-                }
-
-                is CompositorInput.Incoming -> {
-                    input.spans.during(presentationTimeUs)?.let { incomingSettings(it, inputId, presentationTimeUs) }
-                }
-
-                is CompositorInput.Backdrop -> {
-                    input.spans.during(presentationTimeUs)?.let { stretched(inputId) }
-                }
-            }
-        return settings ?: hidden
+        val time = presentationTimeUs
+        return when (input) {
+            CompositorInput.Clock -> hidden
+            is CompositorInput.Overlay -> overlaySettings(input.spans.showing(time), inputId)
+            is CompositorInput.Base -> baseSettings(input.spans.at(time), inputId, time)
+            CompositorInput.Solid -> stretched(inputId)
+            is CompositorInput.Blur -> if (input.spans.at(time) == null) hidden else blurSettings(inputId)
+            is CompositorInput.Incoming -> incomingSettings(input.spans.during(time), inputId, time)
+            is CompositorInput.Backdrop -> if (input.spans.during(time) == null) hidden else stretched(inputId)
+        }
     }
 
-    /** Places base input [inputId] by [span] at [timeUs], moved as the outgoing side of any transition there. */
+    /**
+     * Places base input [inputId] by [span] at [timeUs], moved as the outgoing side of any transition there, or hides
+     * it when no span covers the time.
+     */
     private fun baseSettings(
-        span: BaseSpan,
+        span: BaseSpan?,
         inputId: Int,
         timeUs: Long,
     ): OverlaySettings {
+        if (span == null) return hidden
         val progress = TransitionMotion.progress(span.startMicros, span.endMicros, timeUs)
         val motion = span.outgoing?.let { TransitionMotion.outgoing(it, progress) } ?: Motion()
         return movedSettings(span.placement, inputId, motion)
     }
 
-    /** Places incoming input [inputId] by transition [span] at [timeUs], moved as its incoming side. */
+    /**
+     * Places incoming input [inputId] by transition [span] at [timeUs], moved as its incoming side, or hides it when
+     * no transition plays then.
+     */
     private fun incomingSettings(
-        span: TransitionSpan,
+        span: TransitionSpan?,
         inputId: Int,
         timeUs: Long,
     ): OverlaySettings {
+        if (span == null) return hidden
         val progress = TransitionMotion.progress(span.startMicros, span.endMicros, timeUs)
         return movedSettings(span.placement, inputId, TransitionMotion.incoming(span.kind, progress))
     }
+
+    /** Fills the canvas with blur input [inputId]. */
+    private fun blurSettings(inputId: Int): OverlaySettings = movedSettings(BLUR_PLACEMENT, inputId, Motion())
 
     /** Returns the factor that sizes input [inputId] to the canvas by [fit]; it is 1 before any size is known. */
     private fun fit(
@@ -132,18 +120,20 @@ internal class CanvasCompositorSettings(
         }
     }
 
-    /** Maps overlay [transform] to Media3 settings scaled by [fit]. */
+    /** Maps overlay input [inputId] showing [span] to Media3 settings fitted to the canvas, or hides it without one. */
     private fun overlaySettings(
-        transform: OverlayTransform,
-        fit: Float,
-    ): OverlaySettings =
-        placementSettings(
+        span: OverlaySpan?,
+        inputId: Int,
+    ): OverlaySettings {
+        val transform = span?.transform ?: return hidden
+        return placementSettings(
             centerX = transform.centerX,
             centerY = transform.centerY,
             rotationDegrees = transform.rotationDegrees,
-            scale = transform.scale * fit,
+            scale = transform.scale * fit(inputId, CanvasFit.FIT),
             alpha = transform.opacity,
         )
+    }
 
     /** Maps base [placement] of input [inputId], moved by [motion], to Media3 settings. */
     private fun movedSettings(
