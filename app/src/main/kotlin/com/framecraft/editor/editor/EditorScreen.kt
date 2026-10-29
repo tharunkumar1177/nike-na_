@@ -33,6 +33,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
@@ -56,6 +57,18 @@ const val REDO_TAG = "editor_redo"
 
 /** Test tag of the delete clip tool. */
 const val TOOL_DELETE_TAG = "editor_tool_delete"
+
+/** Test tag of the split clip tool. */
+const val TOOL_SPLIT_TAG = "editor_tool_split"
+
+/** Test tag of the previous frame action. */
+const val FRAME_BACK_TAG = "editor_frame_back"
+
+/** Test tag of the next frame action. */
+const val FRAME_FORWARD_TAG = "editor_frame_forward"
+
+/** Opacity of a disabled tool. */
+private const val DISABLED_ALPHA = 0.38f
 
 /** Share of the editor height given to the preview. */
 private const val PREVIEW_WEIGHT = 0.45f
@@ -88,14 +101,31 @@ data class EditorNotices(
     val saveFailed: Boolean = false,
 )
 
-/** What the editor's controls do. */
+/** What the editor's top bar and notices do. */
 class EditorActions(
-    val onPlayPause: () -> Unit,
     val onClose: () -> Unit,
     val onUndo: () -> Unit,
     val onRedo: () -> Unit,
-    val onDeleteClip: () -> Unit,
     val onNoticeShown: (EditorNotice) -> Unit,
+)
+
+/** What the playback bar does. */
+class PlaybackActions(
+    val onPlayPause: () -> Unit,
+    val onFrameBack: () -> Unit,
+    val onFrameForward: () -> Unit,
+)
+
+/** What the selected-clip tools do. */
+class ToolActions(
+    val onSplitClip: () -> Unit,
+    val onDeleteClip: () -> Unit,
+)
+
+/** Which tools apply: [hasSelection] when a clip is selected, [canSplit] when the playhead is inside it. */
+data class ToolAvailability(
+    val hasSelection: Boolean = false,
+    val canSplit: Boolean = false,
 )
 
 /**
@@ -110,9 +140,11 @@ fun EditorScreen(
     aspectRatio: Float,
     canUndo: Boolean,
     canRedo: Boolean,
-    hasSelection: Boolean,
+    availability: ToolAvailability,
     notices: EditorNotices,
     actions: EditorActions,
+    playback: PlaybackActions,
+    tools: ToolActions,
     previewSurface: @Composable (Modifier) -> Unit,
     timeline: @Composable (Modifier) -> Unit,
     modifier: Modifier = Modifier,
@@ -127,9 +159,9 @@ fun EditorScreen(
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             PreviewArea(aspectRatio, previewSurface)
-            PlaybackBar(previewState, actions.onPlayPause)
+            PlaybackBar(previewState, playback)
             timeline(Modifier.fillMaxWidth().weight(TIMELINE_WEIGHT))
-            ToolsZone(hasSelection, actions.onDeleteClip)
+            ToolsZone(availability, tools)
         }
     }
 }
@@ -218,11 +250,11 @@ private fun ColumnScope.PreviewArea(
     }
 }
 
-/** Play/pause button and the position over duration timecode. */
+/** Previous frame, play/pause, and next frame buttons, then the position over duration timecode. */
 @Composable
 private fun PlaybackBar(
     state: PreviewState,
-    onPlayPause: () -> Unit,
+    playback: PlaybackActions,
 ) {
     val resources = LocalResources.current
     val spokenProgress =
@@ -237,8 +269,22 @@ private fun PlaybackBar(
     ) {
         val icon = if (state.isPlaying) R.drawable.ic_pause else R.drawable.ic_play_arrow
         val label = if (state.isPlaying) R.string.editor_pause else R.string.editor_play
-        IconButton(onClick = onPlayPause) {
+        IconButton(
+            onClick = playback.onFrameBack,
+            enabled = state.positionMicros > 0L,
+            modifier = Modifier.testTag(FRAME_BACK_TAG),
+        ) {
+            Icon(painterResource(R.drawable.ic_chevron_left), stringResource(R.string.editor_previous_frame))
+        }
+        IconButton(onClick = playback.onPlayPause) {
             Icon(painter = painterResource(icon), contentDescription = stringResource(label))
+        }
+        IconButton(
+            onClick = playback.onFrameForward,
+            enabled = state.positionMicros < state.durationMicros,
+            modifier = Modifier.testTag(FRAME_FORWARD_TAG),
+        ) {
+            Icon(painterResource(R.drawable.ic_chevron_right), stringResource(R.string.editor_next_frame))
         }
         Spacer(Modifier.weight(1f))
         Text(
@@ -250,11 +296,11 @@ private fun PlaybackBar(
     }
 }
 
-/** Contextual tools for the selection; empty when nothing is selected. */
+/** Contextual tools for the selection, Split then Delete; empty when nothing is selected. */
 @Composable
 private fun ColumnScope.ToolsZone(
-    hasSelection: Boolean,
-    onDeleteClip: () -> Unit,
+    availability: ToolAvailability,
+    tools: ToolActions,
 ) {
     Row(
         modifier =
@@ -263,21 +309,30 @@ private fun ColumnScope.ToolsZone(
                 .weight(TOOLS_WEIGHT)
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .padding(horizontal = Spacing.md),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (hasSelection) {
+        if (availability.hasSelection) {
+            ToolButton(
+                iconRes = R.drawable.ic_content_cut,
+                label = stringResource(R.string.editor_tool_split),
+                description = stringResource(R.string.editor_tool_split_description),
+                onClick = tools.onSplitClip,
+                enabled = availability.canSplit,
+                modifier = Modifier.testTag(TOOL_SPLIT_TAG),
+            )
             ToolButton(
                 iconRes = R.drawable.ic_delete,
                 label = stringResource(R.string.editor_tool_delete),
                 description = stringResource(R.string.editor_tool_delete_description),
-                onClick = onDeleteClip,
+                onClick = tools.onDeleteClip,
                 modifier = Modifier.testTag(TOOL_DELETE_TAG),
             )
         }
     }
 }
 
-/** 64dp tool with an icon over a label, read by TalkBack as [description]. */
+/** 64dp tool with an icon over a label, read by TalkBack as [description]; dimmed when not [enabled]. */
 @Composable
 private fun ToolButton(
     @DrawableRes iconRes: Int,
@@ -285,12 +340,14 @@ private fun ToolButton(
     description: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     Column(
         modifier =
             modifier
                 .size(TOOL_SIZE)
-                .clickable(role = Role.Button, onClick = onClick)
+                .alpha(if (enabled) 1f else DISABLED_ALPHA)
+                .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
                 .semantics(mergeDescendants = true) { contentDescription = description },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,

@@ -48,6 +48,10 @@
   <string name="editor_redo">Redo</string>
   <string name="editor_tool_delete">Delete</string>
   <string name="editor_tool_delete_description">Delete clip</string>
+  <string name="editor_tool_split">Split</string>
+  <string name="editor_tool_split_description">Split clip at playhead</string>
+  <string name="editor_previous_frame">Previous frame</string>
+  <string name="editor_next_frame">Next frame</string>
   <string name="editor_save_failed">Couldn\'t save changes.</string>
   <plurals name="editor_recovered_edits">
     <item quantity="one">Recovered project. %d unsaved edit couldn\'t be restored.</item>
@@ -61,6 +65,8 @@
   <string name="editor_storage_body">Storage is full or unavailable. Free up some space and try again.</string>
 
   <string name="timeline_zoom_to_fit">Zoom to fit timeline</string>
+  <string name="timeline_snap">Snap to playhead and clip edges</string>
+  <string name="timeline_zoom_to_playhead">Zoom to playhead</string>
   <string name="timeline_description">Timeline. Playhead at %1$s. %2$s Swipe up or down to seek.</string>
   <plurals name="timeline_track_clips">
     <item quantity="one">%1$d clip on track %2$d.</item>

@@ -76,10 +76,13 @@ sealed interface EditorState {
     ) : EditorState
 }
 
-/** Holds the open project, its saving session, and its preview across configuration changes. */
+/**
+ * Holds the open project, its saving session, and its preview across configuration changes. [idGenerator] also
+ * makes the ids of clips that edits create.
+ */
 class EditorViewModel(
     private val importer: MediaImporter,
-    private val idGenerator: IdGenerator,
+    val idGenerator: IdGenerator,
     private val store: ProjectStore,
     private val previewFactory: () -> ProjectPreview,
     private val thumbnailsFactory: () -> ClipThumbnails,

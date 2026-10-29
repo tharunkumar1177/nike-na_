@@ -106,6 +106,11 @@ class ProjectPreview(
         player.play()
     }
 
+    /** Pauses playback; does nothing when already paused. */
+    fun pause() {
+        player.pause()
+    }
+
     /** Pauses and switches the player to frame-accurate scrubbing; pause first so ending the scrub cannot resume. */
     fun beginScrub() {
         player.pause()

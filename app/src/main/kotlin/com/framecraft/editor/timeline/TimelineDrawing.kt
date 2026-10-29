@@ -97,6 +97,21 @@ class TimelineMetrics(
     /** Size of the icon shown when a thumbnail failed. */
     val iconSize = with(scope) { 24.dp.toPx() }
 
+    /** Width of a trim handle grip. */
+    val handleWidth = with(scope) { 8.dp.toPx() }
+
+    /** Height of a trim handle grip. */
+    val handleHeight = with(scope) { 32.dp.toPx() }
+
+    /** Width of the touch zone centered on each edge of the selected clip. */
+    val handleZone = with(scope) { 48.dp.toPx() }
+
+    /** Distance within which a dragged edge snaps to a target. */
+    val snapThreshold = with(scope) { 12.dp.toPx() }
+
+    /** Width of the snap guideline. */
+    val guideWidth = with(scope) { 1.dp.toPx() }
+
     /** Returns the top edge of track row [index]. */
     fun rowTop(index: Int): Float = rulerHeight + rowGap + index * (rowHeight + rowGap)
 }
@@ -112,7 +127,7 @@ class TimelineFrame(
 )
 
 /** Returns the x position of [micros] in this frame. */
-private fun DrawScope.x(
+internal fun DrawScope.x(
     frame: TimelineFrame,
     micros: Long,
 ): Float = TimelineGeometry.timeToX(micros, frame.centerMicros, frame.pxPerSecond, size.width)

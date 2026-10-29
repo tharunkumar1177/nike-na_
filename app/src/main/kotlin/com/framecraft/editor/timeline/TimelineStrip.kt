@@ -1,20 +1,22 @@
 /*
- * Read-only timeline strip: fixed center playhead, drag to scrub, pinch to zoom, and zoom to fit.
+ * Timeline strip: fixed center playhead, scrub, pinch zoom, tap selection, trim and reorder drags, and the snap,
+ * zoom to playhead, and zoom to fit controls.
  */
 package com.framecraft.editor.timeline
 
 import android.content.res.Resources
+import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.calculatePan
-import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledIconToggleButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -27,10 +29,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
@@ -44,16 +44,25 @@ import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import com.framecraft.editor.R
+import com.framecraft.editor.domain.command.EditCommand
 import com.framecraft.editor.domain.model.Project
 import com.framecraft.editor.domain.time.MICROS_PER_SECOND
 import com.framecraft.editor.engine.ThumbnailSource
 import com.framecraft.editor.ui.spokenDuration
 import com.framecraft.editor.ui.theme.Spacing
-import kotlin.math.abs
-import kotlin.math.roundToLong
+import kotlinx.coroutines.delay
 
 /** Test tag of the timeline canvas. */
 const val TIMELINE_TAG = "timeline_canvas"
+
+/** Test tag of the snap toggle. */
+const val SNAP_TOGGLE_TAG = "editor_snap_toggle"
+
+/** Test tag of the zoom to playhead toggle. */
+const val ZOOM_PLAYHEAD_TAG = "editor_zoom_playhead"
+
+/** How long a finished drag keeps its preview while waiting for the saved project. */
+private const val SETTLE_TIMEOUT_MS = 1_000L
 
 /** Callbacks a scrub gesture drives. */
 class ScrubCallbacks(
@@ -65,7 +74,9 @@ class ScrubCallbacks(
 /**
  * Draws [project] around a fixed center playhead at [positionMicros]. Touching pauses via
  * [ScrubCallbacks.onStart]; dragging seeks frame by frame; pinching zooms around the playhead. A tap
- * selects the clip under it, or clears the selection on empty space, through [onClipSelected].
+ * selects the clip under it, or clears the selection on empty space, through [onClipSelected]. Dragging a
+ * handle of the selected clip trims it and holding a clip lifts it for reordering; each drag reports one
+ * command to [onEdit] when the finger lifts. [onHaptic] plays snap and pickup feedback.
  */
 @Composable
 fun TimelineStrip(
@@ -75,47 +86,98 @@ fun TimelineStrip(
     callbacks: ScrubCallbacks,
     selectedClipId: String?,
     onClipSelected: (String?) -> Unit,
+    onEdit: (EditCommand) -> Unit,
+    onHaptic: (HapticFeedbackType) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state = rememberTimelineState(project.id)
-    val style = rememberTimelineStyle()
-    val resources = LocalResources.current
-    val thumbnailVersion by thumbnails.version.collectAsState()
-    val currentOnClipSelected by rememberUpdatedState(onClipSelected)
+    val currentSelection by rememberUpdatedState(selectedClipId)
+    val edits = rememberEditCallbacks(onClipSelected, onEdit, onHaptic)
+    val pending = state.preview
+    LaunchedEffect(pending) {
+        if (pending?.settling == true) {
+            delay(SETTLE_TIMEOUT_MS)
+            state.preview = null
+        }
+    }
     BoxWithConstraints(modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         val viewportWidthDp = maxWidth.value
         ThumbnailPrefetch(project, state, positionMicros, thumbnails, constraints.maxWidth.toFloat())
-        Canvas(
-            Modifier
-                .fillMaxSize()
-                .testTag(TIMELINE_TAG)
-                .timelineSemantics(resources, project, positionMicros, callbacks.onSeek)
-                .pointerInput(project) {
-                    scrubGestures(state, project, positionMicros, callbacks) { tap ->
-                        currentOnClipSelected(clipAtPosition(project, state, tap))
-                    }
+        TimelineCanvas(
+            project = project,
+            preview = pending?.takeIf { it.base === project },
+            state = state,
+            positionMicros = positionMicros,
+            thumbnails = thumbnails,
+            selectedClipId = selectedClipId,
+            onSeek = callbacks.onSeek,
+            modifier =
+                Modifier.pointerInput(project) {
+                    val context = TimelineGestureContext(state, project, edits) { currentSelection }
+                    timelineGestures(context, positionMicros, callbacks)
                 },
-        ) {
-            // Reading the version here redraws the canvas whenever a thumbnail finishes loading.
-            thumbnailVersion
-            val frame =
-                TimelineFrame(
-                    project = project,
-                    centerMicros = if (state.scrubbing) state.centerMicros else positionMicros(),
-                    pxPerSecond = state.dpPerSecond.dp.toPx(),
-                    metrics = TimelineMetrics(this),
-                    style = style,
-                    thumbnails = thumbnails,
-                )
-            drawRuler(frame)
-            project.tracks.forEachIndexed { index, track -> drawTrack(frame, track, frame.metrics.rowTop(index)) }
-            drawSelection(frame, selectedClipId)
-            drawPlayhead(frame)
-        }
-        ZoomToFitButton(
-            onClick = { state.dpPerSecond = TimelineGeometry.fitZoom(project.durationMicros, viewportWidthDp) },
+        )
+        TimelineControls(
+            state = state,
+            onZoomToFit = { state.zoomTo(TimelineGeometry.fitZoom(project.durationMicros, viewportWidthDp)) },
             modifier = Modifier.align(Alignment.BottomEnd),
         )
+    }
+}
+
+/** Remembers edit callbacks that always call the latest [onSelect], [onCommit], and [onHaptic]. */
+@Composable
+private fun rememberEditCallbacks(
+    onSelect: (String?) -> Unit,
+    onCommit: (EditCommand) -> Unit,
+    onHaptic: (HapticFeedbackType) -> Unit,
+): TimelineEditCallbacks {
+    val select by rememberUpdatedState(onSelect)
+    val commit by rememberUpdatedState(onCommit)
+    val haptic by rememberUpdatedState(onHaptic)
+    return remember { TimelineEditCallbacks({ select(it) }, { commit(it) }, { haptic(it) }) }
+}
+
+/** The drawn timeline: [preview] replaces [project] while a drag is in progress. */
+@Composable
+private fun TimelineCanvas(
+    project: Project,
+    preview: TimelinePreview?,
+    state: TimelineState,
+    positionMicros: () -> Long,
+    thumbnails: ThumbnailSource,
+    selectedClipId: String?,
+    onSeek: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val style = rememberTimelineStyle()
+    val resources = LocalResources.current
+    val thumbnailVersion by thumbnails.version.collectAsState()
+    val shown = preview?.project ?: project
+    Canvas(
+        modifier
+            .fillMaxSize()
+            .testTag(TIMELINE_TAG)
+            .timelineSemantics(resources, project, positionMicros, onSeek),
+    ) {
+        // Reading the version here redraws the canvas whenever a thumbnail finishes loading.
+        thumbnailVersion
+        val frame =
+            TimelineFrame(
+                project = shown,
+                centerMicros = if (state.scrubbing) state.centerMicros else positionMicros(),
+                pxPerSecond = state.dpPerSecond.dp.toPx(),
+                metrics = TimelineMetrics(this),
+                style = style,
+                thumbnails = thumbnails,
+            )
+        drawRuler(frame)
+        shown.tracks.forEachIndexed { index, track -> drawTrack(frame, track, frame.metrics.rowTop(index)) }
+        drawSelection(frame, selectedClipId)
+        if (preview?.floating == null) drawTrimHandles(frame, selectedClipId)
+        drawFloatingClip(frame, preview?.floating)
+        drawSnapGuide(frame, preview?.snapMicros)
+        drawPlayhead(frame)
     }
 }
 
@@ -168,25 +230,68 @@ private fun ThumbnailPrefetch(
     }
 }
 
-/** 48dp button that zooms so the whole project fits the viewport. */
+/** The snap toggle, zoom to playhead toggle, and zoom to fit button, in that order. */
 @Composable
-private fun ZoomToFitButton(
-    onClick: () -> Unit,
+private fun TimelineControls(
+    state: TimelineState,
+    onZoomToFit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    FilledIconButton(
-        onClick = onClick,
-        colors =
-            IconButtonDefaults.filledIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            ),
-        modifier = modifier.padding(Spacing.md).size(Spacing.xxl),
-    ) {
-        Icon(
-            painter = painterResource(R.drawable.ic_zoom_out_map),
-            contentDescription = stringResource(R.string.timeline_zoom_to_fit),
+    Row(modifier.padding(Spacing.md), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        ControlToggle(
+            checked = state.snapEnabled,
+            onCheckedChange = { state.snapEnabled = it },
+            iconRes = R.drawable.ic_snap,
+            descriptionRes = R.string.timeline_snap,
+            modifier = Modifier.testTag(SNAP_TOGGLE_TAG),
         )
+        ControlToggle(
+            checked = state.zoomBeforePlayhead != null,
+            onCheckedChange = { state.toggleZoomToPlayhead() },
+            iconRes = R.drawable.ic_zoom_in,
+            descriptionRes = R.string.timeline_zoom_to_playhead,
+            modifier = Modifier.testTag(ZOOM_PLAYHEAD_TAG),
+        )
+        FilledIconButton(
+            onClick = onZoomToFit,
+            colors =
+                IconButtonDefaults.filledIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ),
+            modifier = Modifier.size(Spacing.xxl),
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_zoom_out_map),
+                contentDescription = stringResource(R.string.timeline_zoom_to_fit),
+            )
+        }
+    }
+}
+
+/** 48dp on/off control: primary when [checked], muted otherwise; TalkBack reads its state. */
+@Composable
+private fun ControlToggle(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    @DrawableRes iconRes: Int,
+    @StringRes descriptionRes: Int,
+    modifier: Modifier = Modifier,
+) {
+    val scheme = MaterialTheme.colorScheme
+    FilledIconToggleButton(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        colors =
+            IconButtonDefaults.filledIconToggleButtonColors(
+                containerColor = scheme.surfaceVariant,
+                contentColor = scheme.onSurfaceVariant,
+                checkedContainerColor = scheme.primaryContainer,
+                checkedContentColor = scheme.primary,
+            ),
+        modifier = modifier.size(Spacing.xxl),
+    ) {
+        Icon(painter = painterResource(iconRes), contentDescription = stringResource(descriptionRes))
     }
 }
 
@@ -209,64 +314,6 @@ private fun Modifier.timelineSemantics(
             true
         }
     }
-
-/**
- * Handles one gesture at a time: one finger scrubs, two fingers zoom around the playhead. A single finger
- * that lifts within the touch slop is also reported to [onTap] with its down position.
- */
-private suspend fun PointerInputScope.scrubGestures(
-    state: TimelineState,
-    project: Project,
-    positionMicros: () -> Long,
-    callbacks: ScrubCallbacks,
-    onTap: (Offset) -> Unit,
-) {
-    awaitEachGesture {
-        val down = awaitFirstDown(requireUnconsumed = false)
-        state.beginScrub(positionMicros())
-        callbacks.onStart()
-        var lastSeek = state.centerMicros
-        var travelPx = 0f
-        var multiTouch = false
-        do {
-            val event = awaitPointerEvent()
-            if (event.changes.size > 1) {
-                multiTouch = true
-                state.dpPerSecond = TimelineGeometry.clampZoom(state.dpPerSecond * event.calculateZoom())
-            } else {
-                val pan = event.calculatePan().x
-                travelPx += abs(pan)
-                val delta = (-pan / state.dpPerSecond.dp.toPx() * MICROS_PER_SECOND).roundToLong()
-                state.centerMicros = (state.centerMicros + delta).coerceIn(0L, project.durationMicros)
-                val snapped = project.frameRate.snapToNearestFrame(state.centerMicros)
-                if (snapped != lastSeek) {
-                    lastSeek = snapped
-                    callbacks.onSeek(snapped)
-                }
-            }
-            event.changes.forEach { if (it.positionChanged()) it.consume() }
-        } while (event.changes.any { it.pressed })
-        if (!multiTouch && travelPx <= viewConfiguration.touchSlop) onTap(down.position)
-        state.endScrub()
-        callbacks.onEnd()
-    }
-}
-
-/** Returns the id of the clip drawn under [position], or null for the ruler, gaps, and empty space. */
-private fun PointerInputScope.clipAtPosition(
-    project: Project,
-    state: TimelineState,
-    position: Offset,
-): String? {
-    val metrics = TimelineMetrics(this)
-    val row = TimelineGeometry.rowAt(position.y, metrics.rulerHeight, metrics.rowHeight, metrics.rowGap)
-    val micros =
-        TimelineGeometry.xToTime(position.x, state.centerMicros, state.dpPerSecond.dp.toPx(), size.width.toFloat())
-    return row
-        ?.let { project.tracks.getOrNull(it) }
-        ?.let { TimelineGeometry.clipAt(it, micros) }
-        ?.id
-}
 
 /** Builds the TalkBack description: playhead position, clip counts per track, and how to seek. */
 private fun describeTimeline(

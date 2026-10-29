@@ -1,13 +1,15 @@
 /*
- * JVM UI tests (Robolectric) for the editor screen: playback, closing, undo and redo, and tools.
+ * JVM UI tests (Robolectric) for the editor screen: playback, frame steps, closing, undo and redo, and tools.
  */
 package com.framecraft.editor.editor
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -31,32 +33,50 @@ class EditorScreenTest {
 
     private val actions =
         EditorActions(
-            onPlayPause = { events += "playPause" },
             onClose = { events += "close" },
             onUndo = { events += "undo" },
             onRedo = { events += "redo" },
-            onDeleteClip = { events += "delete" },
             onNoticeShown = { events += it.name },
         )
 
-    /** Sets the editor content with the preview at 0:05 of 1:23. */
+    private val playback =
+        PlaybackActions(
+            onPlayPause = { events += "playPause" },
+            onFrameBack = { events += "frameBack" },
+            onFrameForward = { events += "frameForward" },
+        )
+
+    private val tools =
+        ToolActions(
+            onSplitClip = { events += "split" },
+            onDeleteClip = { events += "delete" },
+        )
+
+    /** Sets the editor content with the preview at [positionMicros] of 1:23. */
     private fun showEditor(
         isPlaying: Boolean = false,
         canUndo: Boolean = false,
-        hasSelection: Boolean = false,
+        availability: ToolAvailability = ToolAvailability(),
+        positionMicros: Long = 5_000_000L,
     ) {
         composeRule.setContent {
             FramecraftTheme {
                 EditorScreen(
                     projectName = "New project",
                     previewState =
-                        PreviewState(isPlaying = isPlaying, positionMicros = 5_000_000L, durationMicros = 83_000_000L),
+                        PreviewState(
+                            isPlaying = isPlaying,
+                            positionMicros = positionMicros,
+                            durationMicros = 83_000_000L,
+                        ),
                     aspectRatio = 16f / 9f,
                     canUndo = canUndo,
                     canRedo = false,
-                    hasSelection = hasSelection,
+                    availability = availability,
                     notices = EditorNotices(),
                     actions = actions,
+                    playback = playback,
+                    tools = tools,
                     previewSurface = { modifier -> Box(modifier) },
                     timeline = { modifier -> Box(modifier) },
                 )
@@ -80,6 +100,23 @@ class EditorScreenTest {
         composeRule.onNodeWithContentDescription("Pause video").assertIsDisplayed()
     }
 
+    /** Frame steps report each direction and are disabled at the start of the timeline. */
+    @Test
+    fun frameStepButtons() {
+        showEditor()
+        composeRule.onNodeWithContentDescription("Previous frame").performClick()
+        composeRule.onNodeWithContentDescription("Next frame").performClick()
+        assertEquals(listOf("frameBack", "frameForward"), events)
+    }
+
+    /** At time zero there is no previous frame. */
+    @Test
+    fun noPreviousFrameAtStart() {
+        showEditor(positionMicros = 0L)
+        composeRule.onNodeWithTag(FRAME_BACK_TAG).assertIsNotEnabled()
+        composeRule.onNodeWithTag(FRAME_FORWARD_TAG).assertIsEnabled()
+    }
+
     /** Navigating up closes right away because every edit is already saved. */
     @Test
     fun navigatingUpClosesWithoutConfirmation() {
@@ -97,11 +134,27 @@ class EditorScreenTest {
         assertEquals(listOf("undo"), events)
     }
 
-    /** The delete tool appears only with a selection. */
+    /** The tools appear only with a selection. */
     @Test
-    fun deleteToolNeedsSelection() {
-        showEditor(hasSelection = true)
+    fun toolsNeedSelection() {
+        showEditor()
+        composeRule.onAllNodesWithTag(TOOL_DELETE_TAG).assertCountEquals(0)
+        composeRule.onAllNodesWithTag(TOOL_SPLIT_TAG).assertCountEquals(0)
+    }
+
+    /** With a selection and the playhead inside it, Split and Delete both report. */
+    @Test
+    fun splitAndDeleteWithSelection() {
+        showEditor(availability = ToolAvailability(hasSelection = true, canSplit = true))
+        composeRule.onNodeWithContentDescription("Split clip at playhead").assertIsEnabled().performClick()
         composeRule.onNodeWithContentDescription("Delete clip").assertIsDisplayed().performClick()
-        assertEquals(listOf("delete"), events)
+        assertEquals(listOf("split", "delete"), events)
+    }
+
+    /** Split is shown but disabled when the playhead is not inside the selected clip. */
+    @Test
+    fun splitDisabledOutsideClip() {
+        showEditor(availability = ToolAvailability(hasSelection = true, canSplit = false))
+        composeRule.onNodeWithTag(TOOL_SPLIT_TAG).assertIsNotEnabled()
     }
 }
