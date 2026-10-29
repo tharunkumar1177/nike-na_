@@ -76,14 +76,18 @@ Feature modules never import Media3 types directly; they talk to engine interfac
 - A project is one immutable aggregate snapshot: `Project → Track[] → Clip[]`, plus project settings (aspect ratio, frame rate, canvas background).
 - There is **no privileged main track**. Any track may set `magnetic = true`, which closes gaps when clips are removed or trimmed on that track.
 - Gaps are **implicit**: a gap is any timeline span with no clip on a track. The domain never stores filler clips.
-- The document carries an integer `schemaVersion`. Readers migrate older versions forward; they refuse newer versions with a visible error.
+- Each track has a kind: `VIDEO` (base video, drawn full frame) or `OVERLAY` (composited over the base). Only overlay clips carry a placement: center in normalized canvas units with y downward, scale relative to the largest size that fits inside the canvas, clockwise rotation, and opacity.
+- The canvas size and aspect ratio come from the first base clip, never from an overlay.
+- The document carries an integer `schemaVersion` (currently 2). Readers migrate older versions forward; they refuse newer versions with a visible error.
 
 ### Anchoring and ripple
 
 - A clip may declare an anchor: `anchor = (parentClipId, offsetMicros)`. Its absolute start is derived from the parent's start plus the offset.
 - Anchors form a forest; cycles are rejected at command validation.
-- When a parent clip moves or ripples, anchored children move with it. When a parent is deleted, children become unanchored at their current absolute position.
-- Ripple on a magnetic track shifts following clips on that track and, through anchors, their children on other tracks.
+- Anchored clips live only on non-magnetic tracks. The stored start of an anchored clip always equals its resolved start: every command re-derives anchored starts after it edits tracks, and a project whose stored starts disagree with its anchors fails validation on load.
+- When a parent clip moves or ripples, anchored children move with it. When a parent is deleted, children become unanchored at their current absolute position, and undoing the delete restores their anchors.
+- Splitting a parent hands the children that start at or after the cut to the right part; merging hands the right part's children to the merged clip.
+- Ripple on a magnetic track shifts following clips on that track and, through anchors, their children on other tracks. An edit whose ripple would make clips overlap is rejected as a whole.
 
 ### Edit commands and history
 
@@ -104,6 +108,7 @@ Feature modules never import Media3 types directly; they talk to engine interfac
 
 - The engine consumes immutable project snapshots only. It never writes back to the project.
 - The adapter maps each track to a Media3 `EditedMediaItemSequence` and pads implicit gaps with generated silent or transparent segments at preview and export time.
+- Base video sequences come first and overlay sequences after them. A compositor setting places each overlay frame from the clip covering its time; the first sequence sets the output size. Preview builds its player with a multiple-input video graph so the same composition renders on screen.
 - Transitions consume clip handles (overlapping source media); they never freeze frames.
 - Preview and export use the same translation so what you see is what you export.
 

@@ -45,7 +45,7 @@ class ProjectStore(
     private val rootDir: File,
     private val ioDispatcher: CoroutineDispatcher,
     private val clock: () -> Long = System::currentTimeMillis,
-    private val migrations: SchemaMigrations = SchemaMigrations.NONE,
+    private val migrations: SchemaMigrations = SchemaMigrations.SHIPPED,
 ) {
     /** Saves [project] as a new project and opens it. */
     @Throws(IOException::class)

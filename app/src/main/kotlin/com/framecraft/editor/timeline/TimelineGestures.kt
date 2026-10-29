@@ -25,6 +25,7 @@ import com.framecraft.editor.domain.edit.TrimEdge
 import com.framecraft.editor.domain.model.Clip
 import com.framecraft.editor.domain.model.Project
 import com.framecraft.editor.domain.model.Track
+import com.framecraft.editor.domain.model.TrackKind
 import com.framecraft.editor.domain.time.MICROS_PER_SECOND
 import kotlin.math.abs
 import kotlin.math.roundToLong
@@ -110,15 +111,23 @@ internal suspend fun PointerInputScope.timelineGestures(
     }
 }
 
-/** Waits to see whether a touch is a hold, a tap, or a scrub, and handles it. */
+/**
+ * Handles a touch that is not on a trim handle: a touch on an overlay selects or drags it; otherwise waits to see
+ * whether the touch is a hold, a tap, or a scrub.
+ */
 private suspend fun AwaitPointerEventScope.holdOrScrub(
     context: TimelineGestureContext,
     down: PointerInputChange,
     scrub: ScrubCallbacks,
 ) {
-    val target = clipAt(context, down.position)?.takeIf { it.track.magnetic }
+    val hit = clipAt(context, down.position)
+    val target = hit?.takeIf { it.track.magnetic }
     val hold = if (target == null) Hold.MOVED else awaitHold(down)
     when {
+        hit != null && hit.track.kind == TrackKind.OVERLAY -> {
+            overlayDrag(context, hit, down)
+        }
+
         hold == Hold.LONG_PRESS && target != null -> {
             reorderDrag(context, target, down)
         }
@@ -129,7 +138,7 @@ private suspend fun AwaitPointerEventScope.holdOrScrub(
 
         else -> {
             val tapped = scrubLoop(context, scrub)
-            if (tapped && target == null) context.edits.onSelect(clipAt(context, down.position)?.clip?.id)
+            if (tapped && target == null) context.edits.onSelect(hit?.clip?.id)
         }
     }
 }
@@ -246,7 +255,7 @@ private suspend fun AwaitPointerEventScope.reorderDrag(
 }
 
 /** Reports each new position of the pointer [down] to [onMove] until every finger lifts; others are ignored. */
-private suspend fun AwaitPointerEventScope.awaitDrag(
+internal suspend fun AwaitPointerEventScope.awaitDrag(
     down: PointerInputChange,
     onMove: (Offset) -> Unit,
 ) {

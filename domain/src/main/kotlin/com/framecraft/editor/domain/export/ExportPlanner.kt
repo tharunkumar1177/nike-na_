@@ -5,6 +5,7 @@ package com.framecraft.editor.domain.export
 
 import com.framecraft.editor.domain.model.MediaAsset
 import com.framecraft.editor.domain.model.Project
+import com.framecraft.editor.domain.model.TrackKind
 import com.framecraft.editor.domain.time.FrameRate
 import com.framecraft.editor.domain.time.MICROS_PER_SECOND
 import kotlin.math.roundToInt
@@ -115,9 +116,13 @@ object ExportPlanner {
         return bitsPerSecond * durationMicros / MICROS_PER_SECOND / BITS_PER_BYTE
     }
 
-    /** Returns the displayed size of the first clip's source, or the default canvas when there is no clip. */
+    /**
+     * Returns the displayed size of the first base clip's source (overlays only when there is no base clip), or the
+     * default canvas when there is no clip.
+     */
     private fun canvasOf(project: Project): ExportSize {
-        val first = project.tracks.firstNotNullOfOrNull { it.clips.firstOrNull() }
+        val baseFirst = project.tracks.sortedBy { it.kind != TrackKind.VIDEO }
+        val first = baseFirst.firstNotNullOfOrNull { it.clips.firstOrNull() }
         return first?.let { displayedSize(project.assetOf(it)) } ?: DEFAULT_CANVAS
     }
 

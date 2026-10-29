@@ -51,6 +51,8 @@ class EditorScreenTest {
         ToolActions(
             onSplitClip = { events += "split" },
             onDeleteClip = { events += "delete" },
+            onAddOverlay = { events += "overlay" },
+            onOpacityCommit = { events += "opacity $it" },
         )
 
     /** Sets the editor content with the preview at [positionMicros] of 1:23. */
@@ -169,6 +171,31 @@ class EditorScreenTest {
         composeRule.onNodeWithContentDescription("Exporting, 45 percent complete").assertIsDisplayed()
         composeRule.onNodeWithTag(EXPORT_TOP_ICON_TAG).performClick()
         assertEquals(listOf("export"), events)
+    }
+
+    /** Without a selection the Overlay tool is offered and reports; it is dimmed while it cannot add. */
+    @Test
+    fun overlayToolWithoutSelection() {
+        showEditor(availability = ToolAvailability(canAddOverlay = true))
+        composeRule.onNodeWithContentDescription("Add overlay at playhead").assertIsEnabled().performClick()
+        assertEquals(listOf("overlay"), events)
+    }
+
+    /** The Overlay tool is disabled when nothing can be added. */
+    @Test
+    fun overlayToolDisabled() {
+        showEditor(availability = ToolAvailability(canAddOverlay = false))
+        composeRule.onNodeWithTag(TOOL_OVERLAY_TAG).assertIsNotEnabled()
+    }
+
+    /** A selected overlay shows its opacity instead of the Overlay tool, alongside Split and Delete. */
+    @Test
+    fun selectedOverlayShowsOpacity() {
+        showEditor(availability = ToolAvailability(hasSelection = true, canAddOverlay = true, overlayOpacity = 0.5f))
+        composeRule.onAllNodesWithTag(TOOL_OVERLAY_TAG).assertCountEquals(0)
+        composeRule.onNodeWithText("Opacity 50%").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Overlay opacity").assertIsDisplayed()
+        composeRule.onNodeWithTag(TOOL_DELETE_TAG).assertIsDisplayed()
     }
 
     /** Split is shown but disabled when the playhead is not inside the selected clip. */

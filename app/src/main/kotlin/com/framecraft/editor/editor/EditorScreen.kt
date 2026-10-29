@@ -25,13 +25,17 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -49,6 +53,7 @@ import com.framecraft.editor.domain.time.Timecode
 import com.framecraft.editor.engine.PreviewState
 import com.framecraft.editor.ui.spokenDuration
 import com.framecraft.editor.ui.theme.Spacing
+import kotlin.math.roundToInt
 
 /** Test tag of the undo action. */
 const val UNDO_TAG = "editor_undo"
@@ -61,6 +66,12 @@ const val TOOL_DELETE_TAG = "editor_tool_delete"
 
 /** Test tag of the split clip tool. */
 const val TOOL_SPLIT_TAG = "editor_tool_split"
+
+/** Test tag of the add overlay tool. */
+const val TOOL_OVERLAY_TAG = "editor_tool_overlay"
+
+/** Test tag of the selected overlay's opacity slider. */
+const val TOOL_OPACITY_TAG = "editor_tool_opacity"
 
 /** Test tag of the previous frame action. */
 const val FRAME_BACK_TAG = "editor_frame_back"
@@ -105,13 +116,20 @@ enum class EditorNotice {
 
     /** An edit could not be saved. */
     SAVE_FAILED,
+
+    /** An edit was refused because it would have broken the project. */
+    EDIT_REJECTED,
 }
 
-/** Notices waiting to be shown: [skippedCount] unreadable files, [droppedEditCount] lost edits, and [saveFailed]. */
+/**
+ * Notices waiting to be shown: [skippedCount] unreadable files, [droppedEditCount] lost edits, [saveFailed], and
+ * [editRejected].
+ */
 data class EditorNotices(
     val skippedCount: Int = 0,
     val droppedEditCount: Int = 0,
     val saveFailed: Boolean = false,
+    val editRejected: Boolean = false,
 )
 
 /** What the editor's top bar and notices do. */
@@ -136,21 +154,29 @@ class PlaybackActions(
     val onFrameForward: () -> Unit,
 )
 
-/** What the selected-clip tools do. */
+/** What the tools do: split and delete the selection, add an overlay, and save the selected overlay's opacity. */
 class ToolActions(
     val onSplitClip: () -> Unit,
     val onDeleteClip: () -> Unit,
-)
-
-/** Which tools apply: [hasSelection] when a clip is selected, [canSplit] when the playhead is inside it. */
-data class ToolAvailability(
-    val hasSelection: Boolean = false,
-    val canSplit: Boolean = false,
+    val onAddOverlay: () -> Unit = {},
+    val onOpacityCommit: (Float) -> Unit = {},
 )
 
 /**
- * Stateless editor screen. [previewSurface] renders the video and [timeline] the timeline into the
- * modifiers they receive. Every edit is already saved, so back closes the editor without asking.
+ * Which tools apply: [hasSelection] when a clip is selected, [canSplit] when the playhead is inside it,
+ * [canAddOverlay] when an overlay can be added now, and [overlayOpacity] when the selection is an overlay.
+ */
+data class ToolAvailability(
+    val hasSelection: Boolean = false,
+    val canSplit: Boolean = false,
+    val canAddOverlay: Boolean = false,
+    val overlayOpacity: Float? = null,
+)
+
+/**
+ * Stateless editor screen. [previewSurface] renders the video, [overlayLayer] the selected overlay's handles on top
+ * of it, and [timeline] the timeline into the modifiers they receive. Every edit is already saved, so back closes
+ * the editor without asking.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -169,6 +195,7 @@ fun EditorScreen(
     timeline: @Composable (Modifier) -> Unit,
     modifier: Modifier = Modifier,
     export: ExportIndicator = ExportIndicator(),
+    overlayLayer: (@Composable (Modifier) -> Unit)? = null,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     EditorSnackbars(snackbarHostState, notices, previewState.errorCode, actions.onNoticeShown)
@@ -179,7 +206,7 @@ fun EditorScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            PreviewArea(aspectRatio, previewSurface)
+            PreviewArea(aspectRatio, previewSurface, overlayLayer)
             PlaybackBar(previewState, playback)
             timeline(Modifier.fillMaxWidth().weight(TIMELINE_WEIGHT))
             ToolsZone(availability, tools)
@@ -274,6 +301,12 @@ private fun EditorSnackbars(
             onShown(EditorNotice.SAVE_FAILED)
         }
     }
+    LaunchedEffect(notices.editRejected) {
+        if (notices.editRejected) {
+            snackbarHostState.showSnackbar(resources.getString(R.string.editor_edit_rejected))
+            onShown(EditorNotice.EDIT_REJECTED)
+        }
+    }
     LaunchedEffect(errorCode) {
         if (errorCode != null) {
             snackbarHostState.showSnackbar(resources.getString(R.string.editor_playback_failed))
@@ -281,11 +314,12 @@ private fun EditorSnackbars(
     }
 }
 
-/** Black stage that letterboxes the preview at [aspectRatio]. */
+/** Black stage that letterboxes the preview at [aspectRatio], with [overlayLayer] over the same area. */
 @Composable
 private fun ColumnScope.PreviewArea(
     aspectRatio: Float,
     previewSurface: @Composable (Modifier) -> Unit,
+    overlayLayer: (@Composable (Modifier) -> Unit)?,
 ) {
     Box(
         modifier =
@@ -296,6 +330,7 @@ private fun ColumnScope.PreviewArea(
         contentAlignment = Alignment.Center,
     ) {
         previewSurface(Modifier.aspectRatio(aspectRatio))
+        overlayLayer?.invoke(Modifier.aspectRatio(aspectRatio))
     }
 }
 
@@ -345,7 +380,10 @@ private fun PlaybackBar(
     }
 }
 
-/** Contextual tools for the selection, Split then Delete; empty when nothing is selected. */
+/**
+ * Contextual tools. Overlay shows when nothing or a base clip is selected; a selected overlay shows its opacity
+ * slider instead. Split then Delete follow whenever a clip is selected.
+ */
 @Composable
 private fun ColumnScope.ToolsZone(
     availability: ToolAvailability,
@@ -361,6 +399,19 @@ private fun ColumnScope.ToolsZone(
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        val opacity = availability.overlayOpacity
+        if (opacity == null) {
+            ToolButton(
+                iconRes = R.drawable.ic_overlay,
+                label = stringResource(R.string.editor_tool_overlay),
+                description = stringResource(R.string.editor_tool_overlay_description),
+                onClick = tools.onAddOverlay,
+                enabled = availability.canAddOverlay,
+                modifier = Modifier.testTag(TOOL_OVERLAY_TAG),
+            )
+        } else {
+            OpacitySlider(opacity, tools.onOpacityCommit, Modifier.weight(1f))
+        }
         if (availability.hasSelection) {
             ToolButton(
                 iconRes = R.drawable.ic_content_cut,
@@ -378,6 +429,33 @@ private fun ColumnScope.ToolsZone(
                 modifier = Modifier.testTag(TOOL_DELETE_TAG),
             )
         }
+    }
+}
+
+/**
+ * Labelled opacity slider for the selected overlay, starting at [opacity]. Dragging moves only the slider; the value
+ * goes to [onCommit] once, when the drag ends.
+ */
+@Composable
+private fun OpacitySlider(
+    opacity: Float,
+    onCommit: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var draft by remember(opacity) { mutableFloatStateOf(opacity) }
+    val label = stringResource(R.string.editor_tool_opacity)
+    Column(modifier = modifier) {
+        Text(
+            text = stringResource(R.string.editor_opacity_value, (draft * PERCENT_SCALE).roundToInt()),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Slider(
+            value = draft,
+            onValueChange = { draft = it },
+            onValueChangeFinished = { onCommit(draft) },
+            modifier = Modifier.testTag(TOOL_OPACITY_TAG).semantics { contentDescription = label },
+        )
     }
 }
 

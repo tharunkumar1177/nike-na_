@@ -24,9 +24,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.framecraft.editor.R
-import com.framecraft.editor.domain.command.DeleteClip
-import com.framecraft.editor.domain.command.SplitClip
-import com.framecraft.editor.domain.model.Clip
+import com.framecraft.editor.domain.model.Project
+import com.framecraft.editor.domain.model.TrackKind
 import com.framecraft.editor.domain.time.FrameRate
 import com.framecraft.editor.engine.PreviewSurface
 import com.framecraft.editor.engine.ProjectPreview
@@ -85,25 +84,23 @@ private fun ReadyEditor(
     val preview = viewModel.preview ?: return
     val thumbnails = viewModel.thumbnails ?: return
     val previewState by preview.state.collectAsStateWithLifecycle()
+    val overlayBusy by viewModel.overlays.busy.collectAsStateWithLifecycle()
     val haptics = LocalHapticFeedback.current
     val project = state.project
-    val clips = project.tracks.flatMap { it.clips }
-    val aspectRatio = clips.firstOrNull()?.let { project.assetOf(it).displayAspectRatio } ?: DEFAULT_ASPECT_RATIO
-    val selected = clips.firstOrNull { it.id == state.selectedClipId }
+    val selectedTrack = project.tracks.firstOrNull { track -> track.clips.any { it.id == state.selectedClipId } }
+    val selected = selectedTrack?.clips?.firstOrNull { it.id == state.selectedClipId }
+    val overlay = selected?.takeIf { selectedTrack?.kind == TrackKind.OVERLAY }
     val position = previewState.positionMicros
     val export = rememberExportControls(exportViewModel, project)
+    val pickOverlay = rememberOverlayPicker(viewModel.overlays, preview)
     EditorScreen(
         projectName = project.name,
         previewState = previewState,
-        aspectRatio = aspectRatio,
+        aspectRatio = canvasAspectRatio(project),
         canUndo = state.canUndo,
         canRedo = state.canRedo,
-        availability =
-            ToolAvailability(
-                hasSelection = selected != null,
-                canSplit = selected != null && SplitClip.isSplittable(selected, position, project.frameRate),
-            ),
-        notices = EditorNotices(state.skippedCount, state.droppedEditCount, state.saveFailed),
+        availability = toolAvailability(project, selected, overlay, position, overlayBusy),
+        notices = EditorNotices(state.skippedCount, state.droppedEditCount, state.saveFailed, state.editRejected),
         actions =
             EditorActions(
                 onClose = viewModel::close,
@@ -113,7 +110,7 @@ private fun ReadyEditor(
                 onNoticeShown = viewModel::acknowledge,
             ),
         playback = playbackActions(preview, project.frameRate, position),
-        tools = toolActions(viewModel, selected, position),
+        tools = toolActions(viewModel, selected, overlay != null, position, pickOverlay),
         previewSurface = { surfaceModifier -> PreviewSurface(preview, surfaceModifier) },
         timeline = { timelineModifier ->
             TimelineStrip(
@@ -130,7 +127,17 @@ private fun ReadyEditor(
         },
         modifier = modifier,
         export = export.indicator,
+        overlayLayer =
+            overlay
+                ?.takeIf { position >= it.startMicros && position < it.endMicros }
+                ?.let { overlayLayer(it, project, viewModel::dispatch, haptics) },
     )
+}
+
+/** Returns the preview aspect ratio: the first base clip's, else the first overlay's, else the default. */
+private fun canvasAspectRatio(project: Project): Float {
+    val first = project.tracks.sortedBy { it.kind != TrackKind.VIDEO }.firstNotNullOfOrNull { it.clips.firstOrNull() }
+    return first?.let { project.assetOf(it).displayAspectRatio } ?: DEFAULT_ASPECT_RATIO
 }
 
 /** Play/pause and frame steps on [preview]; a step pauses and moves one [frameRate] frame from [positionMicros]. */
@@ -150,19 +157,6 @@ private fun playbackActions(
         onFrameForward = { step(1L) },
     )
 }
-
-/** Split at [positionMicros] and delete for the [selected] clip; both do nothing without a selection. */
-private fun toolActions(
-    viewModel: EditorViewModel,
-    selected: Clip?,
-    positionMicros: Long,
-): ToolActions =
-    ToolActions(
-        onSplitClip = {
-            selected?.let { viewModel.dispatch(SplitClip(it.id, positionMicros, viewModel.idGenerator.next())) }
-        },
-        onDeleteClip = { selected?.let { viewModel.dispatch(DeleteClip(it.id)) } },
-    )
 
 /** Full-screen progress while picked media is probed or a project opens. */
 @Composable

@@ -8,7 +8,11 @@ import kotlinx.serialization.Serializable
 /** What a track carries. */
 @Serializable
 enum class TrackKind {
+    /** The base video. */
     VIDEO,
+
+    /** Picture-in-picture clips drawn over the base video. */
+    OVERLAY,
 }
 
 /**

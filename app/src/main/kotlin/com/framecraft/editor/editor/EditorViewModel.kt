@@ -53,9 +53,9 @@ sealed interface EditorState {
     data object Loading : EditorState
 
     /**
-     * [project] is open. The counters and flag are one-shot notices not yet shown: [skippedCount] picked
-     * files could not be read, [droppedEditCount] edits were lost in a crash, and [saveFailed] an edit
-     * could not be saved.
+     * [project] is open. The counters and flags are one-shot notices not yet shown: [skippedCount] picked
+     * files could not be read, [droppedEditCount] edits were lost in a crash, [saveFailed] an edit
+     * could not be saved, and [editRejected] an edit would have broken the project.
      */
     data class Ready(
         val project: Project,
@@ -65,6 +65,7 @@ sealed interface EditorState {
         val skippedCount: Int = 0,
         val droppedEditCount: Int = 0,
         val saveFailed: Boolean = false,
+        val editRejected: Boolean = false,
     ) : EditorState
 
     /** None of the picked files could be read. */
@@ -97,6 +98,10 @@ class EditorViewModel(
     /** Preview of the open project; non-null while the state is [EditorState.Ready]. */
     val preview: ProjectPreview?
         get() = open?.preview
+
+    /** Adds picked media to the open project as overlays. */
+    val overlays: OverlayImport =
+        OverlayImport(viewModelScope, importer, idGenerator, ioDispatcher, mutableState, ::dispatch)
 
     /** Timeline thumbnails of the open project; non-null while the state is [EditorState.Ready]. */
     val thumbnails: ClipThumbnails?
@@ -146,9 +151,26 @@ class EditorViewModel(
         }
     }
 
-    /** Applies and saves [command]; rejected commands change nothing. */
-    fun dispatch(command: EditCommand) {
-        edit { session -> (session.dispatch(command) as? DispatchResult.Applied)?.state }
+    /**
+     * Applies and saves [command], then selects [selectClipId] when given. A rejected command changes nothing and
+     * raises the rejection notice.
+     */
+    fun dispatch(
+        command: EditCommand,
+        selectClipId: String? = null,
+    ) {
+        edit(selectClipId) { session ->
+            when (val result = session.dispatch(command)) {
+                is DispatchResult.Applied -> {
+                    result.state
+                }
+
+                is DispatchResult.Rejected -> {
+                    mutableState.updateReady { it.copy(editRejected = true) }
+                    null
+                }
+            }
+        }
     }
 
     /** Undoes the last edit. */
@@ -173,6 +195,7 @@ class EditorViewModel(
                 EditorNotice.SKIPPED_FILES -> ready.copy(skippedCount = 0)
                 EditorNotice.DROPPED_EDITS -> ready.copy(droppedEditCount = 0)
                 EditorNotice.SAVE_FAILED -> ready.copy(saveFailed = false)
+                EditorNotice.EDIT_REJECTED -> ready.copy(editRejected = false)
             }
         }
     }
@@ -212,17 +235,22 @@ class EditorViewModel(
     }
 
     /**
-     * Runs [change] on the open project after earlier changes and shows its result while that project is still
-     * open; a failed save raises the notice.
+     * Runs [change] on the open project after earlier changes and shows its result, selecting [selectClipId] when
+     * given, while that project is still open; a failed save raises the notice.
      */
-    private fun edit(change: suspend (ProjectSession) -> SessionState?) {
+    private fun edit(
+        selectClipId: String? = null,
+        change: suspend (ProjectSession) -> SessionState?,
+    ) {
         val target = open ?: return
         viewModelScope.launch {
             try {
                 val next = target.change(change)
                 if (next != null && open === target) {
                     target.preview.setProject(next.project)
-                    mutableState.updateReady { it.showing(next) }
+                    mutableState.updateReady { ready ->
+                        ready.copy(selectedClipId = selectClipId ?: ready.selectedClipId).showing(next)
+                    }
                 }
             } catch (ignored: IOException) {
                 mutableState.updateReady { it.copy(saveFailed = true) }
@@ -249,7 +277,7 @@ class EditorViewModel(
 }
 
 /** Applies [transform] when a project is open. */
-private fun MutableStateFlow<EditorState>.updateReady(transform: (EditorState.Ready) -> EditorState.Ready) {
+internal fun MutableStateFlow<EditorState>.updateReady(transform: (EditorState.Ready) -> EditorState.Ready) {
     update { state -> if (state is EditorState.Ready) transform(state) else state }
 }
 
