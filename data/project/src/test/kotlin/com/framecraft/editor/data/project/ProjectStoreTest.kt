@@ -245,10 +245,12 @@ class ProjectStoreTest {
             File(dir(), "snapshot.json").writeText(SCHEMA_TWO_SNAPSHOT)
             File(dir(), "journal.jsonl").writeText(SCHEMA_TWO_JOURNAL)
             val opened = store().opened()
-            assertEquals(listOf("track"), opened.session.state.project.tracks.map { it.id })
+            val reopened = opened.session.state.project
+            assertEquals(listOf("track"), reopened.tracks.map { it.id })
             val restored = requireNotNull(opened.session.undo()).project
             assertEquals(listOf("lane", "track"), restored.tracks.map { it.id })
-            val overlay = restored.tracks.first().clips.single()
+            val overlayLane = restored.tracks.first()
+            val overlay = overlayLane.clips.single()
             assertEquals(0.5f, overlay.overlayTransform?.opacity)
             assertEquals("a", overlay.anchor?.parentClipId)
             assertTrue(overlay.hasDefaultAudio)

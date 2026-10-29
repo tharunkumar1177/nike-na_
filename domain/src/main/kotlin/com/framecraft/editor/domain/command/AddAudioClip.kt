@@ -51,7 +51,8 @@ internal fun List<Track>.withAudioClip(
 ): List<Track> {
     val existing = firstOrNull { it.id == trackId }
     return if (existing == null) {
-        toMutableList().apply { add(trackIndex.coerceIn(0, size), Track(trackId, TrackKind.AUDIO, false, listOf(clip))) }
+        val lane = Track(trackId, TrackKind.AUDIO, false, listOf(clip))
+        toMutableList().apply { add(trackIndex.coerceIn(0, size), lane) }
     } else {
         require(existing.kind == TrackKind.AUDIO) { "Track $trackId is not an audio track" }
         val placed = existing.copy(clips = (existing.clips + clip).sortedBy { it.startMicros })

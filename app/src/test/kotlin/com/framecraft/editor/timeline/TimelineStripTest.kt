@@ -225,7 +225,8 @@ class TimelineStripTest {
      */
     @Test
     fun audioLaneRequestsWaveformAndSelects() {
-        val video = project.tracks.single().clips.single()
+        val base = project.tracks.single()
+        val video = base.clips.single()
         var next = 0
         val extract = AudioPlacement.proposeExtract(project, video.id, IdGenerator { "audio-${++next}" })!!
         val withAudio = (extract.applyTo(project) as CommandOutcome.Applied).project

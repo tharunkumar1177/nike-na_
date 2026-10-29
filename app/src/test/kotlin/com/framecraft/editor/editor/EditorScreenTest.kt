@@ -235,7 +235,11 @@ class EditorScreenTest {
         showEditor(availability = videoWithSound)
         composeRule.onAllNodesWithTag(TOOL_AUDIO_TAG).assertCountEquals(0)
         composeRule.onNodeWithTag(TOOL_FADE_TAG).performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithTag(TOOL_EXTRACT_TAG).performScrollTo().assertIsEnabled().performClick()
+        composeRule
+            .onNodeWithTag(TOOL_EXTRACT_TAG)
+            .performScrollTo()
+            .assertIsEnabled()
+            .performClick()
         assertEquals(listOf("extract"), events)
     }
 
