@@ -3,9 +3,12 @@
  */
 package com.framecraft.editor.timeline
 
+import com.framecraft.editor.domain.model.Clip
+import com.framecraft.editor.domain.model.Track
 import com.framecraft.editor.domain.time.FrameRate
 import com.framecraft.editor.domain.time.MICROS_PER_SECOND
 import java.util.Locale
+import kotlin.math.floor
 import kotlin.math.roundToLong
 
 /** A clip's horizontal extent on screen and the source time at its left edge. */
@@ -131,6 +134,28 @@ object TimelineGeometry {
             )
         }
     }
+
+    /**
+     * Returns the index of the track row containing [y], or null when [y] is on the ruler, a gap, or below
+     * the rows. Rows are [rowPx] tall, separated by [gapPx], and start one gap below a [rulerPx] tall ruler.
+     */
+    fun rowAt(
+        y: Float,
+        rulerPx: Float,
+        rowPx: Float,
+        gapPx: Float,
+    ): Int? {
+        val offset = y - rulerPx - gapPx
+        val pitch = rowPx + gapPx
+        val index = floor(offset / pitch).toInt()
+        return index.takeIf { offset >= 0f && offset - index * pitch < rowPx }
+    }
+
+    /** Returns the clip of [track] showing at [micros], or null in a gap. */
+    fun clipAt(
+        track: Track,
+        micros: Long,
+    ): Clip? = track.clips.firstOrNull { micros >= it.startMicros && micros < it.endMicros }
 
     /** Formats a clip duration with one decimal, for example "2.5s". */
     fun formatClipDuration(durationMicros: Long): String =

@@ -12,12 +12,14 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -41,6 +43,7 @@ data class TimelineColors(
     val clip: Color,
     val clipLabel: Color,
     val playhead: Color,
+    val selection: Color,
 )
 
 /** Colors, text, and icons used to draw the timeline. */
@@ -53,8 +56,11 @@ class TimelineStyle(
 
 /** Pixel sizes derived from the design's dp values for the current density. */
 class TimelineMetrics(
-    scope: DrawScope,
+    scope: Density,
 ) {
+    /** Stroke width of the selected clip's outline. */
+    val selectionStroke = with(scope) { 2.dp.toPx() }
+
     /** Height of the time ruler. */
     val rulerHeight = with(scope) { 32.dp.toPx() }
 
@@ -235,6 +241,27 @@ private fun DrawScope.drawClipLabel(
             topLeft = Offset(left + metrics.labelPadding, labelTop + metrics.labelPadding / 2f),
         )
     }
+}
+
+/** Outlines the clip [clipId] when it is on a track; nothing is drawn for null or unknown ids. */
+fun DrawScope.drawSelection(
+    frame: TimelineFrame,
+    clipId: String?,
+) {
+    val index = frame.project.tracks.indexOfFirst { track -> track.clips.any { it.id == clipId } }
+    val track = frame.project.tracks.getOrNull(index) ?: return
+    val clip = track.clips.first { it.id == clipId }
+    val metrics = frame.metrics
+    val half = metrics.selectionStroke / 2f
+    val left = x(frame, clip.startMicros) + metrics.clipInset + half
+    val right = x(frame, clip.endMicros) - metrics.clipInset - half
+    drawRoundRect(
+        color = frame.style.colors.selection,
+        topLeft = Offset(left, metrics.rowTop(index) + half),
+        size = Size((right - left).coerceAtLeast(0f), metrics.rowHeight - metrics.selectionStroke),
+        cornerRadius = CornerRadius(metrics.clipCorner),
+        style = Stroke(width = metrics.selectionStroke),
+    )
 }
 
 /** Draws the fixed playhead line and its knob in the ruler. */

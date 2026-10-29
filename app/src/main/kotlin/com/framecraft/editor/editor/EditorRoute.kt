@@ -3,6 +3,7 @@
  */
 package com.framecraft.editor.editor
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,6 +23,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.framecraft.editor.R
+import com.framecraft.editor.domain.command.DeleteClip
 import com.framecraft.editor.engine.PreviewSurface
 import com.framecraft.editor.timeline.ScrubCallbacks
 import com.framecraft.editor.timeline.TimelineStrip
@@ -38,14 +40,34 @@ fun EditorRoute(
     modifier: Modifier = Modifier,
 ) {
     when (state) {
-        EditorState.Idle -> Unit
-        EditorState.Loading -> LoadingScreen(modifier)
-        EditorState.AllFailed -> ImportFailedScreen(onGoBack = viewModel::close, modifier = modifier)
-        is EditorState.Ready -> ReadyEditor(viewModel, state, modifier)
+        EditorState.Idle -> {
+            Unit
+        }
+
+        EditorState.Loading -> {
+            LoadingScreen(modifier)
+        }
+
+        EditorState.AllFailed -> {
+            FailureScreen(
+                titleRes = R.string.editor_import_failed_title,
+                bodyRes = R.string.editor_import_failed_body,
+                onGoBack = viewModel::close,
+                modifier = modifier,
+            )
+        }
+
+        is EditorState.OpenFailed -> {
+            OpenFailedScreen(state.reason, viewModel::close, modifier)
+        }
+
+        is EditorState.Ready -> {
+            ReadyEditor(viewModel, state, modifier)
+        }
     }
 }
 
-/** Editor for an open project, wired to its preview player. */
+/** Editor for an open project, wired to its preview player and saving session. */
 @Composable
 private fun ReadyEditor(
     viewModel: EditorViewModel,
@@ -62,10 +84,19 @@ private fun ReadyEditor(
         projectName = project.name,
         previewState = previewState,
         aspectRatio = aspectRatio,
-        skippedCount = state.skippedCount,
-        onSkippedShown = viewModel::acknowledgeSkipped,
-        onPlayPause = preview::togglePlayPause,
-        onDiscard = viewModel::close,
+        canUndo = state.canUndo,
+        canRedo = state.canRedo,
+        hasSelection = state.selectedClipId != null,
+        notices = EditorNotices(state.skippedCount, state.droppedEditCount, state.saveFailed),
+        actions =
+            EditorActions(
+                onPlayPause = preview::togglePlayPause,
+                onClose = viewModel::close,
+                onUndo = viewModel::undo,
+                onRedo = viewModel::redo,
+                onDeleteClip = { state.selectedClipId?.let { viewModel.dispatch(DeleteClip(it)) } },
+                onNoticeShown = viewModel::acknowledge,
+            ),
         previewSurface = { surfaceModifier -> PreviewSurface(preview, surfaceModifier) },
         timeline = { timelineModifier ->
             TimelineStrip(
@@ -73,6 +104,8 @@ private fun ReadyEditor(
                 positionMicros = { previewState.positionMicros },
                 thumbnails = thumbnails,
                 callbacks = ScrubCallbacks(preview::beginScrub, preview::seekTo, preview::endScrub),
+                selectedClipId = state.selectedClipId,
+                onClipSelected = viewModel::selectClip,
                 modifier = timelineModifier,
             )
         },
@@ -80,7 +113,7 @@ private fun ReadyEditor(
     )
 }
 
-/** Full-screen progress while picked media is probed. */
+/** Full-screen progress while picked media is probed or a project opens. */
 @Composable
 fun LoadingScreen(modifier: Modifier = Modifier) {
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -99,9 +132,27 @@ fun LoadingScreen(modifier: Modifier = Modifier) {
     }
 }
 
-/** Explains that none of the picked files could be read. */
+/** Explains why a project could not be opened or created. */
 @Composable
-fun ImportFailedScreen(
+private fun OpenFailedScreen(
+    reason: OpenFailure,
+    onGoBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val (title, body) =
+        when (reason) {
+            OpenFailure.NEWER_VERSION -> R.string.editor_newer_title to R.string.editor_newer_body
+            OpenFailure.UNREADABLE -> R.string.editor_corrupt_title to R.string.editor_corrupt_body
+            OpenFailure.STORAGE -> R.string.editor_storage_title to R.string.editor_storage_body
+        }
+    FailureScreen(titleRes = title, bodyRes = body, onGoBack = onGoBack, modifier = modifier)
+}
+
+/** A dialog with [titleRes] and [bodyRes] whose only action returns home. */
+@Composable
+fun FailureScreen(
+    @StringRes titleRes: Int,
+    @StringRes bodyRes: Int,
     onGoBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -109,8 +160,8 @@ fun ImportFailedScreen(
         AlertDialog(
             onDismissRequest = onGoBack,
             icon = { Icon(painter = painterResource(R.drawable.ic_error_outline), contentDescription = null) },
-            title = { Text(stringResource(R.string.editor_import_failed_title)) },
-            text = { Text(stringResource(R.string.editor_import_failed_body)) },
+            title = { Text(stringResource(titleRes)) },
+            text = { Text(stringResource(bodyRes)) },
             confirmButton = {
                 TextButton(onClick = onGoBack) { Text(stringResource(R.string.editor_import_failed_action)) }
             },

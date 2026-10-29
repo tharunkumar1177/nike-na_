@@ -1,19 +1,21 @@
 /*
- * JVM UI tests (Robolectric) for the editor screen's playback bar and discard confirmation.
+ * JVM UI tests (Robolectric) for the editor screen: playback, closing, undo and redo, and tools.
  */
 package com.framecraft.editor.editor
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.framecraft.editor.engine.PreviewState
 import com.framecraft.editor.ui.theme.FramecraftTheme
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -25,11 +27,24 @@ class EditorScreenTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    private var playPauseClicks = 0
-    private var discarded = false
+    private val events = mutableListOf<String>()
 
-    /** Sets the editor content with a paused preview at 0:05 of 1:23. */
-    private fun showEditor(isPlaying: Boolean = false) {
+    private val actions =
+        EditorActions(
+            onPlayPause = { events += "playPause" },
+            onClose = { events += "close" },
+            onUndo = { events += "undo" },
+            onRedo = { events += "redo" },
+            onDeleteClip = { events += "delete" },
+            onNoticeShown = { events += it.name },
+        )
+
+    /** Sets the editor content with the preview at 0:05 of 1:23. */
+    private fun showEditor(
+        isPlaying: Boolean = false,
+        canUndo: Boolean = false,
+        hasSelection: Boolean = false,
+    ) {
         composeRule.setContent {
             FramecraftTheme {
                 EditorScreen(
@@ -37,10 +52,11 @@ class EditorScreenTest {
                     previewState =
                         PreviewState(isPlaying = isPlaying, positionMicros = 5_000_000L, durationMicros = 83_000_000L),
                     aspectRatio = 16f / 9f,
-                    skippedCount = 0,
-                    onSkippedShown = {},
-                    onPlayPause = { playPauseClicks++ },
-                    onDiscard = { discarded = true },
+                    canUndo = canUndo,
+                    canRedo = false,
+                    hasSelection = hasSelection,
+                    notices = EditorNotices(),
+                    actions = actions,
                     previewSurface = { modifier -> Box(modifier) },
                     timeline = { modifier -> Box(modifier) },
                 )
@@ -54,7 +70,7 @@ class EditorScreenTest {
         showEditor()
         composeRule.onNodeWithText("0:05 / 1:23").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Play video").performClick()
-        assertEquals(1, playPauseClicks)
+        assertEquals(listOf("playPause"), events)
     }
 
     /** While playing, the button offers pause. */
@@ -64,13 +80,28 @@ class EditorScreenTest {
         composeRule.onNodeWithContentDescription("Pause video").assertIsDisplayed()
     }
 
-    /** Navigating up asks for confirmation before discarding. */
+    /** Navigating up closes right away because every edit is already saved. */
     @Test
-    fun confirmsBeforeDiscarding() {
+    fun navigatingUpClosesWithoutConfirmation() {
         showEditor()
         composeRule.onNodeWithContentDescription("Navigate up").performClick()
-        composeRule.onNodeWithText("Discard project?").assertIsDisplayed()
-        composeRule.onNodeWithText("Discard").performClick()
-        assertTrue(discarded)
+        assertEquals(listOf("close"), events)
+    }
+
+    /** Undo and redo follow their availability. */
+    @Test
+    fun undoAndRedoFollowAvailability() {
+        showEditor(canUndo = true)
+        composeRule.onNodeWithTag(REDO_TAG).assertIsNotEnabled()
+        composeRule.onNodeWithTag(UNDO_TAG).assertIsEnabled().performClick()
+        assertEquals(listOf("undo"), events)
+    }
+
+    /** The delete tool appears only with a selection. */
+    @Test
+    fun deleteToolNeedsSelection() {
+        showEditor(hasSelection = true)
+        composeRule.onNodeWithContentDescription("Delete clip").assertIsDisplayed().performClick()
+        assertEquals(listOf("delete"), events)
     }
 }

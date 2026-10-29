@@ -5,6 +5,33 @@
   <string name="home_empty_headline">No projects yet</string>
   <string name="home_empty_body">Create your first project to start editing.</string>
   <string name="home_new_project">New project</string>
+  <string name="home_project_options">Project options for %1$s</string>
+  <string name="home_unreadable_name">Unreadable project</string>
+  <string name="home_unreadable">Couldn\'t read project file</string>
+  <string name="home_row_subtitle">%1$s • %2$s • %3$s</string>
+  <string name="home_row_description">%1$s. %2$s. %3$s. %4$s.</string>
+  <string name="home_edited_just_now">Edited just now</string>
+  <plurals name="home_edited_minutes">
+    <item quantity="one">Edited %d min ago</item>
+    <item quantity="other">Edited %d min ago</item>
+  </plurals>
+  <plurals name="home_edited_hours">
+    <item quantity="one">Edited %d hr ago</item>
+    <item quantity="other">Edited %d hr ago</item>
+  </plurals>
+  <string name="home_edited_yesterday">Edited yesterday</string>
+  <string name="home_edited_on">Edited %1$s</string>
+  <plurals name="home_clip_count">
+    <item quantity="one">%d clip</item>
+    <item quantity="other">%d clips</item>
+  </plurals>
+  <string name="home_rename">Rename</string>
+  <string name="home_delete">Delete</string>
+  <string name="home_cancel">Cancel</string>
+  <string name="home_rename_title">Rename project</string>
+  <string name="home_rename_label">Project name</string>
+  <string name="home_delete_title">Delete project?</string>
+  <string name="home_delete_body">This can\'t be undone.</string>
 
   <string name="editor_default_project_name">New project</string>
   <string name="editor_navigate_up">Navigate up</string>
@@ -17,10 +44,21 @@
   <string name="editor_import_failed_title">Couldn\'t load media</string>
   <string name="editor_import_failed_body">None of the selected files could be read. They might be corrupted or in an unsupported format.</string>
   <string name="editor_import_failed_action">Go back</string>
-  <string name="editor_discard_title">Discard project?</string>
-  <string name="editor_discard_body">Projects aren\'t saved yet (saving arrives in a future update). If you leave, your edits will be lost.</string>
-  <string name="editor_discard_confirm">Discard</string>
-  <string name="editor_discard_cancel">Cancel</string>
+  <string name="editor_undo">Undo</string>
+  <string name="editor_redo">Redo</string>
+  <string name="editor_tool_delete">Delete</string>
+  <string name="editor_tool_delete_description">Delete clip</string>
+  <string name="editor_save_failed">Couldn\'t save changes.</string>
+  <plurals name="editor_recovered_edits">
+    <item quantity="one">Recovered project. %d unsaved edit couldn\'t be restored.</item>
+    <item quantity="other">Recovered project. %d unsaved edits couldn\'t be restored.</item>
+  </plurals>
+  <string name="editor_newer_title">App update required</string>
+  <string name="editor_newer_body">This project was created in a newer version of Framecraft. Please update the app to open it.</string>
+  <string name="editor_corrupt_title">Couldn\'t open project</string>
+  <string name="editor_corrupt_body">This project file is corrupt and can\'t be opened.</string>
+  <string name="editor_storage_title">Couldn\'t save project</string>
+  <string name="editor_storage_body">Storage is full or unavailable. Free up some space and try again.</string>
 
   <string name="timeline_zoom_to_fit">Zoom to fit timeline</string>
   <string name="timeline_description">Timeline. Playhead at %1$s. %2$s Swipe up or down to seek.</string>

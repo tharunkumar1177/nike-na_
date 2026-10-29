@@ -64,6 +64,7 @@ detekt {
 
 dependencies {
     implementation(project(":domain"))
+    implementation(project(":data:project"))
     implementation(project(":engine:media3"))
 
     implementation(libs.androidx.core.ktx)

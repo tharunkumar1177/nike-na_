@@ -23,9 +23,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
@@ -47,6 +49,7 @@ import com.framecraft.editor.domain.time.MICROS_PER_SECOND
 import com.framecraft.editor.engine.ThumbnailSource
 import com.framecraft.editor.ui.spokenDuration
 import com.framecraft.editor.ui.theme.Spacing
+import kotlin.math.abs
 import kotlin.math.roundToLong
 
 /** Test tag of the timeline canvas. */
@@ -61,7 +64,8 @@ class ScrubCallbacks(
 
 /**
  * Draws [project] around a fixed center playhead at [positionMicros]. Touching pauses via
- * [ScrubCallbacks.onStart]; dragging seeks frame by frame; pinching zooms around the playhead.
+ * [ScrubCallbacks.onStart]; dragging seeks frame by frame; pinching zooms around the playhead. A tap
+ * selects the clip under it, or clears the selection on empty space, through [onClipSelected].
  */
 @Composable
 fun TimelineStrip(
@@ -69,12 +73,15 @@ fun TimelineStrip(
     positionMicros: () -> Long,
     thumbnails: ThumbnailSource,
     callbacks: ScrubCallbacks,
+    selectedClipId: String?,
+    onClipSelected: (String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state = rememberTimelineState(project.id)
     val style = rememberTimelineStyle()
     val resources = LocalResources.current
     val thumbnailVersion by thumbnails.version.collectAsState()
+    val currentOnClipSelected by rememberUpdatedState(onClipSelected)
     BoxWithConstraints(modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         val viewportWidthDp = maxWidth.value
         ThumbnailPrefetch(project, state, positionMicros, thumbnails, constraints.maxWidth.toFloat())
@@ -82,8 +89,12 @@ fun TimelineStrip(
             Modifier
                 .fillMaxSize()
                 .testTag(TIMELINE_TAG)
-                .pointerInput(project) { scrubGestures(state, project, positionMicros, callbacks) }
-                .timelineSemantics(resources, project, positionMicros, callbacks.onSeek),
+                .timelineSemantics(resources, project, positionMicros, callbacks.onSeek)
+                .pointerInput(project) {
+                    scrubGestures(state, project, positionMicros, callbacks) { tap ->
+                        currentOnClipSelected(clipAtPosition(project, state, tap))
+                    }
+                },
         ) {
             // Reading the version here redraws the canvas whenever a thumbnail finishes loading.
             thumbnailVersion
@@ -98,6 +109,7 @@ fun TimelineStrip(
                 )
             drawRuler(frame)
             project.tracks.forEachIndexed { index, track -> drawTrack(frame, track, frame.metrics.rowTop(index)) }
+            drawSelection(frame, selectedClipId)
             drawPlayhead(frame)
         }
         ZoomToFitButton(
@@ -122,6 +134,7 @@ private fun rememberTimelineStyle(): TimelineStyle {
                     clip = scheme.surfaceVariant,
                     clipLabel = scheme.onSurface,
                     playhead = scheme.primary,
+                    selection = scheme.primary,
                 ),
             textMeasurer = textMeasurer,
             labelStyle = labelStyle,
@@ -197,25 +210,33 @@ private fun Modifier.timelineSemantics(
         }
     }
 
-/** Handles one gesture at a time: one finger scrubs, two fingers zoom around the playhead. */
+/**
+ * Handles one gesture at a time: one finger scrubs, two fingers zoom around the playhead. A single finger
+ * that lifts within the touch slop is also reported to [onTap] with its down position.
+ */
 private suspend fun PointerInputScope.scrubGestures(
     state: TimelineState,
     project: Project,
     positionMicros: () -> Long,
     callbacks: ScrubCallbacks,
+    onTap: (Offset) -> Unit,
 ) {
     awaitEachGesture {
-        awaitFirstDown(requireUnconsumed = false)
+        val down = awaitFirstDown(requireUnconsumed = false)
         state.beginScrub(positionMicros())
         callbacks.onStart()
         var lastSeek = state.centerMicros
+        var travelPx = 0f
+        var multiTouch = false
         do {
             val event = awaitPointerEvent()
             if (event.changes.size > 1) {
+                multiTouch = true
                 state.dpPerSecond = TimelineGeometry.clampZoom(state.dpPerSecond * event.calculateZoom())
             } else {
-                val pxPerSecond = state.dpPerSecond.dp.toPx()
-                val delta = (-event.calculatePan().x / pxPerSecond * MICROS_PER_SECOND).roundToLong()
+                val pan = event.calculatePan().x
+                travelPx += abs(pan)
+                val delta = (-pan / state.dpPerSecond.dp.toPx() * MICROS_PER_SECOND).roundToLong()
                 state.centerMicros = (state.centerMicros + delta).coerceIn(0L, project.durationMicros)
                 val snapped = project.frameRate.snapToNearestFrame(state.centerMicros)
                 if (snapped != lastSeek) {
@@ -225,9 +246,26 @@ private suspend fun PointerInputScope.scrubGestures(
             }
             event.changes.forEach { if (it.positionChanged()) it.consume() }
         } while (event.changes.any { it.pressed })
+        if (!multiTouch && travelPx <= viewConfiguration.touchSlop) onTap(down.position)
         state.endScrub()
         callbacks.onEnd()
     }
+}
+
+/** Returns the id of the clip drawn under [position], or null for the ruler, gaps, and empty space. */
+private fun PointerInputScope.clipAtPosition(
+    project: Project,
+    state: TimelineState,
+    position: Offset,
+): String? {
+    val metrics = TimelineMetrics(this)
+    val row = TimelineGeometry.rowAt(position.y, metrics.rulerHeight, metrics.rowHeight, metrics.rowGap)
+    val micros =
+        TimelineGeometry.xToTime(position.x, state.centerMicros, state.dpPerSecond.dp.toPx(), size.width.toFloat())
+    return row
+        ?.let { project.tracks.getOrNull(it) }
+        ?.let { TimelineGeometry.clipAt(it, micros) }
+        ?.id
 }
 
 /** Builds the TalkBack description: playhead position, clip counts per track, and how to seek. */
