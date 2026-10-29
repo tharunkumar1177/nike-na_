@@ -41,6 +41,9 @@ private const val BITS_PER_BYTE = 8L
 /** A half turn in degrees; rotations that are multiples of it keep width and height. */
 private const val HALF_TURN_DEGREES = 180
 
+/** Returns the tracks of [project] that show pictures. */
+private fun pictureTracks(project: Project): List<Track> = project.tracks.filter { it.kind != TrackKind.AUDIO }
+
 /**
  * Derives export choices from a project. The canvas follows the first clip's displayed size, as the preview
  * does. Resolutions never exceed the largest source, and frame rates never exceed the project rate, because
@@ -126,9 +129,6 @@ object ExportPlanner {
         val first = baseFirst.firstNotNullOfOrNull { it.clips.firstOrNull() }
         return first?.let { displayedSize(project.assetOf(it)) } ?: DEFAULT_CANVAS
     }
-
-    /** Returns the tracks of [project] that show pictures. */
-    private fun pictureTracks(project: Project): List<Track> = project.tracks.filter { it.kind != TrackKind.AUDIO }
 
     /** Returns the longest short side among pictures used by clips, or the default canvas's when there is none. */
     private fun largestSourceShortSide(project: Project): Int {

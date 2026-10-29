@@ -82,8 +82,7 @@ private fun ReadyEditor(
     modifier: Modifier = Modifier,
 ) {
     val preview = viewModel.preview ?: return
-    val thumbnails = viewModel.thumbnails ?: return
-    val waveforms = viewModel.waveforms ?: return
+    val media = viewModel.media ?: return
     val previewState by preview.state.collectAsStateWithLifecycle()
     val overlayBusy by viewModel.overlays.busy.collectAsStateWithLifecycle()
     val audioBusy by viewModel.audio.busy.collectAsStateWithLifecycle()
@@ -122,8 +121,8 @@ private fun ReadyEditor(
             TimelineStrip(
                 project = project,
                 positionMicros = { previewState.positionMicros },
-                thumbnails = thumbnails,
-                waveforms = waveforms,
+                thumbnails = media.thumbnails,
+                waveforms = media.waveforms,
                 callbacks = ScrubCallbacks(preview::beginScrub, preview::seekTo, preview::endScrub),
                 selectedClipId = state.selectedClipId,
                 onClipSelected = viewModel::selectClip,

@@ -18,8 +18,6 @@ import com.framecraft.editor.domain.command.EditCommand
 import com.framecraft.editor.domain.model.IdGenerator
 import com.framecraft.editor.domain.model.Project
 import com.framecraft.editor.domain.model.ProjectFactory
-import com.framecraft.editor.engine.AudioWaveforms
-import com.framecraft.editor.engine.ClipThumbnails
 import com.framecraft.editor.engine.ProjectPreview
 import com.framecraft.editor.media.ImportResult
 import com.framecraft.editor.media.MediaImporter
@@ -107,13 +105,9 @@ class EditorViewModel(
     /** Adds picked sound files to the open project as music. */
     val audio: AudioImport = AudioImport(viewModelScope, importer, idGenerator, ioDispatcher, mutableState, ::dispatch)
 
-    /** Timeline thumbnails of the open project; non-null while the state is [EditorState.Ready]. */
-    val thumbnails: ClipThumbnails?
-        get() = open?.media?.thumbnails
-
-    /** Timeline waveforms of the open project; non-null while the state is [EditorState.Ready]. */
-    val waveforms: AudioWaveforms?
-        get() = open?.media?.waveforms
+    /** Timeline thumbnails and waveforms of the open project; non-null while the state is [EditorState.Ready]. */
+    val media: TimelineMedia?
+        get() = open?.media
 
     /** Imports [uris] into a new saved project named [projectName]; ignored when empty or a project is open. */
     fun importMedia(

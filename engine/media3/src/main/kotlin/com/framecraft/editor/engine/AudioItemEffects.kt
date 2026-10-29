@@ -37,7 +37,7 @@ internal object AudioItemEffects {
     /** Returns a processor that mixes any supported channel layout to stereo. */
     private fun stereoMixer(): ChannelMixingAudioProcessor =
         ChannelMixingAudioProcessor().apply {
-            (1..MAX_INPUT_CHANNELS).forEach { channels ->
+            for (channels in 1..MAX_INPUT_CHANNELS) {
                 val matrix =
                     if (channels in CONSTANT_GAIN_INPUTS) {
                         ChannelMixingMatrix.createForConstantGain(channels, OUTPUT_CHANNELS)
