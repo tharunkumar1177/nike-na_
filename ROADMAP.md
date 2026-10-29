@@ -15,7 +15,7 @@ Ordered vertical slices. Each slice is user-visible, shipped on its own branch, 
 
 ## Core editing
 
-- [ ] 7. **Overlays that stay in sync** — picture-in-picture clips anchored to base clips; trimming the base ripples anchored children. UI: yes.
+- [x] 7. **Overlays that stay in sync** — picture-in-picture clips anchored to base clips; trimming the base ripples anchored children. UI: yes.
 - [ ] 8. **Audio basics** — extract audio, import music, per-clip volume and fades. UI: yes.
 - [ ] 9. **Text** — text clips with styles and in/out animations. UI: yes.
 - [ ] 10. **Canvas** — project aspect ratio, clip fit/fill, position, scale, rotation. UI: yes.
