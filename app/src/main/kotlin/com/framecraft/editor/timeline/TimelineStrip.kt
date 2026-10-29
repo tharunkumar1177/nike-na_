@@ -36,8 +36,10 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
@@ -111,6 +113,7 @@ fun TimelineStrip(
             thumbnails = thumbnails,
             selectedClipId = selectedClipId,
             onSeek = callbacks.onSeek,
+            onEdit = edits.onCommit,
             modifier =
                 Modifier.pointerInput(project) {
                     val context = TimelineGestureContext(state, project, edits) { currentSelection }
@@ -138,7 +141,10 @@ private fun rememberEditCallbacks(
     return remember { TimelineEditCallbacks({ select(it) }, { commit(it) }, { haptic(it) }) }
 }
 
-/** The drawn timeline: [preview] replaces [project] while a drag is in progress. */
+/**
+ * The drawn timeline: [preview] replaces [project] while a drag is in progress. TalkBack can nudge a selected overlay
+ * through [onEdit].
+ */
 @Composable
 private fun TimelineCanvas(
     project: Project,
@@ -148,17 +154,19 @@ private fun TimelineCanvas(
     thumbnails: ThumbnailSource,
     selectedClipId: String?,
     onSeek: (Long) -> Unit,
+    onEdit: (EditCommand) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val style = rememberTimelineStyle()
     val resources = LocalResources.current
     val thumbnailVersion by thumbnails.version.collectAsState()
     val shown = preview?.project ?: project
+    val nudges = overlayNudges(project, selectedClipId, onEdit)
     Canvas(
         modifier
             .fillMaxSize()
             .testTag(TIMELINE_TAG)
-            .timelineSemantics(resources, project, positionMicros, onSeek),
+            .timelineSemantics(resources, project, positionMicros, onSeek, nudges),
     ) {
         // Reading the version here redraws the canvas whenever a thumbnail finishes loading.
         thumbnailVersion
@@ -188,7 +196,9 @@ private fun rememberTimelineStyle(): TimelineStyle {
     val textMeasurer = rememberTextMeasurer()
     val labelStyle = MaterialTheme.typography.labelLarge
     val brokenImage = painterResource(R.drawable.ic_broken_image)
-    return remember(scheme, textMeasurer, labelStyle, brokenImage) {
+    val link = painterResource(R.drawable.ic_link)
+    val linkOff = painterResource(R.drawable.ic_link_off)
+    return remember(scheme, textMeasurer, labelStyle, brokenImage, link, linkOff) {
         TimelineStyle(
             colors =
                 TimelineColors(
@@ -201,6 +211,7 @@ private fun rememberTimelineStyle(): TimelineStyle {
             textMeasurer = textMeasurer,
             labelStyle = labelStyle,
             brokenImage = brokenImage,
+            overlay = OverlayStyle(scheme.primaryContainer, link, linkOff, linkOffTint = scheme.error),
         )
     }
 }
@@ -295,15 +306,17 @@ private fun ControlToggle(
     }
 }
 
-/** Exposes the timeline to TalkBack as an adjustable position with a spoken summary. */
+/** Exposes the timeline to TalkBack as an adjustable position with a spoken summary and the [nudges] actions. */
 private fun Modifier.timelineSemantics(
     resources: Resources,
     project: Project,
     positionMicros: () -> Long,
     onSeek: (Long) -> Unit,
+    nudges: List<CustomAccessibilityAction>,
 ): Modifier =
     semantics {
         contentDescription = describeTimeline(resources, project, positionMicros())
+        if (nudges.isNotEmpty()) customActions = nudges
         progressBarRangeInfo =
             ProgressBarRangeInfo(
                 current = positionMicros().toFloat() / MICROS_PER_SECOND,

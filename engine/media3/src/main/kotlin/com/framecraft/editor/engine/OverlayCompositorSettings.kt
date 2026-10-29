@@ -18,7 +18,7 @@ private const val ANCHOR_LIMIT = 1f
 /**
  * Compositor settings built from [spansBySequence], one list per composition sequence in order. Sequences without
  * spans (the base video) fill the frame; overlay sequences use the placement of the span covering the frame time.
- * The first input sets the output size.
+ * The first input sets the output size. An overlay at scale 1 fits inside the canvas whatever its pixel size.
  */
 @OptIn(markerClass = [UnstableApi::class])
 internal class OverlayCompositorSettings(
@@ -26,8 +26,17 @@ internal class OverlayCompositorSettings(
 ) : VideoCompositorSettings {
     private val fullFrame: OverlaySettings = StaticOverlaySettings.Builder().build()
 
-    /** Returns the size of the first input, so the base video sets the canvas as it does without overlays. */
-    override fun getOutputSize(inputSizes: List<Size>): Size = inputSizes.first()
+    @Volatile
+    private var inputSizes: List<Size> = emptyList()
+
+    /**
+     * Returns the size of the first input, so the base video sets the canvas as it does without overlays. The
+     * compositor asks for it before placing each frame's inputs, so the sizes are kept for [getOverlaySettings].
+     */
+    override fun getOutputSize(inputSizes: List<Size>): Size {
+        this.inputSizes = inputSizes
+        return inputSizes.first()
+    }
 
     /** Returns the placement of input [inputId] at [presentationTimeUs], or full frame when none applies. */
     override fun getOverlaySettings(
@@ -38,14 +47,32 @@ internal class OverlayCompositorSettings(
             spansBySequence.getOrNull(inputId)?.firstOrNull {
                 presentationTimeUs >= it.startMicros && presentationTimeUs < it.endMicros
             }
-        return span?.let { settingsFor(it.transform) } ?: fullFrame
+        return span?.let { settingsFor(it.transform, fitFactor(inputId)) } ?: fullFrame
     }
 
-    /** Maps [transform] to Media3 settings: Media3 y points up and rotation runs counter-clockwise. */
-    private fun settingsFor(transform: OverlayTransform): OverlaySettings =
+    /**
+     * Returns the factor that makes input [inputId] fit inside the canvas at scale 1. Media3 draws an overlay at its
+     * pixel size relative to the background, so the factor undoes that; it is 1 before any size is known.
+     */
+    private fun fitFactor(inputId: Int): Float {
+        val sizes = inputSizes
+        val canvas = sizes.firstOrNull()
+        val overlay = sizes.getOrNull(inputId)
+        return if (canvas == null || overlay == null || overlay.width <= 0 || overlay.height <= 0) {
+            1f
+        } else {
+            minOf(canvas.width.toFloat() / overlay.width, canvas.height.toFloat() / overlay.height)
+        }
+    }
+
+    /** Maps [transform] to Media3 settings scaled by [fit]: Media3 y points up and rotation runs counter-clockwise. */
+    private fun settingsFor(
+        transform: OverlayTransform,
+        fit: Float,
+    ): OverlaySettings =
         StaticOverlaySettings
             .Builder()
-            .setScale(transform.scale, transform.scale)
+            .setScale(transform.scale * fit, transform.scale * fit)
             .setRotationDegrees(-transform.rotationDegrees)
             .setAlphaScale(transform.opacity)
             .setOverlayFrameAnchor(0f, 0f)

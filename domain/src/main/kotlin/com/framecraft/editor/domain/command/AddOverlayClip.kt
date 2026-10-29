@@ -12,9 +12,10 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Places [clip], which reads [asset], on overlay track [trackId]. The asset is added if the project lacks it, and the
- * track is created at the end of the track list if it does not exist. An overlap is rejected. Each of
- * [anchorRestorations] then re-attaches a clip that lost its anchor when this clip was removed.
+ * Places [clip], which reads [asset], on overlay track [trackId]. The asset is added if the project lacks it. A
+ * missing track is created at position [trackIndex] of the track list, clamped to the list, which defaults to the
+ * start so a new lane is drawn above the base video. An overlap is rejected. Each of [anchorRestorations] then
+ * re-attaches a clip that lost its anchor when this clip was removed.
  */
 @Serializable
 @SerialName("addOverlayClip")
@@ -23,6 +24,7 @@ data class AddOverlayClip(
     val clip: Clip,
     val asset: MediaAsset,
     val anchorRestorations: List<AnchorRestoration> = emptyList(),
+    val trackIndex: Int = 0,
 ) : EditCommand {
     /** The inverse removes the overlay clip again. */
     override fun applyTo(project: Project): CommandOutcome {
@@ -42,7 +44,10 @@ data class AddOverlayClip(
                 project.replacingTracks(RemoveOverlayClip(clip.id), assets) {
                     val tracks =
                         if (existing == null) {
-                            project.tracks + Track(trackId, TrackKind.OVERLAY, false, listOf(clip))
+                            val lane = Track(trackId, TrackKind.OVERLAY, false, listOf(clip))
+                            project.tracks.toMutableList().apply {
+                                add(trackIndex.coerceIn(0, project.tracks.size), lane)
+                            }
                         } else {
                             val placed = existing.copy(clips = (existing.clips + clip).sortedBy { it.startMicros })
                             project.tracks.map { if (it.id == trackId) placed else it }

@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import com.framecraft.editor.domain.model.Clip
 import com.framecraft.editor.domain.model.Project
 import com.framecraft.editor.domain.model.Track
+import com.framecraft.editor.domain.model.TrackKind
 import com.framecraft.editor.domain.time.MICROS_PER_SECOND
 import com.framecraft.editor.domain.time.Timecode
 import com.framecraft.editor.engine.ThumbnailSource
@@ -46,12 +47,24 @@ data class TimelineColors(
     val selection: Color,
 )
 
+/**
+ * How overlay clips look: their fill [clip], and the [link] badge for attached overlays or the [linkOff] badge in
+ * [linkOffTint] for free ones.
+ */
+class OverlayStyle(
+    val clip: Color,
+    val link: Painter,
+    val linkOff: Painter,
+    val linkOffTint: Color,
+)
+
 /** Colors, text, and icons used to draw the timeline. */
 class TimelineStyle(
     val colors: TimelineColors,
     val textMeasurer: TextMeasurer,
     val labelStyle: TextStyle,
     val brokenImage: Painter,
+    val overlay: OverlayStyle,
 )
 
 /** Pixel sizes derived from the design's dp values for the current density. */
@@ -112,6 +125,9 @@ class TimelineMetrics(
     /** Width of the snap guideline. */
     val guideWidth = with(scope) { 1.dp.toPx() }
 
+    /** Size of the attached or free badge on overlay clips. */
+    val badgeSize = with(scope) { 16.dp.toPx() }
+
     /** Returns the top edge of track row [index]. */
     fun rowTop(index: Int): Float = rulerHeight + rowGap + index * (rowHeight + rowGap)
 }
@@ -170,6 +186,8 @@ fun DrawScope.drawTrack(
 ) {
     val metrics = frame.metrics
     val range = TimelineGeometry.visibleRange(frame.centerMicros, frame.pxPerSecond, size.width)
+    val isOverlay = track.kind == TrackKind.OVERLAY
+    val fill = if (isOverlay) frame.style.overlay.clip else frame.style.colors.clip
     track.clips
         .filter { it.endMicros >= range.first && it.startMicros <= range.last }
         .forEach { clip ->
@@ -185,10 +203,11 @@ fun DrawScope.drawTrack(
                         cornerRadius = CornerRadius(metrics.clipCorner),
                     )
                 clipPath(Path().apply { addRoundRect(block) }) {
-                    drawRect(color = frame.style.colors.clip, topLeft = Offset(left, top), size = block.size())
+                    drawRect(color = fill, topLeft = Offset(left, top), size = block.size())
                     drawThumbnails(frame, clip, top)
                 }
                 drawClipLabel(frame, TimelineGeometry.formatClipDuration(clip.durationMicros), left, width, top)
+                if (isOverlay) drawOverlayBadge(frame, clip, left, width, top)
             }
         }
 }
@@ -255,6 +274,37 @@ private fun DrawScope.drawClipLabel(
             color = style.colors.clipLabel,
             topLeft = Offset(left + metrics.labelPadding, labelTop + metrics.labelPadding / 2f),
         )
+    }
+}
+
+/**
+ * Draws a link badge on a scrim at the bottom-left corner of overlay [clip], spanning [clipLeft] to [clipLeft] +
+ * [clipWidth]: linked when it is attached to a base clip, broken when it is free. Too narrow a clip gets none.
+ */
+private fun DrawScope.drawOverlayBadge(
+    frame: TimelineFrame,
+    clip: Clip,
+    clipLeft: Float,
+    clipWidth: Float,
+    top: Float,
+) {
+    val metrics = frame.metrics
+    val padding = metrics.labelPadding
+    val badge = metrics.badgeSize
+    if (clipWidth < badge + padding * 2) return
+    val left = clipLeft + padding
+    val badgeTop = top + metrics.rowHeight - badge - padding
+    drawCircle(
+        color = Color.Black.copy(alpha = LABEL_SCRIM_ALPHA),
+        radius = badge / 2f + padding / 2f,
+        center = Offset(left + badge / 2f, badgeTop + badge / 2f),
+    )
+    val overlay = frame.style.overlay
+    val attached = clip.anchor != null
+    val icon = if (attached) overlay.link else overlay.linkOff
+    val tint = if (attached) frame.style.colors.clipLabel else overlay.linkOffTint
+    translate(left, badgeTop) {
+        with(icon) { draw(Size(badge, badge), colorFilter = ColorFilter.tint(tint)) }
     }
 }
 

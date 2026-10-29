@@ -3,6 +3,7 @@
  */
 package com.framecraft.editor.domain.edit
 
+import com.framecraft.editor.domain.command.MoveOverlay
 import com.framecraft.editor.domain.model.Clip
 import com.framecraft.editor.domain.model.ClipAnchor
 import com.framecraft.editor.domain.model.IdGenerator
@@ -97,6 +98,25 @@ class OverlayPlacementTest {
     fun noBaseClipsGivesNull() {
         val empty = Track("T0", TrackKind.VIDEO, true, emptyList())
         assertNull(OverlayPlacement.propose(project(empty), 0L, photo, ids()))
+    }
+
+    /** Dragging lands on a frame, snaps within the threshold, re-attaches to the clip under it, or detaches. */
+    @Test
+    fun dragReanchorsSnapsAndDetaches() {
+        val clip = Clip("O", "video", SECOND, 0L, SECOND, ClipAnchor("A", SECOND), OverlayTransform.DEFAULT)
+        val lane = Track("lane", TrackKind.OVERLAY, false, listOf(clip))
+        val project = project(lane, base)
+        val targets = listOf(0L, 6 * SECOND, 10 * SECOND)
+        val free = OverlayPlacement.drag(project, clip, 5_500_000L, targets, 100_000L)
+        assertEquals(MoveOverlay("O", ClipAnchor("B", 500_000L), 6_500_000L), free.command)
+        assertNull(free.snappedMicros)
+        val snapped = OverlayPlacement.drag(project, clip, 4_950_000L, targets, 100_000L)
+        assertEquals(MoveOverlay("O", ClipAnchor("B", 0L), 6 * SECOND), snapped.command)
+        assertEquals(6 * SECOND, snapped.snappedMicros)
+        val endSnap = OverlayPlacement.drag(project, clip, 3_950_000L, targets, 100_000L)
+        assertEquals(5 * SECOND, endSnap.command.startMicros)
+        val detached = OverlayPlacement.drag(project, clip, 9_500_000L, targets, 100_000L)
+        assertEquals(MoveOverlay("O", null, 10_500_000L), detached.command)
     }
 
     /** Overlay drags snap to the playhead, every base edge, and other overlays' edges. */

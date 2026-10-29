@@ -1,9 +1,11 @@
 /*
- * Decides where a newly added overlay goes: at the playhead, attached to the base clip there.
+ * Decides where a newly added overlay goes (at the playhead, attached to the base clip there) and where a dragged
+ * overlay lands in time.
  */
 package com.framecraft.editor.domain.edit
 
 import com.framecraft.editor.domain.command.AddOverlayClip
+import com.framecraft.editor.domain.command.MoveOverlay
 import com.framecraft.editor.domain.model.Clip
 import com.framecraft.editor.domain.model.ClipAnchor
 import com.framecraft.editor.domain.model.IdGenerator
@@ -15,8 +17,37 @@ import com.framecraft.editor.domain.model.Track
 import com.framecraft.editor.domain.model.TrackKind
 import kotlin.math.abs
 
-/** Places new overlays. */
+/** A time drag of an overlay: the [command] that saves it and the snap target it locked to, if any. */
+data class OverlayMove(
+    val command: MoveOverlay,
+    val snappedMicros: Long?,
+)
+
+/** Places new overlays and moves existing ones in time. */
 object OverlayPlacement {
+    /**
+     * Returns where overlay [clip] lands when dragged by [deltaMicros]: its start or end snaps to the nearest of
+     * [targets] within [thresholdMicros], otherwise its start lands on a frame boundary. It attaches to the base
+     * clip under its new start, or detaches over a gap.
+     */
+    fun drag(
+        project: Project,
+        clip: Clip,
+        deltaMicros: Long,
+        targets: List<Long>,
+        thresholdMicros: Long,
+    ): OverlayMove {
+        val raw = (clip.startMicros + deltaMicros).coerceAtLeast(0L)
+        val duration = clip.durationMicros
+        val byStart = SnapPoints.nearest(targets, raw, thresholdMicros)?.let { it to it }
+        val byEnd = SnapPoints.nearest(targets, raw + duration, thresholdMicros)?.let { (it - duration) to it }
+        val snap = listOfNotNull(byStart, byEnd).filter { it.first >= 0 }.minByOrNull { abs(it.first - raw) }
+        val start = snap?.first ?: project.frameRate.snapToNearestFrame(raw)
+        val parent = baseTrack(project)?.clips?.firstOrNull { start >= it.startMicros && start < it.endMicros }
+        val anchor = parent?.let { ClipAnchor(it.id, start - it.startMicros) }
+        return OverlayMove(MoveOverlay(clip.id, anchor, start), snap?.second)
+    }
+
     /**
      * Returns the command that adds [asset] as an overlay at [playheadMicros], or null when the project has no base
      * clip to attach it to. The overlay attaches to the base clip under the playhead (or the nearest one), starts on

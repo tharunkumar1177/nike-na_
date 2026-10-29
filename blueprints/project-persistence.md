@@ -30,7 +30,7 @@ The `:data:project` module saves every edit to a per-project journal before repo
 
 ### Project document model
 
-Older schemas are upgraded through `SchemaMigrations`, which rewrites the project and every journaled command in one pass and then saves the upgraded files. No migration step exists yet; the registry is empty at schema version 1. The slice 5 command types (`trimClip`, `splitClip`, `mergeClips`, `moveClip`) are additive and need no schema change; older app versions treat them as unknown records.
+Older schemas are upgraded through `SchemaMigrations`, which rewrites the project and every journaled command in one pass and then saves the upgraded files. The current schema is 2 and `SchemaMigrations.SHIPPED` holds `Migration1To2`, which leaves documents unchanged: schema 2 only adds optional fields (track kind `OVERLAY`, clip `anchor` and `overlayTransform`, `anchorRestorations` on `addClip`) and the overlay command types, all of which default to schema 1 behavior when absent. The bump exists so schema 1 apps refuse projects that contain overlays instead of dropping them. The slice 5 command types (`trimClip`, `splitClip`, `mergeClips`, `moveClip`) are additive and needed no schema change.
 
 ### Error and recovery
 
@@ -53,7 +53,7 @@ None
 
 ## Relevant implementation and tests
 
-- `data/project/src/main/kotlin/com/framecraft/editor/data/project/` — `ProjectStore`, `ProjectSession`, `ProjectLoader`, `ProjectDirectory`, `ProjectDocuments`, `DurableFiles`, `SchemaMigrations`, `ExportSettingsFile`.
+- `data/project/src/main/kotlin/com/framecraft/editor/data/project/` — `ProjectStore`, `ProjectSession`, `ProjectLoader`, `ProjectDirectory`, `ProjectDocuments`, `DurableFiles`, `SchemaMigrations`, `Migration1To2`, `ExportSettingsFile`.
 - `data/project/src/test/kotlin/com/framecraft/editor/data/project/ExportSettingsStoreTest.kt` — export settings round trip outside history, missing and corrupt files, unknown project.
 - `data/project/src/test/kotlin/com/framecraft/editor/data/project/ProjectStoreTest.kt` — reopen after edits, undo across restart, redo truncation, torn tail, sequence gap, compaction floor, newer and older schemas, list rebuild and unreadable projects, change and delete, unsafe ids.
 
@@ -63,8 +63,8 @@ None
 - [x] A torn final journal line is discarded on recovery, and the original journal is kept for diagnosis.
 - [x] Snapshot, journal rewrite, cursor, and summary writes are atomic (temporary file, flush, atomic rename).
 - [x] Older schema versions open after an upgrade; newer ones are refused with their files untouched.
+- [x] A verbatim schema 1 snapshot and journal open, replay, and are saved as schema 2 (`schemaOneFixtureOpens`).
 
 ## Remaining gaps and unknowns
 
 - Whether to copy imported media into the project (self-contained) or reference it with relink is still open.
-- There is no migration step yet; the first schema change must add one with an old-format fixture test.

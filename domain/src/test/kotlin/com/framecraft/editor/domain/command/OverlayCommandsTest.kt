@@ -246,7 +246,7 @@ class OverlayCommandsTest {
             )
         val added = overlay("O1", "A", SECOND, SECOND, 2 * SECOND)
         val result = applied(AddOverlayClip("lane", added, pip), base)
-        assertEquals(listOf(TrackKind.VIDEO, TrackKind.OVERLAY), result.tracks.map { it.kind })
+        assertEquals(listOf(TrackKind.OVERLAY, TrackKind.VIDEO), result.tracks.map { it.kind })
         assertEquals(listOf("video", "pip"), result.assets.map { it.id })
     }
 
@@ -257,6 +257,13 @@ class OverlayCommandsTest {
         assertEquals(listOf("video", "pip"), result.assets.map { it.id })
         assertNull(clip(result, "O3").anchor)
         assertTrue(rejection(RemoveOverlayClip("A"), fixture()) is CommandRejection.ModelInvariant)
+    }
+
+    /** Removing the last clip of a lane drops the lane; undo puts it back at its old position. */
+    @Test
+    fun removeLastClipRestoresLanePosition() {
+        val result = applied(RemoveOverlayClip("O3"), fixture())
+        assertEquals(listOf("T0", "T1"), result.tracks.map { it.id })
     }
 
     /** Every overlay command and an anchored clip survive a JSON round-trip; schema 1 clips decode without anchors. */

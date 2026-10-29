@@ -226,7 +226,13 @@ class ProjectStoreTest {
             val opened = store().opened()
             val project = opened.session.state.project
             assertEquals("Renamed", project.name)
-            assertNull(project.tracks.single().clips.single().anchor)
+            assertNull(
+                project.tracks
+                    .single()
+                    .clips
+                    .single()
+                    .anchor,
+            )
             opened.session.close()
             assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":2"))
         }

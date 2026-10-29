@@ -8,7 +8,7 @@ Own the pure Kotlin project model: tracks, clips, implicit gaps, magnetic tracks
 
 **Status:** Partial
 
-Time math (`FrameRate`, `Timecode`) and the validated document model (`MediaAsset`, `Clip`, `Track`, `Project`, `ProjectFactory`) are implemented and verified by CI unit tests. Anchoring and ripple are not built yet (slice 7).
+Time math (`FrameRate`, `Timecode`), the validated document model (`MediaAsset`, `Clip`, `Track`, `Project`, `ProjectFactory`), track kinds, overlay placement (`OverlayTransform`), and anchoring (`ClipAnchor`, `AnchorResolver`) are implemented and verified by CI unit tests. Speed and transitions are not built yet.
 
 ## Architecture dependencies
 
@@ -33,7 +33,7 @@ Clips on one track must not overlap. Magnetic tracks are kept gap-free by the co
 
 ### Anchoring and ripple
 
-Absolute clip positions are resolved by a single function that walks the anchor forest; both the timeline UI and the engine call it, so they cannot disagree.
+`AnchorResolver` is the single place that walks the anchor forest. Commands call `AnchorResolver.materialize` after editing tracks, so every stored start is already resolved and the timeline UI and the engine read `startMicros` directly; they cannot disagree. `Project` runs `AnchorResolver.validate` on construction, which rejects anchored clips on magnetic tracks, placements on non-overlay tracks, missing parents, cycles, negative starts, and stored starts that differ from their anchor.
 
 ## Related blueprints
 
@@ -49,17 +49,17 @@ None
 ## Relevant implementation and tests
 
 - `domain/src/main/kotlin/com/framecraft/editor/domain/time/` — `FrameRate`, `Timecode`.
-- `domain/src/main/kotlin/com/framecraft/editor/domain/model/` — `MediaAsset`, `Clip`, `Track`, `Project`, `ProjectFactory`, `IdGenerator`.
-- Tests: `domain/src/test/kotlin/com/framecraft/editor/domain/time/FrameRateTest.kt`, `TimecodeTest.kt`, `domain/src/test/kotlin/com/framecraft/editor/domain/model/ProjectTest.kt`.
+- `domain/src/main/kotlin/com/framecraft/editor/domain/model/` — `MediaAsset`, `Clip`, `Track`, `Project`, `ProjectFactory`, `IdGenerator`, `ClipAnchor`, `OverlayTransform`, `AnchorResolver`.
+- Tests: `domain/src/test/kotlin/com/framecraft/editor/domain/time/FrameRateTest.kt`, `TimecodeTest.kt`, `domain/src/test/kotlin/com/framecraft/editor/domain/model/ProjectTest.kt`, `domain/src/test/kotlin/com/framecraft/editor/domain/command/OverlayCommandsTest.kt`.
 
 ## Acceptance or verification criteria
 
 - [x] Frame math round-trips at fractional rates (29.97) and never returns negative time.
 - [x] Overlapping clips on one track are rejected.
 - [x] Magnetic tracks reject gaps; duplicate IDs and unknown asset references are rejected.
-- [ ] Anchored children resolve to parent start plus offset.
-- [ ] Anchor cycles are rejected.
-- [ ] Ripple on a magnetic track shifts later clips and their anchored children.
+- [x] Anchored children resolve to parent start plus offset.
+- [x] Anchor cycles are rejected.
+- [x] Ripple on a magnetic track shifts later clips and their anchored children.
 
 ## Remaining gaps and unknowns
 

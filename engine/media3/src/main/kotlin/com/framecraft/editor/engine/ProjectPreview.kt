@@ -31,6 +31,7 @@ private const val PROGRESS_INTERVAL_MS = 50L
 
 /** Microseconds in a millisecond. */
 private const val MICROS_PER_MILLI = 1_000L
+
 /** Playback state of the preview, in project time. */
 data class PreviewState(
     val isPlaying: Boolean = false,
