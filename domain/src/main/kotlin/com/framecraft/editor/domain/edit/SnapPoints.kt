@@ -26,6 +26,21 @@ object SnapPoints {
         return (edges + playheadMicros).distinct().sorted()
     }
 
+    /**
+     * Returns snap targets for dragging overlay [dragged]: [playheadMicros], every clip edge on [base], and the edges
+     * of the other clips on [lane].
+     */
+    fun ofOverlay(
+        base: Track?,
+        lane: Track,
+        playheadMicros: Long,
+        dragged: Clip,
+    ): List<Long> {
+        val fixed = base?.clips.orEmpty() + lane.clips.filter { it.id != dragged.id }
+        val edges = fixed.flatMap { listOf(it.startMicros, it.endMicros) }
+        return (edges + playheadMicros).distinct().sorted()
+    }
+
     /** Returns the target closest to [timeMicros] if it is within [thresholdMicros], or null. */
     fun nearest(
         targets: List<Long>,

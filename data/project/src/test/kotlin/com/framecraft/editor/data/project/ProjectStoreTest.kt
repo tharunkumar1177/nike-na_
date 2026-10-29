@@ -70,7 +70,7 @@ class ProjectStoreTest {
         )
 
     /** Returns a store over [root] with a clock that advances on each read. */
-    private fun store(migrations: SchemaMigrations = SchemaMigrations.NONE) =
+    private fun store(migrations: SchemaMigrations = SchemaMigrations.SHIPPED) =
         ProjectStore(root, io, clock = { now++ }, migrations = migrations)
 
     /** Opens [projectId], failing the test unless it opens. */
@@ -182,7 +182,7 @@ class ProjectStoreTest {
         runBlocking {
             store().create(project).close()
             val snapshot = File(dir(), "snapshot.json")
-            val newer = snapshot.readText().replace("\"schemaVersion\":1", "\"schemaVersion\":99")
+            val newer = snapshot.readText().replace("\"schemaVersion\":2", "\"schemaVersion\":99")
             snapshot.writeText(newer)
             assertEquals(OpenProjectResult.TooNew(99), store().open(project.id))
             assertEquals(newer, snapshot.readText())
@@ -197,7 +197,7 @@ class ProjectStoreTest {
             snapshot.writeText(
                 snapshot
                     .readText()
-                    .replace("\"schemaVersion\":1", "\"schemaVersion\":0")
+                    .replace("\"schemaVersion\":2", "\"schemaVersion\":0")
                     .replace("\"name\":\"Trip\"", "\"title\":\"Trip\""),
             )
             val renameTitle =
@@ -211,9 +211,24 @@ class ProjectStoreTest {
                     /** Commands are unchanged between these versions. */
                     override fun migrateCommand(command: JsonObject) = command
                 }
-            val opened = store(SchemaMigrations(listOf(renameTitle))).opened()
+            val opened = store(SchemaMigrations(listOf(renameTitle, Migration1To2))).opened()
             assertEquals("Trip", opened.session.state.project.name)
-            assertTrue(snapshot.readText().contains("\"schemaVersion\":1"))
+            assertTrue(snapshot.readText().contains("\"schemaVersion\":2"))
+        }
+
+    /** A project and journal written verbatim in schema 1 open through the shipped chain and are saved as schema 2. */
+    @Test
+    fun schemaOneFixtureOpens() =
+        runBlocking {
+            dir().mkdirs()
+            File(dir(), "snapshot.json").writeText(SCHEMA_ONE_SNAPSHOT)
+            File(dir(), "journal.jsonl").writeText(SCHEMA_ONE_JOURNAL)
+            val opened = store().opened()
+            val project = opened.session.state.project
+            assertEquals("Renamed", project.name)
+            assertNull(project.tracks.single().clips.single().anchor)
+            opened.session.close()
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":2"))
         }
 
     /** A missing list summary is rebuilt; an unreadable project is listed as unreadable and refused. */
@@ -251,3 +266,23 @@ class ProjectStoreTest {
         assertThrows<IllegalArgumentException> { runBlocking { store().open("../escape") } }
     }
 }
+
+/** A snapshot exactly as schema 1 wrote it. */
+private val SCHEMA_ONE_SNAPSHOT =
+    """
+    {"baseSeq":0,"createdAtEpochMillis":1,"project":{"id":"project-1","name":"Trip",
+    "frameRate":{"numerator":30,"denominator":1},"assets":[{"id":"asset","uri":"content://media/asset",
+    "kind":"VIDEO","durationMicros":10000000,"width":1920,"height":1080,"rotationDegrees":0,"hasAudio":true,
+    "fingerprint":{"sizeBytes":1}}],"tracks":[{"id":"track","kind":"VIDEO","magnetic":true,"clips":[
+    {"id":"a","assetId":"asset","startMicros":0,"trimStartMicros":0,"durationMicros":1000000},
+    {"id":"b","assetId":"asset","startMicros":1000000,"trimStartMicros":0,"durationMicros":1000000}]}],
+    "schemaVersion":1}}
+    """.trimIndent()
+
+/** A journal exactly as schema 1 wrote it: a rename and a clip deletion. */
+private val SCHEMA_ONE_JOURNAL =
+    """
+    {"seq":1,"atEpochMillis":2,"command":{"type":"renameProject","name":"Renamed"}}
+    {"seq":2,"atEpochMillis":3,"command":{"type":"deleteClip","clipId":"b"}}
+
+    """.trimIndent()

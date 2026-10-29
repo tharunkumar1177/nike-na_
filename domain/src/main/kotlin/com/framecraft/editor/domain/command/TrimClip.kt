@@ -12,6 +12,7 @@ import kotlinx.serialization.Serializable
  * Sets clip [clipId] to start at [startMicros], read its source from [trimStartMicros], and last [durationMicros].
  * On a magnetic track the start must not move and later clips shift by the change in duration; on other tracks
  * an overlap is rejected. Clips shorter than one frame and image clips with a changed source offset are rejected.
+ * An anchored clip keeps its parent and its anchor offset moves with the start; clips anchored to moved clips follow.
  */
 @Serializable
 @SerialName("trimClip")
@@ -49,6 +50,7 @@ data class TrimClip(
                     startMicros = startMicros,
                     trimStartMicros = trimStartMicros,
                     durationMicros = durationMicros,
+                    anchor = shiftedAnchor(clip.anchor, startMicros - clip.startMicros),
                 )
             val others = track.clips.filter { it.id != clipId }
             val delta = trimmed.endMicros - clip.endMicros

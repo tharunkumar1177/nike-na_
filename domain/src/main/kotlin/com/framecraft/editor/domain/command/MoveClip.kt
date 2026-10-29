@@ -10,7 +10,8 @@ import kotlinx.serialization.Serializable
 /**
  * Moves clip [clipId] to start at [newStartMicros]. On a magnetic track the clip is first taken out (later clips
  * close the gap) and [newStartMicros] is a clip boundary of that shortened track; clips from there on shift right to
- * make room. On other tracks the clip simply moves and an overlap is rejected.
+ * make room. On other tracks the clip simply moves and an overlap is rejected. An anchored clip keeps its parent and
+ * its offset moves with it; clips anchored to moved clips follow.
  */
 @Serializable
 @SerialName("moveClip")
@@ -31,7 +32,12 @@ data class MoveClip(
                 } else {
                     others
                 }
-            track.copy(clips = (placed + clip.copy(startMicros = newStartMicros)).sortedBy { it.startMicros })
+            val moved =
+                clip.copy(
+                    startMicros = newStartMicros,
+                    anchor = shiftedAnchor(clip.anchor, newStartMicros - clip.startMicros),
+                )
+            track.copy(clips = (placed + moved).sortedBy { it.startMicros })
         }
     }
 }

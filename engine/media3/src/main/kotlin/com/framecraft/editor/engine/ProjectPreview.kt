@@ -9,6 +9,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.ExperimentalApi
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.effect.MultipleInputVideoGraph
 import androidx.media3.transformer.CompositionPlayer
 import com.framecraft.editor.domain.model.Project
 import com.framecraft.editor.engine.plan.PlaybackPlanner
@@ -30,7 +31,6 @@ private const val PROGRESS_INTERVAL_MS = 50L
 
 /** Microseconds in a millisecond. */
 private const val MICROS_PER_MILLI = 1_000L
-
 /** Playback state of the preview, in project time. */
 data class PreviewState(
     val isPlaying: Boolean = false,
@@ -46,7 +46,11 @@ data class PreviewState(
 class ProjectPreview(
     context: Context,
 ) {
-    internal val player: CompositionPlayer = CompositionPlayer.Builder(context.applicationContext).build()
+    internal val player: CompositionPlayer =
+        CompositionPlayer
+            .Builder(context.applicationContext)
+            .setVideoGraphFactory(MultipleInputVideoGraph.Factory())
+            .build()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val mutableState = MutableStateFlow(PreviewState())
     private var progressJob: Job? = null

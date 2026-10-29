@@ -7,7 +7,7 @@ import com.framecraft.editor.domain.time.FrameRate
 import kotlinx.serialization.Serializable
 
 /** Schema version written by this build. */
-const val CURRENT_SCHEMA_VERSION: Int = 1
+const val CURRENT_SCHEMA_VERSION: Int = 2
 
 /** An immutable project snapshot. Construction fails if any cross-object invariant is broken. */
 @Serializable
@@ -34,6 +34,7 @@ data class Project(
                 }
             }
         }
+        AnchorResolver.validate(tracks)
     }
 
     /** Exclusive end of the latest clip across all tracks. */

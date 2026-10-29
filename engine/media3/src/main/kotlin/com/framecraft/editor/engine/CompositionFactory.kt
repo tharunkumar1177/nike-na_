@@ -24,8 +24,8 @@ private const val MICROS_PER_MILLI = 1_000L
 @OptIn(markerClass = [UnstableApi::class])
 internal object CompositionFactory {
     /**
-     * Returns a composition with one audio-and-video sequence per planned track. Export passes [videoEffects]
-     * that apply to the whole output; the preview passes none.
+     * Returns a composition with one audio-and-video sequence per planned track, with overlay sequences placed by
+     * [OverlayCompositorSettings]. Export passes [videoEffects] that apply to the whole output; the preview passes none.
      */
     fun create(
         plan: PlaybackPlan,
@@ -43,10 +43,11 @@ internal object CompositionFactory {
                 }
                 builder.build()
             }
-        return Composition
-            .Builder(sequences)
-            .setEffects(Effects(emptyList(), videoEffects))
-            .build()
+        val builder = Composition.Builder(sequences).setEffects(Effects(emptyList(), videoEffects))
+        if (plan.sequences.size > 1) {
+            builder.setVideoCompositorSettings(OverlayCompositorSettings(plan.sequences.map { it.overlaySpans }))
+        }
+        return builder.build()
     }
 
     /** Maps a media segment to an edited item, clipping videos and timing images. */

@@ -7,7 +7,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * A segment of [assetId] placed on the timeline at [startMicros] for [durationMicros],
- * reading the source from [trimStartMicros]. The timeline extent is half-open.
+ * reading the source from [trimStartMicros]. The timeline extent is half-open. An [anchor] keeps the clip in sync
+ * with another clip; [startMicros] then always equals the start the anchor resolves to. Overlay clips carry an
+ * [overlayTransform].
  */
 @Serializable
 data class Clip(
@@ -16,6 +18,8 @@ data class Clip(
     val startMicros: Long,
     val trimStartMicros: Long,
     val durationMicros: Long,
+    val anchor: ClipAnchor? = null,
+    val overlayTransform: OverlayTransform? = null,
 ) {
     init {
         require(id.isNotBlank()) { "Clip id must not be blank" }

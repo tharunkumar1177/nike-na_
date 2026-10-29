@@ -4,6 +4,7 @@
 package com.framecraft.editor.domain.command
 
 import com.framecraft.editor.domain.model.Clip
+import com.framecraft.editor.domain.model.ClipAnchor
 import com.framecraft.editor.domain.model.MediaKind
 import com.framecraft.editor.domain.model.Project
 import com.framecraft.editor.domain.time.FrameRate
@@ -12,7 +13,8 @@ import kotlinx.serialization.Serializable
 
 /**
  * Cuts clip [clipId] at [atMicros]. The left part keeps [clipId]; the right part becomes [rightClipId], which the
- * caller generates so replaying the command creates the same id. Both parts must last at least one frame.
+ * caller generates so replaying the command creates the same id. Both parts must last at least one frame. Clips
+ * anchored to the cut clip that start at or after the cut move their anchor to the right part.
  */
 @Serializable
 @SerialName("splitClip")
@@ -28,11 +30,25 @@ data class SplitClip(
         return if (!isSplittable(clip, atMicros, project.frameRate)) {
             CommandOutcome.Rejected(CommandRejection.ClipTooShort(minimum))
         } else {
-            project.replacingTrack(MergeClips(clipId, rightClipId)) {
+            project.replacingTracks(MergeClips(clipId, rightClipId)) {
                 val left = clip.copy(durationMicros = atMicros - clip.startMicros)
                 val right = rightPart(clip, left.durationMicros, project.assetOf(clip).kind == MediaKind.IMAGE)
-                track.copy(clips = track.clips.flatMap { if (it.id == clipId) listOf(left, right) else listOf(it) })
+                val parts = track.clips.flatMap { if (it.id == clipId) listOf(left, right) else listOf(it) }
+                val cut = track.copy(clips = parts)
+                project.tracks
+                    .map { if (it.id == track.id) cut else it }
+                    .mapClips(::retargeted)
             }
+        }
+    }
+
+    /** Returns [child] attached to the right part if it is anchored to the cut clip and starts at or after the cut. */
+    private fun retargeted(child: Clip): Clip {
+        val anchor = child.anchor
+        return if (anchor?.parentClipId == clipId && child.startMicros >= atMicros) {
+            child.copy(anchor = ClipAnchor(rightClipId, child.startMicros - atMicros))
+        } else {
+            child
         }
     }
 
@@ -47,6 +63,7 @@ data class SplitClip(
             startMicros = atMicros,
             trimStartMicros = if (isImage) clip.trimStartMicros else clip.trimStartMicros + leftDurationMicros,
             durationMicros = clip.endMicros - atMicros,
+            anchor = shiftedAnchor(clip.anchor, leftDurationMicros),
         )
 
     /** Split rules shared with the editor's Split tool. */

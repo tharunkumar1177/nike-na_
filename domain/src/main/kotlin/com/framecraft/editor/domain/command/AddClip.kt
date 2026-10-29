@@ -10,20 +10,22 @@ import kotlinx.serialization.Serializable
 
 /**
  * Places [clip] on track [trackId]. On a magnetic track, clips starting at or after the clip shift
- * right by its duration; on other tracks an overlap is rejected.
+ * right by its duration; on other tracks an overlap is rejected. Each of [anchorRestorations] then re-attaches a
+ * clip that lost its anchor when this clip was removed.
  */
 @Serializable
 @SerialName("addClip")
 data class AddClip(
     val trackId: String,
     val clip: Clip,
+    val anchorRestorations: List<AnchorRestoration> = emptyList(),
 ) : EditCommand {
     /** The inverse deletes the clip again. */
     override fun applyTo(project: Project): CommandOutcome {
         val track =
             project.tracks.firstOrNull { it.id == trackId }
                 ?: return CommandOutcome.Rejected(CommandRejection.TrackNotFound(trackId))
-        return project.replacingTrack(DeleteClip(clip.id)) {
+        return project.replacingTracks(DeleteClip(clip.id)) {
             val shifted =
                 if (track.magnetic) {
                     track.clips.map { other ->
@@ -36,7 +38,10 @@ data class AddClip(
                 } else {
                     track.clips
                 }
-            track.copy(clips = (shifted + clip).sortedBy { it.startMicros })
+            val added = track.copy(clips = (shifted + clip).sortedBy { it.startMicros })
+            project.tracks
+                .map { if (it.id == trackId) added else it }
+                .restoringAnchors(anchorRestorations)
         }
     }
 }

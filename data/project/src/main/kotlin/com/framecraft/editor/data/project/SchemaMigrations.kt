@@ -55,7 +55,7 @@ class SchemaMigrations(
         /** Key of the schema version inside a serialized project. */
         const val SCHEMA_VERSION_KEY = "schemaVersion"
 
-        /** The chain shipped with this build; schema 1 is the first, so nothing needs upgrading yet. */
-        val NONE = SchemaMigrations(emptyList())
+        /** The chain shipped with this build, from schema 1 (the first) to the current schema. */
+        val SHIPPED = SchemaMigrations(listOf(Migration1To2))
     }
 }

@@ -4,8 +4,10 @@
 package com.framecraft.editor.engine.plan
 
 import com.framecraft.editor.domain.model.Clip
+import com.framecraft.editor.domain.model.ClipAnchor
 import com.framecraft.editor.domain.model.MediaAsset
 import com.framecraft.editor.domain.model.MediaKind
+import com.framecraft.editor.domain.model.OverlayTransform
 import com.framecraft.editor.domain.model.Project
 import com.framecraft.editor.domain.model.SourceFingerprint
 import com.framecraft.editor.domain.model.Track
@@ -89,5 +91,35 @@ class PlaybackPlannerTest {
     @Test
     fun skipsEmptyTracks() {
         assertEquals(0, PlaybackPlanner.plan(project(true)).sequences.size)
+    }
+
+    /** Overlay lanes follow the base sequence, padded from zero, with one placement span per overlay clip. */
+    @Test
+    fun plansOverlaysAfterBase() {
+        val placed = OverlayTransform(centerX = 0.5f, scale = 0.4f)
+        val o1 = Clip("o1", "v", 1_000_000, 0, 2_000_000, ClipAnchor("a", 1_000_000), placed)
+        val o3 = Clip("o3", "i", 1_250_000, 0, 1_000_000, ClipAnchor("o1", 250_000), null)
+        val project =
+            Project(
+                id = "p",
+                name = "P",
+                frameRate = FrameRate.FPS_30,
+                assets = listOf(video, image),
+                tracks =
+                    listOf(
+                        Track("lane", TrackKind.OVERLAY, false, listOf(o1)),
+                        Track("t", TrackKind.VIDEO, true, listOf(Clip("a", "v", 0, 0, 6_000_000))),
+                        Track("lane2", TrackKind.OVERLAY, false, listOf(o3)),
+                        Track("empty", TrackKind.OVERLAY, false, emptyList()),
+                    ),
+            )
+        val sequences = PlaybackPlanner.plan(project).sequences
+        assertEquals(3, sequences.size)
+        assertEquals(emptyList<OverlaySpan>(), sequences[0].overlaySpans)
+        val overlayMedia = PlanSegment.Media("content://media/v", MediaKind.VIDEO, 10_000_000, 0, 2_000_000)
+        assertEquals(listOf(PlanSegment.Gap(1_000_000), overlayMedia), sequences[1].segments)
+        assertEquals(listOf(OverlaySpan(1_000_000, 3_000_000, placed)), sequences[1].overlaySpans)
+        assertEquals(listOf(1_250_000L, 1_000_000L), sequences[2].segments.map { it.durationMicros })
+        assertEquals(listOf(OverlaySpan(1_250_000, 2_250_000, OverlayTransform())), sequences[2].overlaySpans)
     }
 }

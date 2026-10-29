@@ -3,7 +3,10 @@
  */
 package com.framecraft.editor.domain.command
 
+import com.framecraft.editor.domain.model.AnchorResolver
 import com.framecraft.editor.domain.model.Clip
+import com.framecraft.editor.domain.model.ClipAnchor
+import com.framecraft.editor.domain.model.MediaAsset
 import com.framecraft.editor.domain.model.Project
 import com.framecraft.editor.domain.model.Track
 import kotlinx.serialization.Serializable
@@ -71,6 +74,20 @@ internal fun Project.locate(clipId: String): ClipLocation? {
 internal fun clipNotFound(clipId: String): CommandOutcome =
     CommandOutcome.Rejected(CommandRejection.ClipNotFound(clipId))
 
+/** Returns the rejection for a result that would break a model rule described by [detail]. */
+internal fun modelInvariant(detail: String): CommandOutcome =
+    CommandOutcome.Rejected(CommandRejection.ModelInvariant(detail))
+
+/** Returns these tracks with every clip replaced by [transform]; clip starts must not change. */
+internal fun List<Track>.mapClips(transform: (Clip) -> Clip): List<Track> =
+    map { track -> track.copy(clips = track.clips.map(transform)) }
+
+/** Returns [anchor] for a clip whose start moved by [deltaMicros] while keeping the same parent. */
+internal fun shiftedAnchor(
+    anchor: ClipAnchor?,
+    deltaMicros: Long,
+): ClipAnchor? = anchor?.copy(offsetMicros = anchor.offsetMicros + deltaMicros)
+
 /** Returns these clips with every clip starting at or after [fromMicros] moved by [deltaMicros]. */
 internal fun List<Clip>.shiftedFrom(
     fromMicros: Long,
@@ -82,17 +99,27 @@ internal fun List<Clip>.shiftedFrom(
 
 /**
  * Replaces the track that [build] returns (matched by id) and pairs the result with [inverse].
- * Model validation failures become [CommandRejection.ModelInvariant].
+ * Anchored clips follow their parents; model validation failures become [CommandRejection.ModelInvariant].
  */
 internal fun Project.replacingTrack(
     inverse: EditCommand,
     build: () -> Track,
+): CommandOutcome =
+    replacingTracks(inverse) {
+        val track = build()
+        tracks.map { if (it.id == track.id) track else it }
+    }
+
+/**
+ * Replaces all tracks with those [build] returns, and the assets with [assets], pairing the result with [inverse].
+ * Anchored clips follow their parents; model validation failures become [CommandRejection.ModelInvariant].
+ */
+internal fun Project.replacingTracks(
+    inverse: EditCommand,
+    assets: List<MediaAsset> = this.assets,
+    build: () -> List<Track>,
 ): CommandOutcome {
-    val result =
-        runCatching {
-            val track = build()
-            copy(tracks = tracks.map { if (it.id == track.id) track else it })
-        }
+    val result = runCatching { copy(assets = assets, tracks = AnchorResolver.materialize(build())) }
     return result.fold(
         onSuccess = { CommandOutcome.Applied(it, inverse) },
         onFailure = { CommandOutcome.Rejected(CommandRejection.ModelInvariant(it.message.orEmpty())) },
