@@ -14,7 +14,8 @@ import kotlinx.serialization.Serializable
 /**
  * Cuts clip [clipId] at [atMicros]. The left part keeps [clipId]; the right part becomes [rightClipId], which the
  * caller generates so replaying the command creates the same id. Both parts must last at least one frame. Clips
- * anchored to the cut clip that start at or after the cut move their anchor to the right part.
+ * anchored to the cut clip that start at or after the cut move their anchor to the right part. The left part keeps
+ * the fade-in and the right part keeps the fade-out, each shortened to fit its part.
  */
 @Serializable
 @SerialName("splitClip")
@@ -30,8 +31,14 @@ data class SplitClip(
         return if (!isSplittable(clip, atMicros, project.frameRate)) {
             CommandOutcome.Rejected(CommandRejection.ClipTooShort(minimum))
         } else {
-            project.replacingTracks(MergeClips(clipId, rightClipId)) {
-                val left = clip.copy(durationMicros = atMicros - clip.startMicros)
+            project.replacingTracks(MergeClips(clipId, rightClipId, clip.fadeInMicros, clip.fadeOutMicros)) {
+                val leftDuration = atMicros - clip.startMicros
+                val left =
+                    clip.copy(
+                        durationMicros = leftDuration,
+                        fadeInMicros = minOf(clip.fadeInMicros, leftDuration),
+                        fadeOutMicros = 0,
+                    )
                 val right = rightPart(clip, left.durationMicros, project.assetOf(clip).kind == MediaKind.IMAGE)
                 val parts = track.clips.flatMap { if (it.id == clipId) listOf(left, right) else listOf(it) }
                 val cut = track.copy(clips = parts)
@@ -64,6 +71,8 @@ data class SplitClip(
             trimStartMicros = if (isImage) clip.trimStartMicros else clip.trimStartMicros + leftDurationMicros,
             durationMicros = clip.endMicros - atMicros,
             anchor = shiftedAnchor(clip.anchor, leftDurationMicros),
+            fadeInMicros = 0,
+            fadeOutMicros = minOf(clip.fadeOutMicros, clip.endMicros - atMicros),
         )
 
     /** Split rules shared with the editor's Split tool. */

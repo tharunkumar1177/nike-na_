@@ -5,6 +5,7 @@ package com.framecraft.editor.domain.export
 
 import com.framecraft.editor.domain.model.MediaAsset
 import com.framecraft.editor.domain.model.Project
+import com.framecraft.editor.domain.model.Track
 import com.framecraft.editor.domain.model.TrackKind
 import com.framecraft.editor.domain.time.FrameRate
 import com.framecraft.editor.domain.time.MICROS_PER_SECOND
@@ -118,17 +119,20 @@ object ExportPlanner {
 
     /**
      * Returns the displayed size of the first base clip's source (overlays only when there is no base clip), or the
-     * default canvas when there is no clip.
+     * default canvas when there is no picture clip. Sound-only tracks never set the canvas.
      */
     private fun canvasOf(project: Project): ExportSize {
-        val baseFirst = project.tracks.sortedBy { it.kind != TrackKind.VIDEO }
+        val baseFirst = pictureTracks(project).sortedBy { it.kind != TrackKind.VIDEO }
         val first = baseFirst.firstNotNullOfOrNull { it.clips.firstOrNull() }
         return first?.let { displayedSize(project.assetOf(it)) } ?: DEFAULT_CANVAS
     }
 
-    /** Returns the longest short side among sources used by clips, or the default canvas's when there is none. */
+    /** Returns the tracks of [project] that show pictures. */
+    private fun pictureTracks(project: Project): List<Track> = project.tracks.filter { it.kind != TrackKind.AUDIO }
+
+    /** Returns the longest short side among pictures used by clips, or the default canvas's when there is none. */
     private fun largestSourceShortSide(project: Project): Int {
-        val used = project.tracks.flatMap { track -> track.clips.map { project.assetOf(it) } }
+        val used = pictureTracks(project).flatMap { track -> track.clips.map { project.assetOf(it) } }
         return used.maxOfOrNull { asset -> displayedSize(asset).let { minOf(it.width, it.height) } }
             ?: minOf(DEFAULT_CANVAS.width, DEFAULT_CANVAS.height)
     }

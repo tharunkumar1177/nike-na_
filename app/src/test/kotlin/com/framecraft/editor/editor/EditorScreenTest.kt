@@ -1,5 +1,6 @@
 /*
- * JVM UI tests (Robolectric) for the editor screen: playback, frame steps, closing, undo and redo, and tools.
+ * JVM UI tests (Robolectric) for the editor screen: playback, frame steps, closing, undo and redo, and tools,
+ * including the audio tools.
  */
 package com.framecraft.editor.editor
 
@@ -14,6 +15,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.framecraft.editor.engine.PreviewState
 import com.framecraft.editor.ui.theme.FramecraftTheme
@@ -53,6 +55,20 @@ class EditorScreenTest {
             onDeleteClip = { events += "delete" },
             onAddOverlay = { events += "overlay" },
             onOpacityCommit = { events += "opacity $it" },
+            onAddAudio = { events += "audio" },
+            onExtractAudio = { events += "extract" },
+            onAudioCommit = { events += "volume ${it.volumePercent}" },
+        )
+
+    /** The tools of a selected video clip that plays at 80% for six seconds. */
+    private val videoWithSound =
+        ToolAvailability(
+            hasSelection = true,
+            canSplit = true,
+            selectedClipId = "clip",
+            showExtract = true,
+            canExtract = true,
+            audio = ClipAudio(volumePercent = 80, fadeInMicros = 0L, fadeOutMicros = 0L, durationMicros = 6_000_000L),
         )
 
     /** Sets the editor content with the preview at [positionMicros] of 1:23. */
@@ -203,5 +219,44 @@ class EditorScreenTest {
     fun splitDisabledOutsideClip() {
         showEditor(availability = ToolAvailability(hasSelection = true, canSplit = false))
         composeRule.onNodeWithTag(TOOL_SPLIT_TAG).assertIsNotEnabled()
+    }
+
+    /** Without a selection the Audio tool is offered and reports; selecting a clip replaces it with the clip tools. */
+    @Test
+    fun audioToolWithoutSelection() {
+        showEditor(availability = ToolAvailability(canAddAudio = true))
+        composeRule.onNodeWithContentDescription("Add audio at playhead").assertIsEnabled().performClick()
+        assertEquals(listOf("audio"), events)
+    }
+
+    /** A selected video with sound offers Extract, Volume, and Fade, reachable by scrolling the row. */
+    @Test
+    fun soundToolsForVideoWithAudio() {
+        showEditor(availability = videoWithSound)
+        composeRule.onAllNodesWithTag(TOOL_AUDIO_TAG).assertCountEquals(0)
+        composeRule.onNodeWithTag(TOOL_FADE_TAG).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithTag(TOOL_EXTRACT_TAG).performScrollTo().assertIsEnabled().performClick()
+        assertEquals(listOf("extract"), events)
+    }
+
+    /** A selection without sound offers neither Volume nor Fade. */
+    @Test
+    fun silentSelectionHasNoSoundTools() {
+        showEditor(availability = ToolAvailability(hasSelection = true, canSplit = true))
+        composeRule.onAllNodesWithTag(TOOL_VOLUME_TAG).assertCountEquals(0)
+        composeRule.onAllNodesWithTag(TOOL_FADE_TAG).assertCountEquals(0)
+    }
+
+    /** The volume panel mutes, unmutes back to the last audible volume, and returns to the tool row. */
+    @Test
+    fun volumePanelMutesAndReturns() {
+        showEditor(availability = videoWithSound)
+        composeRule.onNodeWithTag(TOOL_VOLUME_TAG).performScrollTo().performClick()
+        composeRule.onNodeWithTag(VOLUME_SLIDER_TAG).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Mute audio").performClick()
+        composeRule.onNodeWithContentDescription("Unmute audio").performClick()
+        assertEquals(listOf("volume 0", "volume 80"), events)
+        composeRule.onNodeWithContentDescription("Back to tools").performClick()
+        composeRule.onNodeWithTag(TOOL_VOLUME_TAG).assertExists()
     }
 }

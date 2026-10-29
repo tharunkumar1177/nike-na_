@@ -13,6 +13,8 @@ import kotlinx.serialization.Serializable
  * On a magnetic track the start must not move and later clips shift by the change in duration; on other tracks
  * an overlap is rejected. Clips shorter than one frame and image clips with a changed source offset are rejected.
  * An anchored clip keeps its parent and its anchor offset moves with the start; clips anchored to moved clips follow.
+ * [fadeInMicros] and [fadeOutMicros] set the fades when given; otherwise fades shrink to fit the new duration,
+ * fade-in first.
  */
 @Serializable
 @SerialName("trimClip")
@@ -21,8 +23,10 @@ data class TrimClip(
     val startMicros: Long,
     val trimStartMicros: Long,
     val durationMicros: Long,
+    val fadeInMicros: Long? = null,
+    val fadeOutMicros: Long? = null,
 ) : EditCommand {
-    /** The inverse restores the clip's previous start, source offset, and duration. */
+    /** The inverse restores the clip's previous start, source offset, duration, and fades. */
     override fun applyTo(project: Project): CommandOutcome {
         val location = project.locate(clipId) ?: return clipNotFound(clipId)
         val minimum = project.frameRate.startOfFrame(1)
@@ -39,18 +43,30 @@ data class TrimClip(
         location: ClipLocation,
     ): CommandOutcome {
         val (track, clip) = location
-        val inverse = TrimClip(clipId, clip.startMicros, clip.trimStartMicros, clip.durationMicros)
+        val inverse =
+            TrimClip(
+                clipId,
+                clip.startMicros,
+                clip.trimStartMicros,
+                clip.durationMicros,
+                clip.fadeInMicros,
+                clip.fadeOutMicros,
+            )
         return project.replacingTrack(inverse) {
             val isImage = project.assetOf(clip).kind == MediaKind.IMAGE
             require(!isImage || trimStartMicros == clip.trimStartMicros) {
                 "Image clip $clipId has no source offset to trim"
             }
+            val fadeIn = fadeInMicros ?: minOf(clip.fadeInMicros, durationMicros)
+            val fadeOut = fadeOutMicros ?: minOf(clip.fadeOutMicros, (durationMicros - fadeIn).coerceAtLeast(0))
             val trimmed =
                 clip.copy(
                     startMicros = startMicros,
                     trimStartMicros = trimStartMicros,
                     durationMicros = durationMicros,
                     anchor = shiftedAnchor(clip.anchor, startMicros - clip.startMicros),
+                    fadeInMicros = fadeIn,
+                    fadeOutMicros = fadeOut,
                 )
             val others = track.clips.filter { it.id != clipId }
             val delta = trimmed.endMicros - clip.endMicros

@@ -30,7 +30,7 @@ The `:data:project` module saves every edit to a per-project journal before repo
 
 ### Project document model
 
-Older schemas are upgraded through `SchemaMigrations`, which rewrites the project and every journaled command in one pass and then saves the upgraded files. The current schema is 2 and `SchemaMigrations.SHIPPED` holds `Migration1To2`, which leaves documents unchanged: schema 2 only adds optional fields (track kind `OVERLAY`, clip `anchor` and `overlayTransform`, `anchorRestorations` on `addClip`) and the overlay command types, all of which default to schema 1 behavior when absent. The bump exists so schema 1 apps refuse projects that contain overlays instead of dropping them. The slice 5 command types (`trimClip`, `splitClip`, `mergeClips`, `moveClip`) are additive and needed no schema change.
+Older schemas are upgraded through `SchemaMigrations`, which rewrites the project and every journaled command in one pass and then saves the upgraded files. The current schema is 3 and `SchemaMigrations.SHIPPED` holds `Migration1To2` and `Migration2To3`, both of which leave documents unchanged. Schema 3 adds the `AUDIO` track and asset kinds, clip `volumePercent`, `fadeInMicros`, and `fadeOutMicros`, optional fade fields on `trimClip` and `mergeClips`, and the audio command types, all defaulting to schema 2 behavior when absent. schema 2 only adds optional fields (track kind `OVERLAY`, clip `anchor` and `overlayTransform`, `anchorRestorations` on `addClip`) and the overlay command types, all of which default to schema 1 behavior when absent. Each bump exists so older apps refuse projects that contain the new content instead of dropping it. The slice 5 command types (`trimClip`, `splitClip`, `mergeClips`, `moveClip`) are additive and needed no schema change.
 
 ### Error and recovery
 
@@ -53,7 +53,7 @@ None
 
 ## Relevant implementation and tests
 
-- `data/project/src/main/kotlin/com/framecraft/editor/data/project/` — `ProjectStore`, `ProjectSession`, `ProjectLoader`, `ProjectDirectory`, `ProjectDocuments`, `DurableFiles`, `SchemaMigrations`, `Migration1To2`, `ExportSettingsFile`.
+- `data/project/src/main/kotlin/com/framecraft/editor/data/project/` — `ProjectStore`, `ProjectSession`, `ProjectLoader`, `ProjectDirectory`, `ProjectDocuments`, `DurableFiles`, `SchemaMigrations`, `Migration1To2`, `Migration2To3`, `ExportSettingsFile`.
 - `data/project/src/test/kotlin/com/framecraft/editor/data/project/ExportSettingsStoreTest.kt` — export settings round trip outside history, missing and corrupt files, unknown project.
 - `data/project/src/test/kotlin/com/framecraft/editor/data/project/ProjectStoreTest.kt` — reopen after edits, undo across restart, redo truncation, torn tail, sequence gap, compaction floor, newer and older schemas, list rebuild and unreadable projects, change and delete, unsafe ids.
 
@@ -63,7 +63,8 @@ None
 - [x] A torn final journal line is discarded on recovery, and the original journal is kept for diagnosis.
 - [x] Snapshot, journal rewrite, cursor, and summary writes are atomic (temporary file, flush, atomic rename).
 - [x] Older schema versions open after an upgrade; newer ones are refused with their files untouched.
-- [x] A verbatim schema 1 snapshot and journal open, replay, and are saved as schema 2 (`schemaOneFixtureOpens`).
+- [x] A verbatim schema 1 snapshot and journal open, replay, and are saved as the current schema (`schemaOneFixtureOpens`).
+- [x] A verbatim schema 2 snapshot and journal with an overlay open, undo, and are saved as schema 3 with default clip audio (`schemaTwoFixtureOpens`).
 
 ## Remaining gaps and unknowns
 

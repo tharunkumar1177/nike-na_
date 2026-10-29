@@ -1,5 +1,5 @@
 /*
- * JVM UI tests (Robolectric) for timeline scrubbing, selection, trimming, and the zoom and snap controls.
+ * JVM UI tests (Robolectric) for timeline scrubbing, selection, trimming, audio lanes, and the zoom and snap controls.
  */
 package com.framecraft.editor.timeline
 
@@ -17,14 +17,20 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.framecraft.editor.domain.command.CommandOutcome
 import com.framecraft.editor.domain.command.EditCommand
 import com.framecraft.editor.domain.command.TrimClip
+import com.framecraft.editor.domain.edit.AudioPlacement
+import com.framecraft.editor.domain.model.IdGenerator
 import com.framecraft.editor.domain.model.MediaAsset
 import com.framecraft.editor.domain.model.MediaKind
+import com.framecraft.editor.domain.model.Project
 import com.framecraft.editor.domain.model.ProjectFactory
 import com.framecraft.editor.domain.model.SourceFingerprint
 import com.framecraft.editor.engine.ThumbnailKey
 import com.framecraft.editor.engine.ThumbnailSource
+import com.framecraft.editor.engine.Waveform
+import com.framecraft.editor.engine.WaveformSource
 import com.framecraft.editor.ui.theme.FramecraftTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -83,16 +89,39 @@ class TimelineStripTest {
             }
         }
 
+    private val waveformRequests = mutableListOf<String>()
+
+    /** Waveform source that records requests and never loads a waveform. */
+    private val waveforms =
+        object : WaveformSource {
+            override val version: StateFlow<Int> = MutableStateFlow(0)
+
+            /** Returns no waveform; nothing is decoded in these tests. */
+            override fun get(uri: String): Waveform? = null
+
+            /** Reports no failures. */
+            override fun hasFailed(uri: String): Boolean = false
+
+            /** Records the requested sources. */
+            override fun request(uris: Collection<String>) {
+                waveformRequests += uris
+            }
+        }
+
     private val edits = mutableListOf<EditCommand>()
 
-    /** Shows the strip with the playhead at zero and [selectedClipId] selected. */
-    private fun showStrip(selectedClipId: String? = null) {
+    /** Shows [shown] with the playhead at zero and [selectedClipId] selected. */
+    private fun showStrip(
+        selectedClipId: String? = null,
+        shown: Project = project,
+    ) {
         composeRule.setContent {
             FramecraftTheme {
                 TimelineStrip(
-                    project = project,
+                    project = shown,
                     positionMicros = { 0L },
                     thumbnails = thumbnails,
+                    waveforms = waveforms,
                     callbacks =
                         ScrubCallbacks(
                             onStart = { events += "start" },
@@ -189,5 +218,22 @@ class TimelineStripTest {
         composeRule.waitForIdle()
         assertTrue(requested.all { it.uri == "content://media/asset" && it.kind == MediaKind.VIDEO })
         assertTrue(requested.any { it.sourceMicros == 0L })
+    }
+
+    /**
+     * An extracted audio lane asks for its sound's waveform, and tapping the lane selects the audio clip.
+     */
+    @Test
+    fun audioLaneRequestsWaveformAndSelects() {
+        val video = project.tracks.single().clips.single()
+        var next = 0
+        val extract = AudioPlacement.proposeExtract(project, video.id, IdGenerator { "audio-${++next}" })!!
+        val withAudio = (extract.applyTo(project) as CommandOutcome.Applied).project
+        showStrip(shown = withAudio)
+        composeRule.waitForIdle()
+        assertEquals(listOf("content://media/asset"), waveformRequests.distinct())
+        composeRule.onNodeWithTag(TIMELINE_TAG).performTouchInput { click(Offset(width * 0.75f, 144.dp.toPx())) }
+        composeRule.waitForIdle()
+        assertEquals(listOf<String?>(extract.clip.id), selections)
     }
 }

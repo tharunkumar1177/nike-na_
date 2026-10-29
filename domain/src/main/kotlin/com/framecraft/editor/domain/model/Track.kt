@@ -13,6 +13,9 @@ enum class TrackKind {
 
     /** Picture-in-picture clips drawn over the base video. */
     OVERLAY,
+
+    /** Sound-only clips mixed under the picture. */
+    AUDIO,
 }
 
 /**

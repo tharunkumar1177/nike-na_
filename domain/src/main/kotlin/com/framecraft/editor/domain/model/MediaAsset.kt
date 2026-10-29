@@ -10,6 +10,7 @@ import kotlinx.serialization.Serializable
 enum class MediaKind {
     VIDEO,
     IMAGE,
+    AUDIO,
 }
 
 /** Identifying properties of a source file, used to detect that it went missing or was replaced. */
@@ -25,9 +26,12 @@ private val VALID_ROTATIONS = setOf(0, 90, 180, 270)
 /** A half turn in degrees; rotations that are multiples of it keep width and height. */
 private const val HALF_TURN_DEGREES = 180
 
+/** Width and height every audio asset declares, since sound has no picture. */
+const val AUDIO_ASSET_SIDE: Int = 1
+
 /**
- * A source file imported into a project. Videos carry their full duration; images have none
- * because a clip decides how long an image shows.
+ * A source file imported into a project. Videos and audio carry their full duration; images have none
+ * because a clip decides how long an image shows. Audio assets are 1x1 and unrotated.
  */
 @Serializable
 data class MediaAsset(
@@ -53,6 +57,12 @@ data class MediaAsset(
             MediaKind.IMAGE -> {
                 require(durationMicros == null) { "Image asset $id must not declare a duration" }
                 require(!hasAudio) { "Image asset $id cannot have audio" }
+            }
+
+            MediaKind.AUDIO -> {
+                require(durationMicros != null && durationMicros > 0) { "Audio asset $id needs a positive duration" }
+                require(width == AUDIO_ASSET_SIDE && height == AUDIO_ASSET_SIDE) { "Audio asset $id must be 1x1" }
+                require(rotationDegrees == 0 && hasAudio) { "Audio asset $id must be unrotated and have audio" }
             }
         }
     }

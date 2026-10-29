@@ -122,4 +122,30 @@ class PlaybackPlannerTest {
         assertEquals(listOf(1_250_000L, 1_000_000L), sequences[2].segments.map { it.durationMicros })
         assertEquals(listOf(OverlaySpan(1_250_000, 2_250_000, OverlayTransform())), sequences[2].overlaySpans)
     }
+
+    /** Audio lanes come last with their volume and fades, and the base pads to music that outlasts it. */
+    @Test
+    fun plansAudioLastAndPadsBase() {
+        val song = video.copy(id = "s", uri = "content://media/s", kind = MediaKind.AUDIO, width = 1, height = 1)
+        val music = Clip("m", "s", 1_000_000, 0, 5_000_000, volumePercent = 150, fadeOutMicros = 1_000_000)
+        val base = Clip("a", "v", 0, 0, 4_000_000, volumePercent = 0)
+        val project =
+            Project(
+                id = "p",
+                name = "P",
+                frameRate = FrameRate.FPS_30,
+                assets = listOf(video, song),
+                tracks =
+                    listOf(
+                        Track("music", TrackKind.AUDIO, false, listOf(music)),
+                        Track("t", TrackKind.VIDEO, true, listOf(base)),
+                    ),
+            )
+        val sequences = PlaybackPlanner.plan(project).sequences
+        assertEquals(listOf(TrackKind.VIDEO, TrackKind.AUDIO), sequences.map { it.kind })
+        val muted = PlanSegment.Media("content://media/v", MediaKind.VIDEO, 10_000_000, 0, 4_000_000, 0)
+        assertEquals(listOf(muted, PlanSegment.Gap(2_000_000)), sequences[0].segments)
+        val tune = PlanSegment.Media("content://media/s", MediaKind.AUDIO, 10_000_000, 0, 5_000_000, 150, 0, 1_000_000)
+        assertEquals(listOf(PlanSegment.Gap(1_000_000), tune), sequences[1].segments)
+    }
 }

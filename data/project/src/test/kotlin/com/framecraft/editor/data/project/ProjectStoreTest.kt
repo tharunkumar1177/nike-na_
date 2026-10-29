@@ -182,7 +182,7 @@ class ProjectStoreTest {
         runBlocking {
             store().create(project).close()
             val snapshot = File(dir(), "snapshot.json")
-            val newer = snapshot.readText().replace("\"schemaVersion\":2", "\"schemaVersion\":99")
+            val newer = snapshot.readText().replace("\"schemaVersion\":3", "\"schemaVersion\":99")
             snapshot.writeText(newer)
             assertEquals(OpenProjectResult.TooNew(99), store().open(project.id))
             assertEquals(newer, snapshot.readText())
@@ -197,7 +197,7 @@ class ProjectStoreTest {
             snapshot.writeText(
                 snapshot
                     .readText()
-                    .replace("\"schemaVersion\":2", "\"schemaVersion\":0")
+                    .replace("\"schemaVersion\":3", "\"schemaVersion\":0")
                     .replace("\"name\":\"Trip\"", "\"title\":\"Trip\""),
             )
             val renameTitle =
@@ -211,12 +211,12 @@ class ProjectStoreTest {
                     /** Commands are unchanged between these versions. */
                     override fun migrateCommand(command: JsonObject) = command
                 }
-            val opened = store(SchemaMigrations(listOf(renameTitle, Migration1To2))).opened()
+            val opened = store(SchemaMigrations(listOf(renameTitle, Migration1To2, Migration2To3))).opened()
             assertEquals("Trip", opened.session.state.project.name)
-            assertTrue(snapshot.readText().contains("\"schemaVersion\":2"))
+            assertTrue(snapshot.readText().contains("\"schemaVersion\":3"))
         }
 
-    /** A project and journal written verbatim in schema 1 open through the shipped chain and are saved as schema 2. */
+    /** A project and journal written verbatim in schema 1 open through the shipped chain and are saved as schema 3. */
     @Test
     fun schemaOneFixtureOpens() =
         runBlocking {
@@ -234,7 +234,26 @@ class ProjectStoreTest {
                     .anchor,
             )
             opened.session.close()
-            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":2"))
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":3"))
+        }
+
+    /** A schema 2 project with an overlay and its journal open, replay, undo, and are saved as schema 3. */
+    @Test
+    fun schemaTwoFixtureOpens() =
+        runBlocking {
+            dir().mkdirs()
+            File(dir(), "snapshot.json").writeText(SCHEMA_TWO_SNAPSHOT)
+            File(dir(), "journal.jsonl").writeText(SCHEMA_TWO_JOURNAL)
+            val opened = store().opened()
+            assertEquals(listOf("track"), opened.session.state.project.tracks.map { it.id })
+            val restored = requireNotNull(opened.session.undo()).project
+            assertEquals(listOf("lane", "track"), restored.tracks.map { it.id })
+            val overlay = restored.tracks.first().clips.single()
+            assertEquals(0.5f, overlay.overlayTransform?.opacity)
+            assertEquals("a", overlay.anchor?.parentClipId)
+            assertTrue(overlay.hasDefaultAudio)
+            opened.session.close()
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":3"))
         }
 
     /** A missing list summary is rebuilt; an unreadable project is listed as unreadable and refused. */
@@ -292,3 +311,25 @@ private val SCHEMA_ONE_JOURNAL =
     {"seq":2,"atEpochMillis":3,"command":{"type":"deleteClip","clipId":"b"}}
 
     """.trimIndent()
+
+/** A snapshot exactly as schema 2 wrote it: a base track under an anchored overlay lane. */
+private val SCHEMA_TWO_SNAPSHOT =
+    """
+    {"baseSeq":0,"createdAtEpochMillis":1,"project":{"id":"project-1","name":"Trip",
+    "frameRate":{"numerator":30,"denominator":1},"assets":[{"id":"asset","uri":"content://media/asset",
+    "kind":"VIDEO","durationMicros":10000000,"width":1920,"height":1080,"rotationDegrees":0,"hasAudio":true,
+    "fingerprint":{"sizeBytes":1}}],"tracks":[{"id":"lane","kind":"OVERLAY","magnetic":false,"clips":[
+    {"id":"o","assetId":"asset","startMicros":0,"trimStartMicros":0,"durationMicros":1000000,
+    "anchor":{"parentClipId":"a","offsetMicros":0},"overlayTransform":{"scale":0.4}}]},
+    {"id":"track","kind":"VIDEO","magnetic":true,"clips":[
+    {"id":"a","assetId":"asset","startMicros":0,"trimStartMicros":0,"durationMicros":2000000}]}],
+    "schemaVersion":2}}
+    """.trimIndent()
+
+/** A journal exactly as schema 2 wrote it: an opacity change, then removal of the overlay. */
+private val SCHEMA_TWO_JOURNAL =
+    listOf(
+        """{"seq":1,"atEpochMillis":2,"command":{"type":"setOverlayTransform","clipId":"o",""" +
+            """"transform":{"scale":0.4,"opacity":0.5}}}""",
+        """{"seq":2,"atEpochMillis":3,"command":{"type":"removeOverlayClip","clipId":"o"}}""",
+    ).joinToString(separator = "\n", postfix = "\n")

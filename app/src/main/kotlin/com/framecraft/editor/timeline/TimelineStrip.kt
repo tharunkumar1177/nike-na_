@@ -50,6 +50,7 @@ import com.framecraft.editor.domain.command.EditCommand
 import com.framecraft.editor.domain.model.Project
 import com.framecraft.editor.domain.time.MICROS_PER_SECOND
 import com.framecraft.editor.engine.ThumbnailSource
+import com.framecraft.editor.engine.WaveformSource
 import com.framecraft.editor.ui.spokenDuration
 import com.framecraft.editor.ui.theme.Spacing
 import kotlinx.coroutines.delay
@@ -78,13 +79,15 @@ class ScrubCallbacks(
  * [ScrubCallbacks.onStart]; dragging seeks frame by frame; pinching zooms around the playhead. A tap
  * selects the clip under it, or clears the selection on empty space, through [onClipSelected]. Dragging a
  * handle of the selected clip trims it and holding a clip lifts it for reordering; each drag reports one
- * command to [onEdit] when the finger lifts. [onHaptic] plays snap and pickup feedback.
+ * command to [onEdit] when the finger lifts. [onHaptic] plays snap and pickup feedback. Audio lanes show the loudness
+ * of their sounds from [waveforms].
  */
 @Composable
 fun TimelineStrip(
     project: Project,
     positionMicros: () -> Long,
     thumbnails: ThumbnailSource,
+    waveforms: WaveformSource,
     callbacks: ScrubCallbacks,
     selectedClipId: String?,
     onClipSelected: (String?) -> Unit,
@@ -105,12 +108,13 @@ fun TimelineStrip(
     BoxWithConstraints(modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         val viewportWidthDp = maxWidth.value
         ThumbnailPrefetch(project, state, positionMicros, thumbnails, constraints.maxWidth.toFloat())
+        LaunchedEffect(project, waveforms) { waveforms.request(audioWaveformUris(project)) }
         TimelineCanvas(
             project = project,
             preview = pending?.takeIf { it.base === project },
             state = state,
             positionMicros = positionMicros,
-            thumbnails = thumbnails,
+            sources = remember(thumbnails, waveforms) { TimelineSources(thumbnails, waveforms) },
             selectedClipId = selectedClipId,
             onSeek = callbacks.onSeek,
             onEdit = edits.onCommit,
@@ -151,7 +155,7 @@ private fun TimelineCanvas(
     preview: TimelinePreview?,
     state: TimelineState,
     positionMicros: () -> Long,
-    thumbnails: ThumbnailSource,
+    sources: TimelineSources,
     selectedClipId: String?,
     onSeek: (Long) -> Unit,
     onEdit: (EditCommand) -> Unit,
@@ -159,7 +163,8 @@ private fun TimelineCanvas(
 ) {
     val style = rememberTimelineStyle()
     val resources = LocalResources.current
-    val thumbnailVersion by thumbnails.version.collectAsState()
+    val thumbnailVersion by sources.thumbnails.version.collectAsState()
+    val waveformVersion by sources.waveforms.version.collectAsState()
     val shown = preview?.project ?: project
     val nudges = overlayNudges(project, selectedClipId, onEdit)
     Canvas(
@@ -168,8 +173,9 @@ private fun TimelineCanvas(
             .testTag(TIMELINE_TAG)
             .timelineSemantics(resources, project, positionMicros, onSeek, nudges),
     ) {
-        // Reading the version here redraws the canvas whenever a thumbnail finishes loading.
+        // Reading the versions here redraws the canvas whenever a thumbnail or waveform finishes loading.
         thumbnailVersion
+        waveformVersion
         val frame =
             TimelineFrame(
                 project = shown,
@@ -177,10 +183,12 @@ private fun TimelineCanvas(
                 pxPerSecond = state.dpPerSecond.dp.toPx(),
                 metrics = TimelineMetrics(this),
                 style = style,
-                thumbnails = thumbnails,
+                sources = sources,
             )
         drawRuler(frame)
-        shown.tracks.forEachIndexed { index, track -> drawTrack(frame, track, frame.metrics.rowTop(index)) }
+        shown.tracks.forEachIndexed { index, track ->
+            drawTrack(frame, track, frame.metrics.rowTop(index), selectedClipId)
+        }
         drawSelection(frame, selectedClipId)
         if (preview?.floating == null) drawTrimHandles(frame, selectedClipId)
         drawFloatingClip(frame, preview?.floating)
@@ -212,6 +220,7 @@ private fun rememberTimelineStyle(): TimelineStyle {
             labelStyle = labelStyle,
             brokenImage = brokenImage,
             overlay = OverlayStyle(scheme.primaryContainer, link, linkOff, linkOffTint = scheme.error),
+            audio = AudioStyle(clip = scheme.tertiaryContainer, wave = scheme.onTertiaryContainer),
         )
     }
 }

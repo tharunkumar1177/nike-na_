@@ -9,6 +9,7 @@ import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.OpenableColumns
+import com.framecraft.editor.domain.model.AUDIO_ASSET_SIDE
 import com.framecraft.editor.domain.model.IdGenerator
 import com.framecraft.editor.domain.model.MediaAsset
 import com.framecraft.editor.domain.model.MediaKind
@@ -48,7 +49,7 @@ class AndroidMediaImporter(
 ) : MediaImporter {
     private val resolver = context.contentResolver
 
-    /** Keeps read access to [uri], then probes it as a video or image according to its MIME type. */
+    /** Keeps read access to [uri], then probes it as a video, image, or sound file according to its MIME type. */
     override fun importUri(uri: String): ImportResult {
         val parsed = Uri.parse(uri)
         keepReadAccess(parsed)
@@ -56,9 +57,47 @@ class AndroidMediaImporter(
         return when {
             mimeType.startsWith("video/") -> importVideo(uri, parsed)
             mimeType.startsWith("image/") -> importImage(uri, parsed)
+            mimeType.startsWith("audio/") -> importAudio(uri, parsed)
             else -> ImportResult.Failed(uri, "Unsupported type '$mimeType'")
         }
     }
+
+    /** Creates a sound asset from its probed duration. */
+    @Suppress("TooGenericExceptionCaught")
+    private fun importAudio(
+        uri: String,
+        parsed: Uri,
+    ): ImportResult =
+        try {
+            val duration =
+                MediaMetadataRetriever().use { retriever ->
+                    retriever.setDataSource(context, parsed)
+                    AudioMetadataParser.parseDurationMicros(
+                        durationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION),
+                        hasAudio = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_AUDIO),
+                    )
+                }
+            if (duration == null) {
+                ImportResult.Failed(uri, "Missing or invalid audio metadata")
+            } else {
+                ImportResult.Imported(
+                    MediaAsset(
+                        id = idGenerator.next(),
+                        uri = uri,
+                        kind = MediaKind.AUDIO,
+                        durationMicros = duration,
+                        width = AUDIO_ASSET_SIDE,
+                        height = AUDIO_ASSET_SIDE,
+                        rotationDegrees = 0,
+                        hasAudio = true,
+                        fingerprint = fingerprint(parsed),
+                    ),
+                )
+            }
+        } catch (e: RuntimeException) {
+            // setDataSource reports unreadable media as a bare RuntimeException.
+            ImportResult.Failed(uri, describe(e))
+        }
 
     /** Requests a persistable read grant so the project can reopen this media later. */
     private fun keepReadAccess(uri: Uri) {

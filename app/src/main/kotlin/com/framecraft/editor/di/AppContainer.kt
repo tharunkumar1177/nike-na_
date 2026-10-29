@@ -7,6 +7,8 @@ import android.content.Context
 import com.framecraft.editor.data.project.ProjectStore
 import com.framecraft.editor.domain.model.IdGenerator
 import com.framecraft.editor.domain.model.UuidIdGenerator
+import com.framecraft.editor.editor.TimelineMedia
+import com.framecraft.editor.engine.AudioWaveforms
 import com.framecraft.editor.engine.ClipThumbnails
 import com.framecraft.editor.engine.ProjectPreview
 import com.framecraft.editor.engine.export.ProjectExporter
@@ -42,10 +44,10 @@ class AppContainer(
     /** Creates an exporter; the caller owns and must release it. */
     fun createExporter(): ProjectExporter = ProjectExporter(appContext)
 
-    /** Creates a thumbnail cache sized for timeline rows; the caller owns and must close it. */
-    fun createThumbnails(): ClipThumbnails {
+    /** Creates timeline caches, with thumbnails sized for timeline rows; the caller owns and must close them. */
+    fun createTimelineMedia(): TimelineMedia {
         val heightPx = (TIMELINE_ROW_HEIGHT_DP * appContext.resources.displayMetrics.density).roundToInt()
-        return ClipThumbnails(appContext, heightPx)
+        return TimelineMedia(ClipThumbnails(appContext, heightPx), AudioWaveforms(appContext))
     }
 
     private companion object {

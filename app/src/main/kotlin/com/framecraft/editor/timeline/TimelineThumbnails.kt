@@ -6,6 +6,7 @@ package com.framecraft.editor.timeline
 import com.framecraft.editor.domain.model.Clip
 import com.framecraft.editor.domain.model.MediaKind
 import com.framecraft.editor.domain.model.Project
+import com.framecraft.editor.domain.model.TrackKind
 import com.framecraft.editor.engine.ThumbnailKey
 
 /** The visible window of the timeline in pixels. */
@@ -40,12 +41,13 @@ fun clipThumbnails(
     }
 }
 
-/** Returns the distinct thumbnail keys visible across all tracks. */
+/** Returns the distinct thumbnail keys visible across all picture tracks; audio lanes show waveforms instead. */
 fun visibleThumbnailKeys(
     project: Project,
     viewport: TimelineViewport,
 ): List<ThumbnailKey> =
     project.tracks
+        .filter { it.kind != TrackKind.AUDIO }
         .flatMap { it.clips }
         .flatMap { clip -> clipThumbnails(project, clip, viewport).map { it.key } }
         .distinct()

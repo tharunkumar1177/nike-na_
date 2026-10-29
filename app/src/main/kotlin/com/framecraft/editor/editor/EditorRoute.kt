@@ -83,8 +83,10 @@ private fun ReadyEditor(
 ) {
     val preview = viewModel.preview ?: return
     val thumbnails = viewModel.thumbnails ?: return
+    val waveforms = viewModel.waveforms ?: return
     val previewState by preview.state.collectAsStateWithLifecycle()
     val overlayBusy by viewModel.overlays.busy.collectAsStateWithLifecycle()
+    val audioBusy by viewModel.audio.busy.collectAsStateWithLifecycle()
     val haptics = LocalHapticFeedback.current
     val project = state.project
     val selectedTrack = project.tracks.firstOrNull { track -> track.clips.any { it.id == state.selectedClipId } }
@@ -92,14 +94,18 @@ private fun ReadyEditor(
     val overlay = selected?.takeIf { selectedTrack?.kind == TrackKind.OVERLAY }
     val position = previewState.positionMicros
     val export = rememberExportControls(exportViewModel, project)
-    val pickOverlay = rememberOverlayPicker(viewModel.overlays, preview)
+    val pickers =
+        MediaPickers(
+            overlay = rememberOverlayPicker(viewModel.overlays, preview),
+            audio = rememberAudioPicker(viewModel.audio, preview),
+        )
     EditorScreen(
         projectName = project.name,
         previewState = previewState,
         aspectRatio = canvasAspectRatio(project),
         canUndo = state.canUndo,
         canRedo = state.canRedo,
-        availability = toolAvailability(project, selected, overlay, position, overlayBusy),
+        availability = toolAvailability(project, selected, selectedTrack?.kind, position, overlayBusy || audioBusy),
         notices = EditorNotices(state.skippedCount, state.droppedEditCount, state.saveFailed, state.editRejected),
         actions =
             EditorActions(
@@ -110,13 +116,14 @@ private fun ReadyEditor(
                 onNoticeShown = viewModel::acknowledge,
             ),
         playback = playbackActions(preview, project.frameRate, position),
-        tools = toolActions(viewModel, selected, overlay != null, position, pickOverlay),
+        tools = toolActions(viewModel, selected, selectedTrack?.kind, position, pickers),
         previewSurface = { surfaceModifier -> PreviewSurface(preview, surfaceModifier) },
         timeline = { timelineModifier ->
             TimelineStrip(
                 project = project,
                 positionMicros = { previewState.positionMicros },
                 thumbnails = thumbnails,
+                waveforms = waveforms,
                 callbacks = ScrubCallbacks(preview::beginScrub, preview::seekTo, preview::endScrub),
                 selectedClipId = state.selectedClipId,
                 onClipSelected = viewModel::selectClip,
@@ -136,7 +143,11 @@ private fun ReadyEditor(
 
 /** Returns the preview aspect ratio: the first base clip's, else the first overlay's, else the default. */
 private fun canvasAspectRatio(project: Project): Float {
-    val first = project.tracks.sortedBy { it.kind != TrackKind.VIDEO }.firstNotNullOfOrNull { it.clips.firstOrNull() }
+    val first =
+        project.tracks
+            .filter { it.kind != TrackKind.AUDIO }
+            .sortedBy { it.kind != TrackKind.VIDEO }
+            .firstNotNullOfOrNull { it.clips.firstOrNull() }
     return first?.let { project.assetOf(it).displayAspectRatio } ?: DEFAULT_ASPECT_RATIO
 }
 
