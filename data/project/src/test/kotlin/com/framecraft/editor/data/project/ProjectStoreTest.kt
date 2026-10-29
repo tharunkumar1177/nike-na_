@@ -211,7 +211,8 @@ class ProjectStoreTest {
                     /** Commands are unchanged between these versions. */
                     override fun migrateCommand(command: JsonObject) = command
                 }
-            val opened = store(SchemaMigrations(listOf(renameTitle, Migration1To2, Migration2To3, Migration3To4))).opened()
+            val migrations = SchemaMigrations(listOf(renameTitle, Migration1To2, Migration2To3, Migration3To4))
+            val opened = store(migrations).opened()
             assertEquals("Trip", opened.session.state.project.name)
             assertTrue(snapshot.readText().contains("\"schemaVersion\":4"))
         }

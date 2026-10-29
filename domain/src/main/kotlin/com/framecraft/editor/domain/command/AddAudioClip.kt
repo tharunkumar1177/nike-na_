@@ -34,7 +34,8 @@ data class AddAudioClip(
         } else {
             val assets = if (known == null) project.assets + asset else project.assets
             project.replacingTracks(RemoveAudioClip(clip.id), assets) {
-                project.tracks.withLaneClip(TrackKind.AUDIO, trackId, clip, trackIndex).restoringAnchors(anchorRestorations)
+                val laid = project.tracks.withLaneClip(TrackKind.AUDIO, trackId, clip, trackIndex)
+                laid.restoringAnchors(anchorRestorations)
             }
         }
     }

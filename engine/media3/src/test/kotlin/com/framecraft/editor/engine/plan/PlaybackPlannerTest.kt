@@ -96,9 +96,9 @@ class PlaybackPlannerTest {
         assertEquals(0, PlaybackPlanner.plan(project(true)).sequences.size)
     }
 
-    /** Overlay lanes follow the base sequence, padded from zero, with one placement span per overlay clip. */
+    /** Overlay lanes come before the base from the top lane down, padded to the end, with one span per clip. */
     @Test
-    fun plansOverlaysAfterBase() {
+    fun plansOverlaysBeforeBase() {
         val placed = OverlayTransform(centerX = 0.5f, scale = 0.4f)
         val o1 = Clip("o1", "v", 1_000_000, 0, 2_000_000, ClipAnchor("a", 1_000_000), placed)
         val o3 = Clip("o3", "i", 1_250_000, 0, 1_000_000, ClipAnchor("o1", 250_000), null)
@@ -117,13 +117,16 @@ class PlaybackPlannerTest {
                     ),
             )
         val sequences = PlaybackPlanner.plan(project).sequences
-        assertEquals(3, sequences.size)
-        assertEquals(emptyList<OverlaySpan>(), sequences[0].overlaySpans)
+        assertEquals(listOf(TrackKind.OVERLAY, TrackKind.OVERLAY, TrackKind.VIDEO), sequences.map { it.kind })
         val overlayMedia = PlanSegment.Media("content://media/v", MediaKind.VIDEO, 10_000_000, 0, 2_000_000)
-        assertEquals(listOf(PlanSegment.Gap(1_000_000), overlayMedia), sequences[1].segments)
-        assertEquals(listOf(OverlaySpan(1_000_000, 3_000_000, placed)), sequences[1].overlaySpans)
-        assertEquals(listOf(1_250_000L, 1_000_000L), sequences[2].segments.map { it.durationMicros })
-        assertEquals(listOf(OverlaySpan(1_250_000, 2_250_000, OverlayTransform())), sequences[2].overlaySpans)
+        assertEquals(
+            listOf(PlanSegment.Gap(1_000_000), overlayMedia, PlanSegment.Gap(3_000_000)),
+            sequences[0].segments,
+        )
+        assertEquals(listOf(OverlaySpan(1_000_000, 3_000_000, placed)), sequences[0].overlaySpans)
+        assertEquals(listOf(1_250_000L, 1_000_000L, 3_750_000L), sequences[1].segments.map { it.durationMicros })
+        assertEquals(listOf(OverlaySpan(1_250_000, 2_250_000, OverlayTransform())), sequences[1].overlaySpans)
+        assertEquals(emptyList<OverlaySpan>(), sequences[2].overlaySpans)
     }
 
     /** Audio lanes come last with their volume and fades, and the base pads to music that outlasts it. */
@@ -175,7 +178,8 @@ class PlaybackPlannerTest {
             )
         val plan = PlaybackPlanner.plan(project)
         assertEquals(listOf(TrackKind.VIDEO), plan.sequences.map { it.kind })
-        assertEquals(PlanSegment.Gap(2_000_000), plan.sequences.single().segments.last())
+        val base = plan.sequences.single()
+        assertEquals(PlanSegment.Gap(2_000_000), base.segments.last())
         assertEquals(
             listOf(
                 TextSpan(1_000_000, 5_000_000, OverlayTransform(), caption),

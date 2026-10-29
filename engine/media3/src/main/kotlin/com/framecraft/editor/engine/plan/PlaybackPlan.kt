@@ -32,7 +32,7 @@ sealed interface PlanSegment {
         val fadeOutMicros: Long = 0,
     ) : PlanSegment
 
-    /** Empty timeline span: black frames and silence on the base sequence, see-through on overlay sequences. */
+    /** Empty timeline span: black frames and silence on the base sequence, hidden on overlay sequences. */
     data class Gap(
         override val durationMicros: Long,
     ) : PlanSegment
@@ -73,11 +73,12 @@ data class PlaybackPlan(
 /** Converts project snapshots into playback plans. */
 object PlaybackPlanner {
     /**
-     * Plans every non-empty base video track of [project], then every non-empty overlay track, then every non-empty
-     * audio track, filling implicit gaps with [PlanSegment.Gap]. Base tracks come first so the first sequence sets
-     * the canvas, and audio comes last so overlay inputs keep their positions. Base tracks that end before the
-     * latest track are padded with a gap, so black frames show under music that runs past the video. Text tracks
-     * add no sequence but count toward that end; their spans run from the bottom lane up, so upper lanes draw on top.
+     * Plans every non-empty overlay track of [project] from the top lane down, then every non-empty base video
+     * track, then every non-empty audio track, filling implicit gaps with [PlanSegment.Gap]. Media3 draws earlier
+     * picture sequences over later ones, so overlays come before the base. Picture tracks that end before the latest
+     * track are padded with a gap, because the compositor waits for a frame from every picture input; on the base
+     * this shows black under music that runs past the video. Text tracks add no sequence but count toward that end;
+     * their spans run from the bottom lane up, so upper lanes draw on top.
      */
     fun plan(project: Project): PlaybackPlan {
         val planned = project.tracks.filter { it.clips.isNotEmpty() }
@@ -85,14 +86,11 @@ object PlaybackPlanner {
         val base =
             planned
                 .filter { it.kind == TrackKind.VIDEO }
-                .map { track ->
-                    val pad = end - track.endMicros
-                    SequencePlan(segmentsOf(project, track) + listOfNotNull(PlanSegment.Gap(pad).takeIf { pad > 0 }))
-                }
+                .map { SequencePlan(paddedSegmentsOf(project, it, end)) }
         val overlays =
             planned
                 .filter { it.kind == TrackKind.OVERLAY }
-                .map { SequencePlan(segmentsOf(project, it), spansOf(it), TrackKind.OVERLAY) }
+                .map { SequencePlan(paddedSegmentsOf(project, it, end), spansOf(it), TrackKind.OVERLAY) }
         val audio =
             planned
                 .filter { it.kind == TrackKind.AUDIO }
@@ -102,7 +100,17 @@ object PlaybackPlanner {
                 .filter { it.kind == TrackKind.TEXT }
                 .asReversed()
                 .flatMap(::textSpansOf)
-        return PlaybackPlan(sequences = base + overlays + audio, frameRate = project.frameRate, textSpans = text)
+        return PlaybackPlan(sequences = overlays + base + audio, frameRate = project.frameRate, textSpans = text)
+    }
+
+    /** Returns the segments of [track] followed by a gap that runs it on to [endMicros]. */
+    private fun paddedSegmentsOf(
+        project: Project,
+        track: Track,
+        endMicros: Long,
+    ): List<PlanSegment> {
+        val pad = endMicros - track.endMicros
+        return segmentsOf(project, track) + listOfNotNull(PlanSegment.Gap(pad).takeIf { pad > 0 })
     }
 
     /** Returns the media and gap segments of [track] from time zero. */

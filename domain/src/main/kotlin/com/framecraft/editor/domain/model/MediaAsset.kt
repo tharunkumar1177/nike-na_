@@ -71,7 +71,8 @@ data class MediaAsset(
 
             MediaKind.TEXT -> {
                 require(durationMicros == null && !hasAudio) { "Text asset $id must have no duration or audio" }
-                require(width == 1 && height == 1 && rotationDegrees == 0) { "Text asset $id must be 1x1 and unrotated" }
+                val unitSize = width == 1 && height == 1 && rotationDegrees == 0
+                require(unitSize) { "Text asset $id must be 1x1 and unrotated" }
             }
         }
     }

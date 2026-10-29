@@ -215,8 +215,14 @@ fun DrawScope.drawTrack(
                 clipPath(Path().apply { addRoundRect(block) }) {
                     val bounds = Rect(left, top, block.right, block.bottom)
                     when {
-                        isAudio -> drawAudioClip(frame, clip, bounds, selected = clip.id == selectedClipId)
-                        isText -> drawTextClip(frame, clip, bounds)
+                        isAudio -> {
+                            drawAudioClip(frame, clip, bounds, selected = clip.id == selectedClipId)
+                        }
+
+                        isText -> {
+                            drawTextClip(frame, clip, bounds)
+                        }
+
                         else -> {
                             drawRect(color = fill, topLeft = Offset(left, top), size = block.size())
                             drawThumbnails(frame, clip, top)
