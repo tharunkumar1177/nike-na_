@@ -17,6 +17,7 @@ import com.framecraft.editor.di.AppContainer
 import com.framecraft.editor.editor.EditorRoute
 import com.framecraft.editor.editor.EditorState
 import com.framecraft.editor.editor.EditorViewModel
+import com.framecraft.editor.export.ExportViewModel
 import com.framecraft.editor.home.HomeScreen
 import com.framecraft.editor.home.HomeViewModel
 
@@ -25,6 +26,7 @@ import com.framecraft.editor.home.HomeViewModel
 fun FramecraftApp(container: AppContainer) {
     val viewModel: EditorViewModel = viewModel(factory = EditorViewModel.factory(container))
     val homeViewModel: HomeViewModel = viewModel(factory = HomeViewModel.factory(container))
+    val exportViewModel: ExportViewModel = viewModel(factory = ExportViewModel.factory(container))
     val state by viewModel.state.collectAsStateWithLifecycle()
     val home by homeViewModel.state.collectAsStateWithLifecycle()
     val projectName = stringResource(R.string.editor_default_project_name)
@@ -48,6 +50,6 @@ fun FramecraftApp(container: AppContainer) {
             onDelete = homeViewModel::delete,
         )
     } else {
-        EditorRoute(viewModel = viewModel, state = state)
+        EditorRoute(viewModel = viewModel, exportViewModel = exportViewModel, state = state)
     }
 }

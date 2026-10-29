@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Framecraft application manifest: app identity and the single launcher activity. -->
+<!-- Framecraft application manifest: app identity, the launcher activity, and the export foreground service. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROCESSING" />
 
   <application
     android:name=".FramecraftApplication"
@@ -12,12 +17,19 @@
     android:theme="@style/Theme.Framecraft">
     <activity
       android:name=".MainActivity"
-      android:exported="true">
+      android:exported="true"
+      android:launchMode="singleTop">
       <intent-filter>
         <action android:name="android.intent.action.MAIN" />
         <category android:name="android.intent.category.LAUNCHER" />
       </intent-filter>
     </activity>
+
+    <service
+      android:name=".export.ExportService"
+      android:exported="false"
+      android:foregroundServiceType="dataSync|mediaProcessing"
+      android:stopWithTask="false" />
   </application>
 
 </manifest>
