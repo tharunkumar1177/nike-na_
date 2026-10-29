@@ -8,7 +8,7 @@ Own edit commands and linear undo/redo: every user edit becomes a validated, inv
 
 **Status:** Implemented
 
-The commands `RenameProject`, `DeleteClip`, and `AddClip` and the `EditHistory` stack are implemented in `:domain` and verified by `EditCommandTest` and `EditHistoryTest`. Persistent undo is verified by `ProjectStoreTest`.
+The commands `RenameProject`, `DeleteClip`, `AddClip`, `TrimClip`, `SplitClip`, `MergeClips`, and `MoveClip` and the `EditHistory` stack are implemented in `:domain` and verified by `EditCommandTest`, `ClipEditCommandsTest`, and `EditHistoryTest`. The drag rules in `domain/edit` (`TrimController`, `SnapPoints`, `ReorderSlots`) are verified by `EditGesturesTest`. Persistent undo is verified by `ProjectStoreTest`.
 
 ## Architecture dependencies
 
@@ -23,6 +23,10 @@ The commands `RenameProject`, `DeleteClip`, and `AddClip` and the `EditHistory` 
 - `applyTo(project)` returns `Applied(project, inverse)` or `Rejected(reason)`. Model invariant failures thrown while building a track become `Rejected(ModelInvariant)`.
 - A command that creates objects carries their generated ids, so replay is deterministic.
 - On a magnetic track, `DeleteClip` shifts later clips left and `AddClip` shifts clips at or after the new start right.
+- `TrimClip` sets a clip's start, source in-point, and duration. A clip must stay at least one frame long (`ClipTooShort`), an image keeps its in-point, a magnetic clip keeps its start, and later clips on a magnetic track shift by the change in the clip's end.
+- `SplitClip` keeps the clip id on the left part and gives the right part the carried id; it needs a frame on each side (`SplitClip.isSplittable`). Its inverse is `MergeClips`, which only joins adjacent parts of one source with continuous source times.
+- `MoveClip` on a magnetic track removes the clip (later clips close the gap) and inserts it at the new start in the closed-up track; on a free track overlaps are rejected.
+- A drag produces exactly one command when the finger lifts; `TrimController` turns a drag delta into a frame-aligned, clamped, optionally snapped `TrimClip`, and `ReorderSlots` lists where a lifted clip can land.
 - A new command after undo discards the redo branch.
 
 ### Project persistence and recovery
@@ -42,8 +46,10 @@ The commands `RenameProject`, `DeleteClip`, and `AddClip` and the `EditHistory` 
 
 ## Relevant implementation and tests
 
-- `domain/src/main/kotlin/com/framecraft/editor/domain/command/` — `EditCommand`, `RenameProject`, `DeleteClip`, `AddClip`, `EditHistory`.
-- `domain/src/test/kotlin/com/framecraft/editor/domain/command/` — `EditCommandTest`, `EditHistoryTest`.
+- `domain/src/main/kotlin/com/framecraft/editor/domain/command/` — `EditCommand`, `RenameProject`, `DeleteClip`, `AddClip`, `TrimClip`, `SplitClip`, `MergeClips`, `MoveClip`, `EditHistory`.
+- `domain/src/main/kotlin/com/framecraft/editor/domain/edit/` — `TrimController`, `SnapPoints`, `ReorderSlots`.
+- `domain/src/test/kotlin/com/framecraft/editor/domain/command/` — `EditCommandTest`, `ClipEditCommandsTest`, `EditHistoryTest`.
+- `domain/src/test/kotlin/com/framecraft/editor/domain/edit/EditGesturesTest.kt` — trim clamps, frame and target snapping, reorder slots.
 - `data/project/src/test/kotlin/com/framecraft/editor/data/project/ProjectStoreTest.kt` — undo after restart.
 
 ## Acceptance or verification criteria
@@ -51,7 +57,9 @@ The commands `RenameProject`, `DeleteClip`, and `AddClip` and the `EditHistory` 
 - [x] Applying a command then its inverse yields the original project.
 - [x] Invalid commands return a typed failure and leave the project unchanged.
 - [x] Undo and redo are available after reopening a project.
+- [x] Trim, split, merge, and move round-trip through JSON and their inverses restore the project.
+- [x] A trim drag yields one frame-aligned command clamped to the source and to the one-frame minimum.
 
 ## Remaining gaps and unknowns
 
-- Drag gestures that coalesce into one command arrive with trim and reorder in slice 5.
+- Trimming on free (non-magnetic) tracks is implemented in the domain but no free tracks exist in the UI until overlays arrive in slice 7.

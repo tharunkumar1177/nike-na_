@@ -49,7 +49,7 @@ None
 
 - `engine/media3/src/main/kotlin/com/framecraft/editor/engine/plan/PlaybackPlan.kt` — plan types and `PlaybackPlanner`.
 - `engine/media3/src/main/kotlin/com/framecraft/editor/engine/CompositionFactory.kt` — plan to `Composition` (clipping for video, image durations, `addGap` padding).
-- `engine/media3/src/main/kotlin/com/framecraft/editor/engine/ProjectPreview.kt`, `PreviewSurface.kt` — preview player (with scrubbing mode) and its SurfaceView.
+- `engine/media3/src/main/kotlin/com/framecraft/editor/engine/ProjectPreview.kt`, `PreviewSurface.kt` — preview player (play, pause, seek, scrubbing mode) and its SurfaceView.
 - `engine/media3/src/main/kotlin/com/framecraft/editor/engine/ClipThumbnails.kt` — timeline thumbnails via Media3 `FrameExtractor` (video) and `ImageDecoder` (images), cached in memory.
 - Tests: `engine/media3/src/test/kotlin/com/framecraft/editor/engine/plan/PlaybackPlannerTest.kt`.
 

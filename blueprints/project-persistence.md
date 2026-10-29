@@ -30,7 +30,7 @@ The `:data:project` module saves every edit to a per-project journal before repo
 
 ### Project document model
 
-Older schemas are upgraded through `SchemaMigrations`, which rewrites the project and every journaled command in one pass and then saves the upgraded files. No migration step exists yet; the registry is empty at schema version 1.
+Older schemas are upgraded through `SchemaMigrations`, which rewrites the project and every journaled command in one pass and then saves the upgraded files. No migration step exists yet; the registry is empty at schema version 1. The slice 5 command types (`trimClip`, `splitClip`, `mergeClips`, `moveClip`) are additive and need no schema change; older app versions treat them as unknown records.
 
 ### Error and recovery
 
