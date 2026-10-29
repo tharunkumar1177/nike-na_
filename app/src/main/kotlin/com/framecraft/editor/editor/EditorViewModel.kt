@@ -29,8 +29,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.IOException
 
@@ -88,19 +86,18 @@ class EditorViewModel(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
     private val mutableState = MutableStateFlow<EditorState>(EditorState.Idle)
-    private val editLock = Mutex()
-    private var session: ProjectSession? = null
+    private var open: OpenProject? = null
 
     /** Current editor state. */
     val state: StateFlow<EditorState> = mutableState.asStateFlow()
 
     /** Preview of the open project; non-null while the state is [EditorState.Ready]. */
-    var preview: ProjectPreview? = null
-        private set
+    val preview: ProjectPreview?
+        get() = open?.preview
 
     /** Timeline thumbnails of the open project; non-null while the state is [EditorState.Ready]. */
-    var thumbnails: ClipThumbnails? = null
-        private set
+    val thumbnails: ClipThumbnails?
+        get() = open?.thumbnails
 
     /** Imports [uris] into a new saved project named [projectName]; ignored when empty or a project is open. */
     fun importMedia(
@@ -163,42 +160,33 @@ class EditorViewModel(
 
     /** Selects the clip [clipId], or clears the selection when null. */
     fun selectClip(clipId: String?) {
-        updateReady { it.copy(selectedClipId = clipId) }
+        mutableState.updateReady { it.copy(selectedClipId = clipId) }
     }
 
-    /** Marks the skipped-files notice as shown. */
-    fun acknowledgeSkipped() {
-        updateReady { it.copy(skippedCount = 0) }
-    }
-
-    /** Marks the lost-edits notice as shown. */
-    fun acknowledgeDroppedEdits() {
-        updateReady { it.copy(droppedEditCount = 0) }
-    }
-
-    /** Marks the save-failure notice as shown. */
-    fun acknowledgeSaveFailed() {
-        updateReady { it.copy(saveFailed = false) }
+    /** Marks [notice] as shown so it does not show again. */
+    fun acknowledge(notice: EditorNotice) {
+        mutableState.updateReady { ready ->
+            when (notice) {
+                EditorNotice.SKIPPED_FILES -> ready.copy(skippedCount = 0)
+                EditorNotice.DROPPED_EDITS -> ready.copy(droppedEditCount = 0)
+                EditorNotice.SAVE_FAILED -> ready.copy(saveFailed = false)
+            }
+        }
     }
 
     /** Closes the open project, already saved, and returns to the home screen. */
     fun close() {
-        session?.let { closing ->
-            viewModelScope.launch {
-                try {
-                    closing.close()
-                } catch (ignored: IOException) {
-                }
-            }
+        open?.let { closing ->
+            closing.release()
+            viewModelScope.launch { closing.closeSession() }
         }
-        session = null
-        releaseProjectResources()
+        open = null
         mutableState.value = EditorState.Idle
     }
 
     /** Releases the preview and thumbnails when the view model is destroyed; edits are already saved. */
     override fun onCleared() {
-        releaseProjectResources()
+        open?.release()
     }
 
     /** Makes [opened] the open project and shows it. */
@@ -208,9 +196,8 @@ class EditorViewModel(
         droppedEditCount: Int,
     ) {
         val current = opened.state
-        session = opened
-        preview = previewFactory().also { it.setProject(current.project) }
-        thumbnails = thumbnailsFactory()
+        val preview = previewFactory().also { it.setProject(current.project) }
+        open = OpenProject(opened, preview, thumbnailsFactory())
         mutableState.value =
             EditorState.Ready(
                 project = current.project,
@@ -221,46 +208,23 @@ class EditorViewModel(
             )
     }
 
-    /** Runs [change] on the open session one at a time and shows its result; a failed save raises the notice. */
+    /**
+     * Runs [change] on the open project after earlier changes and shows its result while that project is still
+     * open; a failed save raises the notice.
+     */
     private fun edit(change: suspend (ProjectSession) -> SessionState?) {
-        val target = session ?: return
+        val target = open ?: return
         viewModelScope.launch {
-            editLock.withLock {
-                try {
-                    change(target)?.let { if (session === target) publish(it) }
-                } catch (ignored: IOException) {
-                    updateReady { it.copy(saveFailed = true) }
+            try {
+                val next = target.change(change)
+                if (next != null && open === target) {
+                    target.preview.setProject(next.project)
+                    mutableState.updateReady { it.showing(next) }
                 }
+            } catch (ignored: IOException) {
+                mutableState.updateReady { it.copy(saveFailed = true) }
             }
         }
-    }
-
-    /** Shows [next] in the preview and state, dropping a selection whose clip no longer exists. */
-    private fun publish(next: SessionState) {
-        preview?.setProject(next.project)
-        val tracks = next.project.tracks
-        val clipIds = tracks.flatMap { track -> track.clips.map { it.id } }.toSet()
-        updateReady { ready ->
-            ready.copy(
-                project = next.project,
-                canUndo = next.canUndo,
-                canRedo = next.canRedo,
-                selectedClipId = ready.selectedClipId?.takeIf { it in clipIds },
-            )
-        }
-    }
-
-    /** Applies [transform] when a project is open. */
-    private fun updateReady(transform: (EditorState.Ready) -> EditorState.Ready) {
-        mutableState.update { state -> if (state is EditorState.Ready) transform(state) else state }
-    }
-
-    /** Releases and forgets the preview player and thumbnails. */
-    private fun releaseProjectResources() {
-        preview?.release()
-        preview = null
-        thumbnails?.close()
-        thumbnails = null
     }
 
     /** Factory wiring. */
@@ -279,4 +243,21 @@ class EditorViewModel(
                 }
             }
     }
+}
+
+/** Applies [transform] when a project is open. */
+private fun MutableStateFlow<EditorState>.updateReady(transform: (EditorState.Ready) -> EditorState.Ready) {
+    update { state -> if (state is EditorState.Ready) transform(state) else state }
+}
+
+/** Returns this state showing [next], dropping a selection whose clip no longer exists. */
+private fun EditorState.Ready.showing(next: SessionState): EditorState.Ready {
+    val tracks = next.project.tracks
+    val clipIds = tracks.flatMap { track -> track.clips.map { it.id } }.toSet()
+    return copy(
+        project = next.project,
+        canUndo = next.canUndo,
+        canRedo = next.canRedo,
+        selectedClipId = selectedClipId?.takeIf { it in clipIds },
+    )
 }

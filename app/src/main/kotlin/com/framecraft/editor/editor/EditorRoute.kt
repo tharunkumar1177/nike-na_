@@ -95,7 +95,7 @@ private fun ReadyEditor(
                 onUndo = viewModel::undo,
                 onRedo = viewModel::redo,
                 onDeleteClip = { state.selectedClipId?.let { viewModel.dispatch(DeleteClip(it)) } },
-                onNoticeShown = { notice -> acknowledge(viewModel, notice) },
+                onNoticeShown = viewModel::acknowledge,
             ),
         previewSurface = { surfaceModifier -> PreviewSurface(preview, surfaceModifier) },
         timeline = { timelineModifier ->
@@ -111,18 +111,6 @@ private fun ReadyEditor(
         },
         modifier = modifier,
     )
-}
-
-/** Marks [notice] as shown in [viewModel]. */
-private fun acknowledge(
-    viewModel: EditorViewModel,
-    notice: EditorNotice,
-) {
-    when (notice) {
-        EditorNotice.SKIPPED_FILES -> viewModel.acknowledgeSkipped()
-        EditorNotice.DROPPED_EDITS -> viewModel.acknowledgeDroppedEdits()
-        EditorNotice.SAVE_FAILED -> viewModel.acknowledgeSaveFailed()
-    }
 }
 
 /** Full-screen progress while picked media is probed or a project opens. */
