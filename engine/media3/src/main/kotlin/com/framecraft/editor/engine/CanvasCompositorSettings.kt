@@ -15,6 +15,7 @@ import com.framecraft.editor.domain.model.OverlayTransform
 import com.framecraft.editor.engine.plan.BaseSpan
 import com.framecraft.editor.engine.plan.CanvasLayout
 import com.framecraft.editor.engine.plan.CompositorInput
+import com.framecraft.editor.engine.plan.OverlaySpan
 import com.framecraft.editor.engine.plan.PixelSize
 import com.framecraft.editor.engine.plan.TransitionSpan
 
@@ -69,17 +70,12 @@ internal class CanvasCompositorSettings(
                 }
 
                 is CompositorInput.Overlay -> {
-                    input.spans
-                        .firstOrNull { presentationTimeUs >= it.startMicros && presentationTimeUs < it.endMicros }
-                        ?.let { overlaySettings(it.transform, fit(inputId, CanvasFit.FIT)) }
+                    val span = input.spans.showing(presentationTimeUs)
+                    span?.let { overlaySettings(it.transform, fit(inputId, CanvasFit.FIT)) }
                 }
 
                 is CompositorInput.Base -> {
-                    input.spans.at(presentationTimeUs)?.let { span ->
-                        val progress = TransitionMotion.progress(span.startMicros, span.endMicros, presentationTimeUs)
-                        val motion = span.outgoing?.let { TransitionMotion.outgoing(it, progress) } ?: Motion()
-                        movedSettings(span.placement, inputId, motion)
-                    }
+                    input.spans.at(presentationTimeUs)?.let { baseSettings(it, inputId, presentationTimeUs) }
                 }
 
                 CompositorInput.Solid -> {
@@ -91,10 +87,7 @@ internal class CanvasCompositorSettings(
                 }
 
                 is CompositorInput.Incoming -> {
-                    input.spans.during(presentationTimeUs)?.let { span ->
-                        val progress = TransitionMotion.progress(span.startMicros, span.endMicros, presentationTimeUs)
-                        movedSettings(span.placement, inputId, TransitionMotion.incoming(span.kind, progress))
-                    }
+                    input.spans.during(presentationTimeUs)?.let { incomingSettings(it, inputId, presentationTimeUs) }
                 }
 
                 is CompositorInput.Backdrop -> {
@@ -104,13 +97,26 @@ internal class CanvasCompositorSettings(
         return settings ?: hidden
     }
 
-    /** Returns the span covering [timeUs], if any. */
-    private fun List<BaseSpan>.at(timeUs: Long): BaseSpan? =
-        firstOrNull { timeUs >= it.startMicros && timeUs < it.endMicros }
+    /** Places base input [inputId] by [span] at [timeUs], moved as the outgoing side of any transition there. */
+    private fun baseSettings(
+        span: BaseSpan,
+        inputId: Int,
+        timeUs: Long,
+    ): OverlaySettings {
+        val progress = TransitionMotion.progress(span.startMicros, span.endMicros, timeUs)
+        val motion = span.outgoing?.let { TransitionMotion.outgoing(it, progress) } ?: Motion()
+        return movedSettings(span.placement, inputId, motion)
+    }
 
-    /** Returns the transition playing at [timeUs], if any. */
-    private fun List<TransitionSpan>.during(timeUs: Long): TransitionSpan? =
-        firstOrNull { timeUs >= it.startMicros && timeUs < it.endMicros }
+    /** Places incoming input [inputId] by transition [span] at [timeUs], moved as its incoming side. */
+    private fun incomingSettings(
+        span: TransitionSpan,
+        inputId: Int,
+        timeUs: Long,
+    ): OverlaySettings {
+        val progress = TransitionMotion.progress(span.startMicros, span.endMicros, timeUs)
+        return movedSettings(span.placement, inputId, TransitionMotion.incoming(span.kind, progress))
+    }
 
     /** Returns the factor that sizes input [inputId] to the canvas by [fit]; it is 1 before any size is known. */
     private fun fit(
@@ -178,6 +184,18 @@ internal class CanvasCompositorSettings(
         return StaticOverlaySettings.Builder().setScale(scaleX, scaleY).build()
     }
 }
+
+/** Returns the span covering [timeUs], if any. */
+private fun List<BaseSpan>.at(timeUs: Long): BaseSpan? =
+    firstOrNull { timeUs >= it.startMicros && timeUs < it.endMicros }
+
+/** Returns the overlay span showing at [timeUs], if any. */
+private fun List<OverlaySpan>.showing(timeUs: Long): OverlaySpan? =
+    firstOrNull { timeUs >= it.startMicros && timeUs < it.endMicros }
+
+/** Returns the transition playing at [timeUs], if any. */
+private fun List<TransitionSpan>.during(timeUs: Long): TransitionSpan? =
+    firstOrNull { timeUs >= it.startMicros && timeUs < it.endMicros }
 
 /**
  * A horizontal move of [x] normalized canvas units for an input whose side is [widthShare] units from its center.
