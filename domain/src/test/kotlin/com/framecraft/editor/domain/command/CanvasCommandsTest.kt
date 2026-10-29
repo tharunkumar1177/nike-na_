@@ -85,7 +85,11 @@ class CanvasCommandsTest {
     private fun baseClip(
         project: Project,
         id: String,
-    ): Clip = project.tracks.last().clips.single { it.id == id }
+    ): Clip =
+        project.tracks
+            .last()
+            .clips
+            .single { it.id == id }
 
     /** A new project has an original-shape canvas on black, and ratios read as width over height. */
     @Test

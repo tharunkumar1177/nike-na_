@@ -295,10 +295,19 @@ class ProjectStoreTest {
             assertEquals(listOf("track"), reopened.tracks.map { it.id })
             assertEquals(CanvasSettings(), reopened.canvas)
             val restored = requireNotNull(opened.session.undo()).project
-            val title = restored.tracks.first().clips.single()
+            val title =
+                restored.tracks
+                    .first()
+                    .clips
+                    .single()
             assertEquals("Hi there", title.text?.text)
             assertEquals(TextAnimationKind.FADE, title.text?.animationIn?.kind)
-            assertNull(restored.tracks.last().clips.single().canvasPlacement)
+            val base =
+                restored.tracks
+                    .last()
+                    .clips
+                    .single()
+            assertNull(base.canvasPlacement)
             opened.session.close()
             assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":5"))
         }
