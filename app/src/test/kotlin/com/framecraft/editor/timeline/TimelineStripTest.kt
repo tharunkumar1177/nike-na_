@@ -124,8 +124,8 @@ class TimelineStripTest {
         showStrip()
         composeRule.onNodeWithTag(TIMELINE_TAG).performTouchInput { click(Offset(width * 0.75f, 72.dp.toPx())) }
         composeRule.waitForIdle()
-        val clip = project.tracks.single().clips.single()
-        assertEquals(listOf<String?>(clip.id), selections)
+        val track = project.tracks.single()
+        assertEquals(listOf<String?>(track.clips.single().id), selections)
     }
 
     /** Tapping left of the playhead, before time zero, clears the selection. */
