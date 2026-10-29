@@ -76,11 +76,12 @@ Feature modules never import Media3 types directly; they talk to engine interfac
 - A project is one immutable aggregate snapshot: `Project → Track[] → Clip[]`, plus project settings (aspect ratio, frame rate, canvas background).
 - There is **no privileged main track**. Any track may set `magnetic = true`, which closes gaps when clips are removed or trimmed on that track.
 - Gaps are **implicit**: a gap is any timeline span with no clip on a track. The domain never stores filler clips.
-- Each track has a kind: `VIDEO` (base video, drawn full frame), `OVERLAY` (composited over the base), or `AUDIO` (sound only, never drawn). Only overlay clips carry a placement: center in normalized canvas units with y downward, scale relative to the largest size that fits inside the canvas, clockwise rotation, and opacity. Only `VIDEO` tracks may be magnetic.
-- Media assets are `VIDEO`, `IMAGE`, or `AUDIO`. Picture tracks reject audio assets; audio tracks accept any asset with sound except images, so an extracted sound shares its video's asset.
-- Every clip carries a volume from 0 to 200 percent (100 is unchanged) and fade-in and fade-out lengths whose sum fits within the clip. Gain is the volume times linear fades from the clip's edges. Images keep the defaults.
-- The canvas size and aspect ratio come from the first base clip, never from an overlay or a sound.
-- The document carries an integer `schemaVersion` (currently 3). Readers migrate older versions forward; they refuse newer versions with a visible error.
+- Each track has a kind: `VIDEO` (base video, drawn full frame), `OVERLAY` (composited over the base), `AUDIO` (sound only, never drawn), or `TEXT` (words drawn over everything). Only overlay and text clips carry a placement: center in normalized canvas units with y downward, a scale, clockwise rotation, and opacity. An overlay's scale is relative to the largest size that fits inside the canvas; a text's scale is relative to its natural size. Only `VIDEO` tracks may be magnetic.
+- Media assets are `VIDEO`, `IMAGE`, `AUDIO`, or `TEXT`. Picture tracks accept only video and image assets; audio tracks accept any asset with sound except images, so an extracted sound shares its video's asset. Text has no source file: every text clip points at one shared `TEXT` asset with an empty URI, and only text tracks accept it.
+- A clip carries text exactly when it sits on a text track. Text content is the words (1 to 500 characters, never blank), a style whose size is a fraction of the canvas height so it looks the same at any resolution, and optional entrance and exit animations, each no longer than the clip.
+- Every clip carries a volume from 0 to 200 percent (100 is unchanged) and fade-in and fade-out lengths whose sum fits within the clip. Gain is the volume times linear fades from the clip's edges. Images and text keep the defaults, and neither has a source offset to trim.
+- The canvas size and aspect ratio come from the first base clip, never from an overlay, a sound, or text.
+- The document carries an integer `schemaVersion` (currently 4). Readers migrate older versions forward; they refuse newer versions with a visible error.
 
 ### Anchoring and ripple
 
@@ -111,6 +112,7 @@ Feature modules never import Media3 types directly; they talk to engine interfac
 - The engine consumes immutable project snapshots only. It never writes back to the project.
 - The adapter maps each track to a Media3 `EditedMediaItemSequence` and pads implicit gaps with generated silent or transparent segments at preview and export time.
 - Base video sequences come first, overlay sequences after them, and audio sequences last. Every base sequence is padded to the end of the latest track so sound beyond the pictures still plays. Audio sequences carry only audio; a muted picture clip carries no audio, and every other clip's sound passes through per-clip processing (to 16-bit PCM, mixed to stereo, then the clip's gain with clamping). A compositor setting places each overlay frame from the clip covering its time; the first sequence sets the output size. Preview builds its player with a multiple-input video graph so the same composition renders on screen.
+- Text tracks add no sequence. Each text clip becomes a bitmap overlay in one overlay effect applied to the composed picture, before any export resizing, so preview and export draw it the same way; upper text lanes draw on top. Text tracks still count toward the padded end. A project with only text has nothing to export.
 - Transitions consume clip handles (overlapping source media); they never freeze frames.
 - Preview and export use the same translation so what you see is what you export.
 

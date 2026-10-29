@@ -131,12 +131,13 @@ class ClipThumbnails(
         }
     }
 
-    /** Decodes the bitmap for [key]; sound has no picture, so audio keys fail. */
+    /** Decodes the bitmap for [key]; sound and text have no source picture, so their keys fail. */
     private suspend fun produce(key: ThumbnailKey): Bitmap =
         when (key.kind) {
             MediaKind.VIDEO -> extractorFor(key.uri).getFrame(key.sourceMicros / MICROS_PER_MILLI).await().bitmap
             MediaKind.IMAGE -> withContext(Dispatchers.IO) { decodeImage(key.uri) }
             MediaKind.AUDIO -> throw IllegalArgumentException("Audio ${key.uri} has no thumbnail")
+            MediaKind.TEXT -> throw IllegalArgumentException("Text has no thumbnail")
         }
 
     /** Returns the frame extractor for [uri], creating it on first use. */

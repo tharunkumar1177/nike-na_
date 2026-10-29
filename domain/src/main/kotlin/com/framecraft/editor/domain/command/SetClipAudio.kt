@@ -3,14 +3,13 @@
  */
 package com.framecraft.editor.domain.command
 
-import com.framecraft.editor.domain.model.MediaKind
 import com.framecraft.editor.domain.model.Project
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Sets clip [clipId] to play at [volumePercent] with fades of [fadeInMicros] and [fadeOutMicros]. Image clips, which
- * have no sound, and fades that overlap or exceed the clip are rejected.
+ * Sets clip [clipId] to play at [volumePercent] with fades of [fadeInMicros] and [fadeOutMicros]. Image and text clips,
+ * which have no sound, and fades that overlap or exceed the clip are rejected.
  */
 @Serializable
 @SerialName("setClipAudio")
@@ -23,8 +22,8 @@ data class SetClipAudio(
     /** The inverse restores the previous volume and fades. */
     override fun applyTo(project: Project): CommandOutcome {
         val (track, clip) = project.locate(clipId) ?: return clipNotFound(clipId)
-        return if (project.assetOf(clip).kind == MediaKind.IMAGE) {
-            modelInvariant("Image clip $clipId has no sound")
+        return if (!project.assetOf(clip).isTimed) {
+            modelInvariant("Clip $clipId has no sound")
         } else {
             val inverse = SetClipAudio(clipId, clip.volumePercent, clip.fadeInMicros, clip.fadeOutMicros)
             project.replacingTrack(inverse) {

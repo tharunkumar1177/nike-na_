@@ -6,6 +6,7 @@ package com.framecraft.editor.domain.command
 import com.framecraft.editor.domain.model.Clip
 import com.framecraft.editor.domain.model.MediaKind
 import com.framecraft.editor.domain.model.Project
+import com.framecraft.editor.domain.model.TrackKind
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -34,7 +35,7 @@ data class ExtractAudio(
             project.replacingTracks(inverse) {
                 project.tracks
                     .mapClips { if (it.id == videoClipId) it.copy(volumePercent = 0) else it }
-                    .withAudioClip(trackId, clip, trackIndex)
+                    .withLaneClip(TrackKind.AUDIO, trackId, clip, trackIndex)
                     .restoringAnchors(anchorRestorations)
             }
         }

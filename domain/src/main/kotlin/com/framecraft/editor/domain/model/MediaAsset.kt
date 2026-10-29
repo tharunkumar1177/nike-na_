@@ -11,6 +11,9 @@ enum class MediaKind {
     VIDEO,
     IMAGE,
     AUDIO,
+
+    /** The shared stand-in for text clips, which have no source file. */
+    TEXT,
 }
 
 /** Identifying properties of a source file, used to detect that it went missing or was replaced. */
@@ -31,7 +34,8 @@ const val AUDIO_ASSET_SIDE: Int = 1
 
 /**
  * A source file imported into a project. Videos and audio carry their full duration; images have none
- * because a clip decides how long an image shows. Audio assets are 1x1 and unrotated.
+ * because a clip decides how long an image shows. Audio assets are 1x1 and unrotated; the text asset is 1x1,
+ * unrotated, silent, and has no duration.
  */
 @Serializable
 data class MediaAsset(
@@ -64,8 +68,17 @@ data class MediaAsset(
                 require(width == AUDIO_ASSET_SIDE && height == AUDIO_ASSET_SIDE) { "Audio asset $id must be 1x1" }
                 require(rotationDegrees == 0 && hasAudio) { "Audio asset $id must be unrotated and have audio" }
             }
+
+            MediaKind.TEXT -> {
+                require(durationMicros == null && !hasAudio) { "Text asset $id must have no duration or audio" }
+                require(width == 1 && height == 1 && rotationDegrees == 0) { "Text asset $id must be 1x1 and unrotated" }
+            }
         }
     }
+
+    /** True for media with its own timeline (video and audio): clips read a span of it and can carry sound. */
+    val isTimed: Boolean
+        get() = kind == MediaKind.VIDEO || kind == MediaKind.AUDIO
 
     /** Width divided by height as displayed, after applying rotation. */
     val displayAspectRatio: Float

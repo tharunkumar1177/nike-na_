@@ -19,6 +19,7 @@ import com.framecraft.editor.domain.export.ExportPlanner
 import com.framecraft.editor.domain.export.ExportSettings
 import com.framecraft.editor.domain.model.Project
 import com.framecraft.editor.engine.CompositionFactory
+import com.framecraft.editor.engine.plan.PlaybackPlan
 import com.framecraft.editor.engine.plan.PlaybackPlanner
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -96,20 +97,25 @@ class ProjectExporter(
             }
         }
 
-    /** Starts exporting [project] with [settings]; does nothing while another export is in progress. */
+    /**
+     * Starts exporting [project] with [settings]; does nothing while another export is in progress. A project with
+     * only text has no picture to draw it on, so it counts as having nothing to export.
+     */
     fun export(
         project: Project,
         settings: ExportSettings,
     ) {
         if (mutableState.value.isInProgress) return
         mutableState.value = ExportState.Preparing
+        val plan = PlaybackPlanner.plan(project)
+        val duration = if (plan.sequences.isEmpty()) 0L else project.durationMicros
         val size = ExportPlanner.outputSize(project, settings.resolution)
-        val estimate = ExportPlanner.estimateBytes(project, settings, project.durationMicros)
-        val failure = ExportPrecheck.check(appContext, project.durationMicros, size, estimate)
+        val estimate = ExportPlanner.estimateBytes(project, settings, duration)
+        val failure = ExportPrecheck.check(appContext, duration, size, estimate)
         if (failure != null) {
             mutableState.value = ExportState.Failed(failure)
         } else {
-            start(project, settings)
+            start(project, plan, settings)
         }
     }
 
@@ -124,9 +130,10 @@ class ProjectExporter(
         scope.cancel()
     }
 
-    /** Builds the composition and starts encoding it to a fresh cache file. */
+    /** Builds the composition of [plan], made from [project], and starts encoding it to a fresh cache file. */
     private fun start(
         project: Project,
+        plan: PlaybackPlan,
         settings: ExportSettings,
     ) {
         val dir = File(appContext.cacheDir, WORK_DIR).apply { deleteRecursively() }
@@ -134,8 +141,7 @@ class ProjectExporter(
         val displayName = GallerySaver.displayNameFor(project.name, LocalDateTime.now())
         val output = PendingOutput(File(dir, "export.mp4"), displayName)
         val size = ExportPlanner.outputSize(project, settings.resolution)
-        val composition =
-            CompositionFactory.create(PlaybackPlanner.plan(project), ExportEffects.create(size, settings.frameRate))
+        val composition = CompositionFactory.create(plan, ExportEffects.create(size, settings.frameRate))
         val bitrate = ExportPlanner.targetBitrateBps(size, settings.frameRate, settings.quality)
         val next = buildTransformer(bitrate)
         pending = output

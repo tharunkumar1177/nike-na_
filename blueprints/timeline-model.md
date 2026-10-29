@@ -8,7 +8,7 @@ Own the pure Kotlin project model: tracks, clips, implicit gaps, magnetic tracks
 
 **Status:** Partial
 
-Time math (`FrameRate`, `Timecode`), the validated document model (`MediaAsset`, `Clip`, `Track`, `Project`, `ProjectFactory`), track kinds (`VIDEO`, `OVERLAY`, `AUDIO`), clip volume and fades, overlay placement (`OverlayTransform`), and anchoring (`ClipAnchor`, `AnchorResolver`) are implemented and verified by CI unit tests. Speed and transitions are not built yet.
+Time math (`FrameRate`, `Timecode`), the validated document model (`MediaAsset`, `Clip`, `Track`, `Project`, `ProjectFactory`), track kinds (`VIDEO`, `OVERLAY`, `AUDIO`, `TEXT`), clip volume and fades, clip text (see [text](text.md)), overlay placement (`OverlayTransform`), and anchoring (`ClipAnchor`, `AnchorResolver`) are implemented and verified by CI unit tests. Speed and transitions are not built yet.
 
 ## Architecture dependencies
 
@@ -31,7 +31,7 @@ Model constructors validate ID uniqueness within a project; duplicate IDs are a 
 
 Clips on one track must not overlap. Magnetic tracks are kept gap-free by the commands that edit them, not by a background normalizer.
 
-`Project` checks that each clip fits its track: picture tracks reject `AUDIO` assets, audio tracks reject images, and image clips keep the default volume and no fades. `Clip` rejects a volume outside 0 to 200 percent, negative fades, and fades that together exceed the clip. Audio assets are stored as 1 by 1 with no rotation so the shared size checks still hold; nothing reads their size.
+`Project` checks that each clip fits its track: picture tracks accept only `VIDEO` and `IMAGE` assets, audio tracks reject images and text, text tracks accept only the shared `TEXT` asset, a clip carries text exactly when it is on a text track, and image and text clips keep the default volume and no fades. Placements are allowed on overlay and text clips (`TrackKind.isPlaced`); only video and audio assets are timed (`MediaAsset.isTimed`), so only they have a source offset to trim. `Clip` rejects a volume outside 0 to 200 percent, negative fades, and fades that together exceed the clip. Audio assets are stored as 1 by 1 with no rotation so the shared size checks still hold; nothing reads their size.
 
 ### Anchoring and ripple
 

@@ -8,6 +8,7 @@ import androidx.media3.common.C
 import androidx.media3.common.Effect
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.effect.OverlayEffect
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
@@ -16,6 +17,7 @@ import com.framecraft.editor.domain.model.MediaKind
 import com.framecraft.editor.domain.model.TrackKind
 import com.framecraft.editor.engine.plan.PlanSegment
 import com.framecraft.editor.engine.plan.PlaybackPlan
+import com.framecraft.editor.engine.text.TextOverlay
 import kotlin.math.roundToInt
 
 /** Microseconds in a millisecond. */
@@ -32,8 +34,8 @@ private val AUDIO_VIDEO_TRACKS = setOf(C.TRACK_TYPE_AUDIO, C.TRACK_TYPE_VIDEO)
 internal object CompositionFactory {
     /**
      * Returns a composition with one sequence per planned track: audio-and-video for picture tracks and audio only
-     * for sound tracks, with overlay sequences placed by [OverlayCompositorSettings]. Export passes [videoEffects]
-     * that apply to the whole output; the preview passes none.
+     * for sound tracks, with overlay sequences placed by [OverlayCompositorSettings]. Text is drawn over the composed
+     * picture before [videoEffects], which export passes to apply to the whole output; the preview passes none.
      */
     fun create(
         plan: PlaybackPlan,
@@ -53,7 +55,9 @@ internal object CompositionFactory {
                 }
                 builder.build()
             }
-        val builder = Composition.Builder(sequences).setEffects(Effects(emptyList(), videoEffects))
+        val text: List<Effect> =
+            if (plan.textSpans.isEmpty()) emptyList() else listOf(OverlayEffect(plan.textSpans.map(::TextOverlay)))
+        val builder = Composition.Builder(sequences).setEffects(Effects(emptyList(), text + videoEffects))
         if (plan.sequences.any { it.kind == TrackKind.OVERLAY }) {
             builder.setVideoCompositorSettings(OverlayCompositorSettings(plan.sequences.map { it.overlaySpans }))
         }
@@ -69,6 +73,7 @@ internal object CompositionFactory {
         when (segment.kind) {
             MediaKind.IMAGE -> imageItem(segment, frameRate)
             MediaKind.VIDEO, MediaKind.AUDIO -> clippedItem(segment, audioOnly || segment.kind == MediaKind.AUDIO)
+            MediaKind.TEXT -> throw IllegalArgumentException("Text is drawn as an overlay, not played as media")
         }
 
     /**

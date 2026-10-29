@@ -24,7 +24,7 @@ object AnchorResolver {
     /**
      * Throws [IllegalArgumentException] unless anchors in [tracks] are consistent: every parent exists, anchors form
      * no cycle, anchored clips sit on non-magnetic tracks at their resolved start, only video tracks are magnetic,
-     * and only overlay tracks hold overlay transforms.
+     * and only overlay and text tracks hold overlay transforms.
      */
     fun validate(tracks: List<Track>) {
         tracks.forEach { track ->
@@ -33,8 +33,8 @@ object AnchorResolver {
                 require(clip.anchor == null || !track.magnetic) {
                     "Clip ${clip.id} is anchored but sits on magnetic track ${track.id}"
                 }
-                require(clip.overlayTransform == null || track.kind == TrackKind.OVERLAY) {
-                    "Clip ${clip.id} has an overlay transform but sits on non-overlay track ${track.id}"
+                require(clip.overlayTransform == null || track.kind.isPlaced) {
+                    "Clip ${clip.id} has an overlay transform but sits on unplaced track ${track.id}"
                 }
             }
         }

@@ -65,19 +65,40 @@ internal class OverlayCompositorSettings(
         }
     }
 
-    /** Maps [transform] to Media3 settings scaled by [fit]: Media3 y points up and rotation runs counter-clockwise. */
+    /** Maps [transform] to Media3 settings scaled by [fit]. */
     private fun settingsFor(
         transform: OverlayTransform,
         fit: Float,
     ): OverlaySettings =
-        StaticOverlaySettings
-            .Builder()
-            .setScale(transform.scale * fit, transform.scale * fit)
-            .setRotationDegrees(-transform.rotationDegrees)
-            .setAlphaScale(transform.opacity)
-            .setOverlayFrameAnchor(0f, 0f)
-            .setBackgroundFrameAnchor(
-                transform.centerX.coerceIn(-ANCHOR_LIMIT, ANCHOR_LIMIT),
-                (-transform.centerY).coerceIn(-ANCHOR_LIMIT, ANCHOR_LIMIT),
-            ).build()
+        placementSettings(
+            centerX = transform.centerX,
+            centerY = transform.centerY,
+            rotationDegrees = transform.rotationDegrees,
+            scale = transform.scale * fit,
+            alpha = transform.opacity,
+        )
 }
+
+/**
+ * Maps a placement in project terms (center with y downward, clockwise [rotationDegrees]) to Media3 settings at
+ * [scale] and [alpha]. Media3 y points up and its rotation runs counter-clockwise; centers past the canvas edge are
+ * held at the edge.
+ */
+@OptIn(markerClass = [UnstableApi::class])
+internal fun placementSettings(
+    centerX: Float,
+    centerY: Float,
+    rotationDegrees: Float,
+    scale: Float,
+    alpha: Float,
+): OverlaySettings =
+    StaticOverlaySettings
+        .Builder()
+        .setScale(scale, scale)
+        .setRotationDegrees(-rotationDegrees)
+        .setAlphaScale(alpha)
+        .setOverlayFrameAnchor(0f, 0f)
+        .setBackgroundFrameAnchor(
+            centerX.coerceIn(-ANCHOR_LIMIT, ANCHOR_LIMIT),
+            (-centerY).coerceIn(-ANCHOR_LIMIT, ANCHOR_LIMIT),
+        ).build()

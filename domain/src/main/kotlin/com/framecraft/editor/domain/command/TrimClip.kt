@@ -3,7 +3,6 @@
  */
 package com.framecraft.editor.domain.command
 
-import com.framecraft.editor.domain.model.MediaKind
 import com.framecraft.editor.domain.model.Project
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -11,10 +10,11 @@ import kotlinx.serialization.Serializable
 /**
  * Sets clip [clipId] to start at [startMicros], read its source from [trimStartMicros], and last [durationMicros].
  * On a magnetic track the start must not move and later clips shift by the change in duration; on other tracks
- * an overlap is rejected. Clips shorter than one frame and image clips with a changed source offset are rejected.
+ * an overlap is rejected. Clips shorter than one frame and image or text clips with a changed source offset are rejected.
  * An anchored clip keeps its parent and its anchor offset moves with the start; clips anchored to moved clips follow.
  * [fadeInMicros] and [fadeOutMicros] set the fades when given; otherwise fades shrink to fit the new duration,
- * fade-in first.
+ * fade-in first. A text clip's animations take [animationInMicros] and [animationOutMicros] when given; otherwise each
+ * shrinks to fit the new duration.
  */
 @Serializable
 @SerialName("trimClip")
@@ -25,8 +25,10 @@ data class TrimClip(
     val durationMicros: Long,
     val fadeInMicros: Long? = null,
     val fadeOutMicros: Long? = null,
+    val animationInMicros: Long? = null,
+    val animationOutMicros: Long? = null,
 ) : EditCommand {
-    /** The inverse restores the clip's previous start, source offset, duration, and fades. */
+    /** The inverse restores the clip's previous start, source offset, duration, fades, and animations. */
     override fun applyTo(project: Project): CommandOutcome {
         val location = project.locate(clipId) ?: return clipNotFound(clipId)
         val minimum = project.frameRate.startOfFrame(1)
@@ -51,11 +53,12 @@ data class TrimClip(
                 clip.durationMicros,
                 clip.fadeInMicros,
                 clip.fadeOutMicros,
+                clip.text?.animationIn?.durationMicros,
+                clip.text?.animationOut?.durationMicros,
             )
         return project.replacingTrack(inverse) {
-            val isImage = project.assetOf(clip).kind == MediaKind.IMAGE
-            require(!isImage || trimStartMicros == clip.trimStartMicros) {
-                "Image clip $clipId has no source offset to trim"
+            require(project.assetOf(clip).isTimed || trimStartMicros == clip.trimStartMicros) {
+                "Clip $clipId has no source offset to trim"
             }
             val fadeIn = fadeInMicros ?: minOf(clip.fadeInMicros, durationMicros)
             val fadeOut = fadeOutMicros ?: minOf(clip.fadeOutMicros, (durationMicros - fadeIn).coerceAtLeast(0))
@@ -67,6 +70,7 @@ data class TrimClip(
                     anchor = shiftedAnchor(clip.anchor, startMicros - clip.startMicros),
                     fadeInMicros = fadeIn,
                     fadeOutMicros = fadeOut,
+                    text = clip.text?.fitted(durationMicros, animationInMicros, animationOutMicros),
                 )
             val others = track.clips.filter { it.id != clipId }
             val delta = trimmed.endMicros - clip.endMicros

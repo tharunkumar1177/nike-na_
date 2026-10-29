@@ -25,7 +25,6 @@ import com.framecraft.editor.domain.edit.TrimEdge
 import com.framecraft.editor.domain.model.Clip
 import com.framecraft.editor.domain.model.Project
 import com.framecraft.editor.domain.model.Track
-import com.framecraft.editor.domain.model.TrackKind
 import com.framecraft.editor.domain.time.MICROS_PER_SECOND
 import kotlin.math.abs
 import kotlin.math.roundToLong
@@ -112,8 +111,8 @@ internal suspend fun PointerInputScope.timelineGestures(
 }
 
 /**
- * Handles a touch that is not on a trim handle: a touch on an overlay selects or drags it; otherwise waits to see
- * whether the touch is a hold, a tap, or a scrub.
+ * Handles a touch that is not on a trim handle: a touch on an overlay or text selects or drags it; otherwise waits
+ * to see whether the touch is a hold, a tap, or a scrub.
  */
 private suspend fun AwaitPointerEventScope.holdOrScrub(
     context: TimelineGestureContext,
@@ -124,7 +123,7 @@ private suspend fun AwaitPointerEventScope.holdOrScrub(
     val target = hit?.takeIf { it.track.magnetic }
     val hold = if (target == null) Hold.MOVED else awaitHold(down)
     when {
-        hit != null && hit.track.kind == TrackKind.OVERLAY -> {
+        hit != null && hit.track.kind.isPlaced -> {
             overlayDrag(context, hit, down)
         }
 

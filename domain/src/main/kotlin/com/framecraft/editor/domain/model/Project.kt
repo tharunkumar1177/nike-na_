@@ -7,7 +7,7 @@ import com.framecraft.editor.domain.time.FrameRate
 import kotlinx.serialization.Serializable
 
 /** Schema version written by this build. */
-const val CURRENT_SCHEMA_VERSION: Int = 3
+const val CURRENT_SCHEMA_VERSION: Int = 4
 
 /** An immutable project snapshot. Construction fails if any cross-object invariant is broken. */
 @Serializable
@@ -35,7 +35,10 @@ data class Project(
         AnchorResolver.validate(tracks)
     }
 
-    /** Throws unless [clip] on [track] reads inside [asset], suits the track kind, and keeps images silent. */
+    /**
+     * Throws unless [clip] on [track] reads inside [asset], suits the track kind, carries text exactly when it is a
+     * text clip, and keeps images and text silent.
+     */
     private fun requireFits(
         track: Track,
         clip: Clip,
@@ -48,13 +51,13 @@ data class Project(
         }
         val suitsTrack =
             when (track.kind) {
-                TrackKind.AUDIO -> asset.hasAudio && asset.kind != MediaKind.IMAGE
-                TrackKind.VIDEO, TrackKind.OVERLAY -> asset.kind != MediaKind.AUDIO
+                TrackKind.AUDIO -> asset.hasAudio && asset.kind != MediaKind.IMAGE && asset.kind != MediaKind.TEXT
+                TrackKind.VIDEO, TrackKind.OVERLAY -> asset.kind == MediaKind.VIDEO || asset.kind == MediaKind.IMAGE
+                TrackKind.TEXT -> asset.kind == MediaKind.TEXT
             }
         require(suitsTrack) { "Clip ${clip.id} puts a ${asset.kind} asset on ${track.kind} track ${track.id}" }
-        require(asset.kind != MediaKind.IMAGE || clip.hasDefaultAudio) {
-            "Image clip ${clip.id} cannot carry volume or fades"
-        }
+        require((clip.text != null) == (track.kind == TrackKind.TEXT)) { "Clip ${clip.id} has text off a text track" }
+        require(asset.isTimed || clip.hasDefaultAudio) { "Clip ${clip.id} has no sound to change" }
     }
 
     /** Exclusive end of the latest clip across all tracks. */

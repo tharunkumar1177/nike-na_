@@ -1,5 +1,6 @@
 /*
- * JVM UI tests (Robolectric) for timeline scrubbing, selection, trimming, audio lanes, and the zoom and snap controls.
+ * JVM UI tests (Robolectric) for timeline scrubbing, selection, trimming, audio and text lanes, and the zoom and snap
+ * controls.
  */
 package com.framecraft.editor.timeline
 
@@ -21,12 +22,14 @@ import com.framecraft.editor.domain.command.CommandOutcome
 import com.framecraft.editor.domain.command.EditCommand
 import com.framecraft.editor.domain.command.TrimClip
 import com.framecraft.editor.domain.edit.AudioPlacement
+import com.framecraft.editor.domain.edit.TextPlacement
 import com.framecraft.editor.domain.model.IdGenerator
 import com.framecraft.editor.domain.model.MediaAsset
 import com.framecraft.editor.domain.model.MediaKind
 import com.framecraft.editor.domain.model.Project
 import com.framecraft.editor.domain.model.ProjectFactory
 import com.framecraft.editor.domain.model.SourceFingerprint
+import com.framecraft.editor.domain.model.TextContent
 import com.framecraft.editor.engine.ThumbnailKey
 import com.framecraft.editor.engine.ThumbnailSource
 import com.framecraft.editor.engine.Waveform
@@ -236,5 +239,21 @@ class TimelineStripTest {
         composeRule.onNodeWithTag(TIMELINE_TAG).performTouchInput { click(Offset(width * 0.75f, 144.dp.toPx())) }
         composeRule.waitForIdle()
         assertEquals(listOf<String?>(extract.clip.id), selections)
+    }
+
+    /** A text lane above the base asks for no thumbnails, and tapping it selects the text clip. */
+    @Test
+    fun textLaneSelectsWithoutThumbnails() {
+        var next = 0
+        val add = TextPlacement.propose(project, 0L, TextContent("Hello"), IdGenerator { "text-${++next}" })!!
+        val withText = (add.applyTo(project) as CommandOutcome.Applied).project
+        showStrip(shown = withText)
+        composeRule.waitForIdle()
+        assertTrue(requested.none { it.kind == MediaKind.TEXT })
+        composeRule.onNodeWithTag(TIMELINE_TAG).performTouchInput {
+            click(Offset(width / 2f + 8.dp.toPx(), 72.dp.toPx()))
+        }
+        composeRule.waitForIdle()
+        assertEquals(listOf<String?>(add.clip.id), selections)
     }
 }

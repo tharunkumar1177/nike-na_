@@ -63,6 +63,15 @@ const val TOOL_OVERLAY_TAG = "editor_tool_overlay"
 /** Test tag of the selected overlay's opacity slider. */
 const val TOOL_OPACITY_TAG = "editor_tool_opacity"
 
+/** Test tag of the add text tool. */
+const val TOOL_TEXT_TAG = "editor_tool_text"
+
+/** Test tag of the edit text tool. */
+const val TOOL_EDIT_TEXT_TAG = "editor_tool_edit_text"
+
+/** Test tag of the animate text tool. */
+const val TOOL_ANIMATE_TEXT_TAG = "editor_tool_animate_text"
+
 /** Test tag of the previous frame action. */
 const val FRAME_BACK_TAG = "editor_frame_back"
 
@@ -139,10 +148,10 @@ class PlaybackActions(
 )
 
 /**
- * What the tools do: split and delete the selection, add an overlay or music, save the selected overlay's opacity,
- * extract the selected clip's audio, and save its volume and fades.
+ * What the tools do: split and delete the selection, add an overlay, text, or music, save the selected overlay's or
+ * text's opacity, edit or animate the selected text, extract the selected clip's audio, and save its volume and fades.
  */
-class ToolActions(
+data class ToolActions(
     val onSplitClip: () -> Unit,
     val onDeleteClip: () -> Unit,
     val onAddOverlay: () -> Unit = {},
@@ -150,14 +159,18 @@ class ToolActions(
     val onAddAudio: () -> Unit = {},
     val onExtractAudio: () -> Unit = {},
     val onAudioCommit: (ClipAudio) -> Unit = {},
+    val onAddText: () -> Unit = {},
+    val onEditText: () -> Unit = {},
+    val onAnimateText: () -> Unit = {},
 )
 
 /**
  * Which tools apply: [hasSelection] when clip [selectedClipId] is selected, [canSplit] when the playhead is inside
  * it, [canAddOverlay] when an overlay can be added now, [showAddOverlay] when the overlay tool belongs in the row,
- * [overlayOpacity] when the selection is an overlay, [canAddAudio] when music can be added now, [showExtract] when
- * the selection is a video whose sound could be lifted and [canExtract] when that is possible now, and [audio] when
- * the selection plays sound.
+ * [overlayOpacity] when the selection is an overlay or text, [showAddText] when the text tool belongs in the row and
+ * [canAddText] when text can be added now, [isText] when the selection is text, [canAddAudio] when music can be added
+ * now, [showExtract] when the selection is a video whose sound could be lifted and [canExtract] when that is possible
+ * now, and [audio] when the selection plays sound.
  */
 data class ToolAvailability(
     val hasSelection: Boolean = false,
@@ -166,6 +179,9 @@ data class ToolAvailability(
     val overlayOpacity: Float? = null,
     val selectedClipId: String? = null,
     val showAddOverlay: Boolean = true,
+    val showAddText: Boolean = false,
+    val canAddText: Boolean = false,
+    val isText: Boolean = false,
     val canAddAudio: Boolean = false,
     val showExtract: Boolean = false,
     val canExtract: Boolean = false,
