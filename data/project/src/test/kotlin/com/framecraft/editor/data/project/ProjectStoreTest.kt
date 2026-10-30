@@ -189,7 +189,7 @@ class ProjectStoreTest {
         runBlocking {
             store().create(project).close()
             val snapshot = File(dir(), "snapshot.json")
-            val newer = snapshot.readText().replace("\"schemaVersion\":9", "\"schemaVersion\":99")
+            val newer = snapshot.readText().replace("\"schemaVersion\":10", "\"schemaVersion\":99")
             snapshot.writeText(newer)
             assertEquals(OpenProjectResult.TooNew(99), store().open(project.id))
             assertEquals(newer, snapshot.readText())
@@ -204,7 +204,7 @@ class ProjectStoreTest {
             snapshot.writeText(
                 snapshot
                     .readText()
-                    .replace("\"schemaVersion\":9", "\"schemaVersion\":0")
+                    .replace("\"schemaVersion\":10", "\"schemaVersion\":0")
                     .replace("\"name\":\"Trip\"", "\"title\":\"Trip\""),
             )
             val renameTitle =
@@ -228,11 +228,12 @@ class ProjectStoreTest {
                     Migration6To7,
                     Migration7To8,
                     Migration8To9,
+                    Migration9To10,
                 )
             val migrations = SchemaMigrations(listOf(renameTitle) + shipped)
             val opened = store(migrations).opened()
             assertEquals("Trip", opened.session.state.project.name)
-            assertTrue(snapshot.readText().contains("\"schemaVersion\":9"))
+            assertTrue(snapshot.readText().contains("\"schemaVersion\":10"))
         }
 
     /** A project and journal written verbatim in schema 1 open through the shipped chain and are saved as schema 4. */
@@ -253,7 +254,7 @@ class ProjectStoreTest {
                     .anchor,
             )
             opened.session.close()
-            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":9"))
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":10"))
         }
 
     /** A schema 2 project with an overlay and its journal open, replay, undo, and are saved as schema 4. */
@@ -274,7 +275,7 @@ class ProjectStoreTest {
             assertEquals("a", overlay.anchor?.parentClipId)
             assertTrue(overlay.hasDefaultAudio)
             opened.session.close()
-            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":9"))
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":10"))
         }
 
     /** A schema 3 project with extracted sound and its journal open, replay, undo, and are saved as schema 4. */
@@ -295,7 +296,7 @@ class ProjectStoreTest {
             assertEquals(500_000L, sound.fadeInMicros)
             assertNull(sound.text)
             opened.session.close()
-            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":9"))
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":10"))
         }
 
     /** A schema 4 project with a title and its journal open, replay, undo, and are saved as schema 5. */
@@ -324,7 +325,7 @@ class ProjectStoreTest {
                     .single()
             assertNull(base.canvasPlacement)
             opened.session.close()
-            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":9"))
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":10"))
         }
 
     /** A schema 5 project on a portrait canvas and its journal open, replay, undo, and are saved as schema 6. */
@@ -350,7 +351,7 @@ class ProjectStoreTest {
             assertNull(base.sourceDurationMicros)
             assertTrue(base.maintainPitch)
             opened.session.close()
-            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":9"))
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":10"))
         }
 
     /** A schema 6 project with a sped clip and its journal open, replay, undo, and are saved as schema 7. */
@@ -371,7 +372,7 @@ class ProjectStoreTest {
             assertEquals(listOf("a", "b"), back.map { it.id })
             assertEquals(500_000L, back.last().durationMicros)
             opened.session.close()
-            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":9"))
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":10"))
         }
 
     /** A schema 8 project with a look and a sound lane opens with unity track volume and no ducking, and saves as 9. */
@@ -394,7 +395,28 @@ class ProjectStoreTest {
             val look = video.clips.single().look
             assertEquals("noir", look?.filterId)
             opened.session.close()
-            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":9"))
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":10"))
+        }
+
+    /** A schema 9 project with a ducked lane and a voiceover opens with no mask or key anywhere, and saves as 10. */
+    @Test
+    fun schemaNineFixtureOpens() =
+        runBlocking {
+            dir().mkdirs()
+            File(dir(), "snapshot.json").writeText(SCHEMA_NINE_SNAPSHOT)
+            File(dir(), "journal.jsonl").writeText(SCHEMA_NINE_JOURNAL)
+            val opened = store().opened()
+            val project = opened.session.state.project
+            val clips = project.tracks.flatMap { it.clips }
+            assertTrue(clips.none { it.mask != null || it.chromaKey != null })
+            assertEquals(50, project.tracks.first { it.id == "music" }.volumePercent)
+            assertEquals(70, clips.first { it.id == "m" }.autoDuckPercent)
+            assertTrue(clips.first { it.id == "v" }.voiceover)
+            val restored = requireNotNull(opened.session.undo()).project
+            val restoredMusic = restored.tracks.flatMap { it.clips }.single { it.id == "m" }
+            assertEquals(60, restoredMusic.autoDuckPercent)
+            opened.session.close()
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":10"))
         }
 
     /** A schema 7 project with a transition and its journal open, replay, undo, and are saved as the current schema. */
@@ -416,7 +438,7 @@ class ProjectStoreTest {
             assertEquals(listOf("a", "b"), back.map { it.id })
             assertEquals(ClipTransition(TransitionKind.DISSOLVE, 1_000_000L), back.first().outTransition)
             opened.session.close()
-            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":9"))
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":10"))
         }
 
     /** A missing list summary is rebuilt; an unreadable project is listed as unreadable and refused. */
@@ -630,4 +652,32 @@ private val SCHEMA_EIGHT_JOURNAL =
             """"fadeInMicros":0,"fadeOutMicros":0}}""",
         """{"seq":2,"atEpochMillis":3,"command":{"type":"setClipLook","clipId":"a",""" +
             """"look":{"filterId":"honey","filterIntensity":60}}}""",
+    ).joinToString(separator = "\n", postfix = "\n")
+
+/** A snapshot exactly as schema 9 wrote it: a video, a ducked music lane, and a recorded voiceover lane. */
+private val SCHEMA_NINE_SNAPSHOT =
+    """
+    {"baseSeq":0,"createdAtEpochMillis":1,"project":{"id":"project-1","name":"Trip",
+    "frameRate":{"numerator":30,"denominator":1},"assets":[{"id":"asset","uri":"content://media/asset",
+    "kind":"VIDEO","durationMicros":10000000,"width":1920,"height":1080,"rotationDegrees":0,"hasAudio":true,
+    "fingerprint":{"sizeBytes":1}},{"id":"take","uri":"file:///recordings/take.m4a","kind":"AUDIO",
+    "durationMicros":3000000,"width":1,"height":1,"rotationDegrees":0,"hasAudio":true,
+    "fingerprint":{"sizeBytes":2}}],"tracks":[{"id":"track","kind":"VIDEO","magnetic":true,"clips":[
+    {"id":"a","assetId":"asset","startMicros":0,"trimStartMicros":0,"durationMicros":4000000}]},
+    {"id":"music","kind":"AUDIO","magnetic":false,"clips":[
+    {"id":"m","assetId":"asset","startMicros":0,"trimStartMicros":0,"durationMicros":4000000,
+    "autoDuckPercent":60}]},
+    {"id":"voice","kind":"AUDIO","magnetic":false,"clips":[
+    {"id":"v","assetId":"take","startMicros":1000000,"trimStartMicros":0,"durationMicros":2000000,
+    "voiceover":true}]}],
+    "schemaVersion":9}}
+    """.trimIndent()
+
+/** A journal exactly as schema 9 wrote it: the music lane turned down, then its ducking deepened. */
+private val SCHEMA_NINE_JOURNAL =
+    listOf(
+        """{"seq":1,"atEpochMillis":2,"command":{"type":"setTrackVolumes",""" +
+            """"values":[{"trackId":"music","volumePercent":50}]}}""",
+        """{"seq":2,"atEpochMillis":3,"command":{"type":"setClipAudio","clipId":"m","volumePercent":100,""" +
+            """"fadeInMicros":0,"fadeOutMicros":0,"autoDuckPercent":70}}""",
     ).joinToString(separator = "\n", postfix = "\n")

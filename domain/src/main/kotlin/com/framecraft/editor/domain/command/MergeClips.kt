@@ -114,7 +114,9 @@ data class MergeClips(
         }
         require(right.text?.animationIn == null) { "Clip $rightClipId animates in at the join" }
         require(left.outTransition == null) { "Clips $leftClipId and $rightClipId have a transition at the join" }
-        require(left.look == right.look) { "Clips $leftClipId and $rightClipId have different looks" }
+        require(listOf(left.look, left.mask, left.chromaKey) == listOf(right.look, right.mask, right.chromaKey)) {
+            "Clips $leftClipId and $rightClipId have different looks, masks, or keys"
+        }
         require(left.voiceover == right.voiceover && left.autoDuckPercent == right.autoDuckPercent) {
             "Clips $leftClipId and $rightClipId duck differently"
         }

@@ -80,9 +80,10 @@ internal fun rememberAudioPicker(
 }
 
 /**
- * What the add, text, speed, look, mixer, and voiceover tools and the cut badges open: [overlay] picks photos and
- * videos, [audio] picks sound files, [text] holds the text sheet, [speed] the speed sheet, [transition] the
- * transition sheet, [look] the look sheet, [mixer] the mixer sheet, and [voiceover] starts the recorder.
+ * What the add, text, speed, look, mask, chroma key, mixer, and voiceover tools and the cut badges open: [overlay]
+ * picks photos and videos, [audio] picks sound files, [text] holds the text sheet, [speed] the speed sheet,
+ * [transition] the transition sheet, [picture] the look sheet and the mask and chroma key panels, [mixer] the mixer
+ * sheet, and [voiceover] starts the recorder.
  */
 internal class MediaPickers(
     val overlay: () -> Unit,
@@ -90,14 +91,14 @@ internal class MediaPickers(
     val text: TextEditing,
     val speed: SpeedEditing,
     val transition: TransitionEditing,
-    val look: LookEditing,
+    val picture: PictureEditing,
     val mixer: MixerEditing,
     val voiceover: VoiceoverStarter,
 )
 
 /**
- * Returns the overlay and music pickers, the text, speed, transition, look, and mixer sheets, and the voiceover
- * recorder of [viewModel], adding at [preview]'s playhead.
+ * Returns the overlay and music pickers, the text, speed, transition, look, and mixer sheets, the mask and chroma key
+ * panels, and the voiceover recorder of [viewModel], adding at [preview]'s playhead.
  */
 @Composable
 internal fun rememberMediaPickers(
@@ -110,7 +111,7 @@ internal fun rememberMediaPickers(
         text = rememberTextEditing(viewModel),
         speed = rememberSpeedEditing(),
         transition = rememberTransitionEditing(),
-        look = rememberLookEditing(),
+        picture = rememberPictureEditing(),
         mixer = rememberMixerEditing(),
         voiceover = rememberVoiceoverStarter(viewModel.voiceover),
     )
@@ -144,6 +145,8 @@ internal fun toolAvailability(
         showExtract = isVideo,
         showSpeed = isVideo,
         showLook = selectedKind?.takesLook == true,
+        maskActive = selected?.mask != null,
+        chromaKeyActive = selected?.chromaKey != null,
         canExtract = isVideo && selected != null && AudioPlacement.canExtract(project, selected),
         audio = selected?.takeIf { asset?.hasAudio == true }?.let(::clipAudioOf),
         canRecord = !importing && AudioPlacement.canRecord(project, positionMicros),
@@ -163,7 +166,8 @@ private fun clipAudioOf(clip: Clip): ClipAudio =
 
 /**
  * Tools for the [selected] clip on a track of [selectedKind]: split at [positionMicros], delete, opacity, extract,
- * sound, the text sheet, and the speed sheet, plus the add tools that open [pickers] or add text at
+ * sound, the text and speed sheets, and the look sheet and mask and chroma key panels, plus the add tools that open
+ * [pickers] or add text at
  * [positionMicros]. The clip tools do nothing without a selection.
  */
 internal fun toolActions(
@@ -212,7 +216,9 @@ internal fun toolActions(
         onEditText = { pickers.text.open(selected?.id, TextSheetTab.STYLE) },
         onAnimateText = { pickers.text.open(selected?.id, TextSheetTab.ANIMATION) },
         onOpenSpeed = { pickers.speed.open(selected?.id) },
-        onOpenLook = { pickers.look.open(selected?.id) },
+        onOpenLook = { pickers.picture.look.open(selected?.id) },
+        onOpenMask = { pickers.picture.openMask(selected?.id) },
+        onOpenChromaKey = { pickers.picture.openChromaKey(selected?.id) },
         onOpenMixer = pickers.mixer::open,
         onRecordVoiceover = { pickers.voiceover.start() },
     )

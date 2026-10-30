@@ -87,6 +87,12 @@ const val TOOL_SPEED_TAG = "editor_tool_speed"
 /** Test tag of the look tool. */
 const val TOOL_LOOK_TAG = "editor_tool_look"
 
+/** Test tag of the mask tool. */
+const val TOOL_MASK_TAG = "editor_tool_mask"
+
+/** Test tag of the chroma key tool. */
+const val TOOL_CHROMA_TAG = "editor_tool_chroma"
+
 /** Test tag of the previous frame action. */
 const val FRAME_BACK_TAG = "editor_frame_back"
 
@@ -170,7 +176,7 @@ class PlaybackActions(
  * What the tools do: split and delete the selection, add an overlay, text, or music, save the selected overlay's or
  * text's opacity, edit or animate the selected text, extract the selected clip's audio, save its volume and fades,
  * open the canvas sheet, toggle the selected base clip's fit and its placement handles, open the speed and look
- * sheets, open the mixer, and record a voiceover.
+ * sheets and the mask and chroma key panels, open the mixer, and record a voiceover.
  */
 data class ToolActions(
     val onSplitClip: () -> Unit,
@@ -188,6 +194,8 @@ data class ToolActions(
     val onToggleAdjust: () -> Unit = {},
     val onOpenSpeed: () -> Unit = {},
     val onOpenLook: () -> Unit = {},
+    val onOpenMask: () -> Unit = {},
+    val onOpenChromaKey: () -> Unit = {},
     val onOpenMixer: () -> Unit = {},
     val onRecordVoiceover: () -> Unit = {},
 )
@@ -211,8 +219,8 @@ data class CanvasToolState(
  * [canAddText] when text can be added now, [isText] when the selection is text, [canAddAudio] when music can be added
  * now, [showExtract] when the selection is a video whose sound could be lifted and [canExtract] when that is possible
  * now, [showSpeed] when the selection is a video whose speed can change, [showLook] when the selection is a picture
- * that can take a look, [audio] when the selection plays sound, [canRecord] when a voiceover can start at the
- * playhead, and the [canvas] tools.
+ * that can take a look, mask, and chroma key, [maskActive] and [chromaKeyActive] when it has them, [audio] when the
+ * selection plays sound, [canRecord] when a voiceover can start at the playhead, and the [canvas] tools.
  */
 data class ToolAvailability(
     val hasSelection: Boolean = false,
@@ -229,6 +237,8 @@ data class ToolAvailability(
     val canExtract: Boolean = false,
     val showSpeed: Boolean = false,
     val showLook: Boolean = false,
+    val maskActive: Boolean = false,
+    val chromaKeyActive: Boolean = false,
     val audio: ClipAudio? = null,
     val canRecord: Boolean = false,
     val canvas: CanvasToolState = CanvasToolState(),

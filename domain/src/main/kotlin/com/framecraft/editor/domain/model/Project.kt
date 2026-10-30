@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
 import kotlin.math.abs
 
 /** Schema version written by this build. */
-const val CURRENT_SCHEMA_VERSION: Int = 9
+const val CURRENT_SCHEMA_VERSION: Int = 10
 
 /** An immutable project snapshot. Construction fails if any cross-object invariant is broken. */
 @Serializable
@@ -32,8 +32,8 @@ data class Project(
             track.clips.forEach { clip ->
                 val asset = requireNotNull(assetsById[clip.assetId]) { "Clip ${clip.id} references unknown asset" }
                 requireFits(track, clip, asset)
-                require(clip.look == null || track.kind == TrackKind.VIDEO || track.kind == TrackKind.OVERLAY) {
-                    "Clip ${clip.id} has a look off a picture track"
+                require(track.kind.takesLook || listOfNotNull(clip.look, clip.mask, clip.chromaKey).isEmpty()) {
+                    "Clip ${clip.id} has a look, mask, or key off a picture track"
                 }
                 require(!clip.voiceover || asset.kind == MediaKind.AUDIO) {
                     "Clip ${clip.id} is a voiceover of a picture"

@@ -202,7 +202,8 @@ internal object CompositionFactory {
         }
 
     /**
-     * Returns the clipped source of [segment] with its look, speed, and sound chain, in a project at [frameRate]. A
+     * Returns the clipped source of [segment] with its key, mask, look, speed, and sound chain, in a project at
+     * [frameRate]. The blurred background replaces these effects with its own, so it is never masked or keyed. A
      * muted picture item drops its sound; a [soundOnly] item drops its picture and keeps its sound, silenced by the
      * gain envelope when muted. A sped-up picture is capped at the project's frame rate so it drops frames instead of
      * playing them faster.
@@ -225,7 +226,7 @@ internal object CompositionFactory {
                 .setClippingConfiguration(clipping)
                 .build()
         val builder = EditedMediaItem.Builder(item).setDurationUs(segment.sourceDurationMicros)
-        val look = if (soundOnly) emptyList() else LookEffects.of(segment.look)
+        val look = if (soundOnly) emptyList() else SegmentVideoEffects.of(segment)
         if (!soundOnly && segment.volumePercent == 0) {
             builder.setRemoveAudio(true)
             if (look.isNotEmpty()) builder.setEffects(Effects(emptyList(), look))
@@ -246,7 +247,7 @@ internal object CompositionFactory {
     }
 
     /**
-     * Returns [segment] as a still image colored by its look, shown for its duration at [framesPerSecond]. A
+     * Returns [segment] as a still image keyed, masked, and colored, shown for its duration at [framesPerSecond]. A
      * generated still in a `data:` URI names its type, which Media3 cannot infer from the URI.
      */
     private fun imageItem(
@@ -264,7 +265,7 @@ internal object CompositionFactory {
                 .Builder(builder.build())
                 .setDurationUs(segment.durationMicros)
                 .setFrameRate(framesPerSecond)
-        val look = LookEffects.of(segment.look)
+        val look = SegmentVideoEffects.of(segment)
         if (look.isNotEmpty()) edited.setEffects(Effects(emptyList(), look))
         return edited.build()
     }

@@ -19,6 +19,7 @@ import com.framecraft.editor.domain.edit.AudioPlacement
 import com.framecraft.editor.domain.model.IdGenerator
 import com.framecraft.editor.domain.model.Project
 import com.framecraft.editor.domain.model.ProjectFactory
+import com.framecraft.editor.engine.KeyColorProbe
 import com.framecraft.editor.engine.ProjectPreview
 import com.framecraft.editor.media.ImportResult
 import com.framecraft.editor.media.MediaImporter
@@ -79,13 +80,15 @@ sealed interface EditorState {
 }
 
 /**
- * What the editor creates for each open project through [createPreview] and [createMedia], and the microphone it
- * records voiceovers with through [voiceoverCapture].
+ * What the editor creates for each open project through [createPreview] and [createMedia], the microphone it
+ * records voiceovers with through [voiceoverCapture], and the frame reader of the chroma key's eyedropper,
+ * [keyColorProbe].
  */
 class EditorResources(
     val createPreview: () -> ProjectPreview,
     val createMedia: () -> TimelineMedia,
     val voiceoverCapture: VoiceoverCapture,
+    val keyColorProbe: KeyColorProbe,
 )
 
 /**
@@ -124,6 +127,9 @@ class EditorViewModel(
             command?.let { dispatch(it, it.clip.id) }
             command != null
         }
+
+    /** Reads source frames for the chroma key's eyedropper. */
+    val keyColorProbe: KeyColorProbe = resources.keyColorProbe
 
     /** Timeline thumbnails and waveforms of the open project; non-null while the state is [EditorState.Ready]. */
     val media: TimelineMedia?
@@ -298,6 +304,7 @@ class EditorViewModel(
                                 createPreview = container::createPreview,
                                 createMedia = container::createTimelineMedia,
                                 voiceoverCapture = container.voiceoverCapture,
+                                keyColorProbe = container.keyColorProbe,
                             ),
                     )
                 }

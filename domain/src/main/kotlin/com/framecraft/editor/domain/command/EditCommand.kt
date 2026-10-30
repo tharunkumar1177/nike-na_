@@ -94,6 +94,16 @@ sealed interface CommandRejection {
     data class TrackVolumeNotSupported(
         val trackId: String,
     ) : CommandRejection
+
+    /** Clip [clipId] is not on a video or overlay track, the only kinds that take a mask. */
+    data class MaskNotSupported(
+        val clipId: String,
+    ) : CommandRejection
+
+    /** Clip [clipId] is not on a video or overlay track, the only kinds that take a chroma key. */
+    data class ChromaKeyNotSupported(
+        val clipId: String,
+    ) : CommandRejection
 }
 
 /** A clip together with the track that holds it. */

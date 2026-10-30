@@ -25,8 +25,9 @@ const val MAX_DUCK_PERCENT: Int = 100
  * source, and its sound keeps its pitch when [maintainPitch] is set. Without a speed the clip reads exactly its own
  * duration of source. A video-track clip may carry the [outTransition] into the clip that starts where it ends; it
  * stays stored while the cut is gone or too short and plays again once the cut allows it. A clip on a video or
- * overlay track may carry a [look] that colors its picture. A [voiceover] is a sound recorded in the editor; any clip
- * with sound may duck by [autoDuckPercent] while a voiceover plays, where 0 never ducks.
+ * overlay track may carry a [look] that colors its picture, a [mask] that shows only part of it, and a [chromaKey]
+ * that keys out one color. A [voiceover] is a sound recorded in the editor; any clip with sound may duck by
+ * [autoDuckPercent] while a voiceover plays, where 0 never ducks.
  */
 @Serializable
 data class Clip(
@@ -49,6 +50,8 @@ data class Clip(
     val look: ClipLook? = null,
     val voiceover: Boolean = false,
     val autoDuckPercent: Int = 0,
+    val mask: ClipMask? = null,
+    val chromaKey: ChromaKey? = null,
 ) {
     init {
         require(id.isNotBlank()) { "Clip id must not be blank" }

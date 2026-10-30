@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -67,6 +68,8 @@ class EditorScreenTest {
             onToggleAdjust = { events += "adjust" },
             onOpenSpeed = { events += "speed" },
             onOpenLook = { events += "look" },
+            onOpenMask = { events += "mask" },
+            onOpenChromaKey = { events += "chroma" },
             onOpenMixer = { events += "mixer" },
             onRecordVoiceover = { events += "voiceover" },
         )
@@ -382,6 +385,27 @@ class EditorScreenTest {
     fun noLookToolOtherwise() {
         showEditor(availability = ToolAvailability(hasSelection = true, canSplit = true))
         composeRule.onAllNodesWithTag(TOOL_LOOK_TAG).assertCountEquals(0)
+        composeRule.onAllNodesWithTag(TOOL_MASK_TAG).assertCountEquals(0)
+        composeRule.onAllNodesWithTag(TOOL_CHROMA_TAG).assertCountEquals(0)
+    }
+
+    /** A selected picture offers Mask and Chroma key, which report and show whether the clip already has them. */
+    @Test
+    fun maskAndChromaToolsForPictures() {
+        val availability =
+            ToolAvailability(hasSelection = true, canSplit = true, showLook = true, maskActive = true)
+        showEditor(availability = availability)
+        composeRule
+            .onNodeWithTag(TOOL_MASK_TAG)
+            .performScrollTo()
+            .assertIsSelected()
+            .performClick()
+        composeRule
+            .onNodeWithTag(TOOL_CHROMA_TAG)
+            .performScrollTo()
+            .assertIsNotSelected()
+            .performClick()
+        assertEquals(listOf("mask", "chroma"), events)
     }
 
     /** Without a selection Voiceover and Mixer are offered and report. */
