@@ -33,7 +33,10 @@ data class SplitClip(
     override fun applyTo(project: Project): CommandOutcome {
         val (track, clip) = project.locate(clipId) ?: return clipNotFound(clipId)
         val minimum = project.frameRate.startOfFrame(1)
-        return if (!isSplittable(clip, atMicros, project.frameRate)) {
+        val lock = captionLock(clip)
+        return if (lock != null) {
+            lock
+        } else if (!isSplittable(clip, atMicros, project.frameRate)) {
             CommandOutcome.Rejected(CommandRejection.ClipTooShort(minimum))
         } else {
             val inverse =
@@ -62,9 +65,10 @@ data class SplitClip(
                 val right = rightPart(clip, leftDuration, leftSource, project.assetOf(clip).isTimed)
                 val parts = track.clips.flatMap { if (it.id == clipId) listOf(left, right) else listOf(it) }
                 val cut = track.copy(clips = parts)
+                val rightSourceStart = clip.trimStartMicros + leftSource
                 project.tracks
                     .map { if (it.id == track.id) cut else it }
-                    .mapClips(::retargeted)
+                    .mapClips { retargeted(it, clip.trimStartMicros, rightSourceStart) }
             }
         }
     }
@@ -84,10 +88,19 @@ data class SplitClip(
         return cut.coerceIn(1L, span - 1L)
     }
 
-    /** Returns [child] attached to the right part if it is anchored to the cut clip and starts at or after the cut. */
-    private fun retargeted(child: Clip): Clip {
+    /**
+     * Returns [child] attached to the right part if it is anchored to the cut clip and starts at or after the cut; a
+     * caption moves when its first word read after [trimStart] starts at or after [rightSourceStart] of the source.
+     */
+    private fun retargeted(
+        child: Clip,
+        trimStart: Long,
+        rightSourceStart: Long,
+    ): Clip {
         val anchor = child.anchor
-        return if (anchor?.parentClipId == clipId && child.startMicros >= atMicros) {
+        val firstWord = child.text?.caption?.words?.firstOrNull { it.sourceStartMicros >= trimStart }
+        val afterCut = firstWord?.let { it.sourceStartMicros >= rightSourceStart } ?: (child.startMicros >= atMicros)
+        return if (anchor?.parentClipId == clipId && afterCut) {
             child.copy(anchor = ClipAnchor(rightClipId, child.startMicros - atMicros))
         } else {
             child

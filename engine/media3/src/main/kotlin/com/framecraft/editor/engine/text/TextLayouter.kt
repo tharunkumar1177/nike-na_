@@ -19,6 +19,7 @@ import com.framecraft.editor.domain.model.TextAlignment
 import com.framecraft.editor.domain.model.TextContent
 import com.framecraft.editor.domain.model.TextFont
 import com.framecraft.editor.domain.model.TextStyle
+import com.framecraft.editor.engine.plan.Karaoke
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.roundToInt
@@ -59,6 +60,16 @@ private class HiddenSpan : CharacterStyle() {
     }
 }
 
+/** Fills the characters it covers in [color], leaving their outline pass in the outline color. */
+private class HighlightSpan(
+    private val color: Int,
+) : CharacterStyle() {
+    /** Recolors the fill pass only, so the outline keeps its own color. */
+    override fun updateDrawState(paint: TextPaint) {
+        if (paint.style == Paint.Style.FILL) paint.color = color
+    }
+}
+
 /** Measures and renders text clips with the system fonts. */
 object TextLayouter {
     /** Returns the size [content] takes on a [canvasWidth] by [canvasHeight] canvas at scale 1. */
@@ -72,23 +83,30 @@ object TextLayouter {
     }
 
     /**
-     * Draws [content] for a [canvasWidth] by [canvasHeight] canvas, showing only its first [revealed] characters.
-     * The bitmap is the same size whatever [revealed] is, so a typing text never moves.
+     * Draws [content] for a [canvasWidth] by [canvasHeight] canvas, showing only its first [revealed] characters and
+     * filling word [spokenWord] in the style's highlight color when it has one. The bitmap is the same size whatever
+     * [revealed] and [spokenWord] are, so a typing or highlighting text never moves.
      */
     fun render(
         content: TextContent,
         canvasWidth: Int,
         canvasHeight: Int,
         revealed: Int,
+        spokenWord: Int = -1,
     ): Bitmap {
         val text = content.text
         val shown = revealed.coerceIn(0, text.length)
+        val highlight =
+            content.style.highlightArgb?.let { color -> Karaoke.rangeOf(text, spokenWord)?.let { color to it } }
         val visible =
-            if (shown >= text.length) {
+            if (shown >= text.length && highlight == null) {
                 text
             } else {
                 SpannableString(text).apply {
-                    setSpan(HiddenSpan(), shown, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    highlight?.let { (color, range) ->
+                        setSpan(HighlightSpan(color), range.first, range.last + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    }
+                    if (shown < text.length) setSpan(HiddenSpan(), shown, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                 }
             }
         val laid = layOut(visible, content.style, canvasWidth, canvasHeight)

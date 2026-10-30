@@ -65,7 +65,8 @@ internal suspend fun AwaitPointerEventScope.overlayDrag(
 
 /**
  * Returns TalkBack actions that move the selected clip [selectedClipId] of [project] one frame earlier or later
- * through [onEdit], or none when the selection is neither an overlay nor text. Earlier is left out at time zero.
+ * through [onEdit], or none when the selection is neither an overlay nor text, or is a caption, whose timing follows
+ * its speech. Earlier is left out at time zero.
  */
 @Composable
 internal fun overlayNudges(
@@ -79,6 +80,7 @@ internal fun overlayNudges(
         project.tracks
             .filter { it.kind.isPlaced }
             .firstNotNullOfOrNull { track -> track.clips.firstOrNull { it.id == selectedClipId } }
+            ?.takeIf { it.text?.caption == null }
     return clip?.let { overlay ->
         /** Returns an action labelled [label] that moves the overlay by [frames] frames. */
         fun nudge(

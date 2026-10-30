@@ -95,7 +95,7 @@ private fun ReadyEditor(
     val export = rememberExportControls(exportViewModel, project)
     val pickers = rememberMediaPickers(viewModel, preview)
     val canvas = rememberCanvasEditing()
-    EditorSheets(pickers, canvas, project, state.selectedClipId, position, viewModel::dispatch, preview::seekTo)
+    EditorSheets(pickers, canvas, project, state.selectedClipId, position, viewModel, preview::seekTo)
     EditorScreen(
         projectName = project.name,
         previewState = previewState,
@@ -165,9 +165,9 @@ private fun timelineSlot(
     }
 
 /**
- * Shows whichever of the text, canvas, speed, transition, look, and mixer sheets and mask and chroma key panels is
- * open over [project] with clip [selectedClipId] selected and the playhead at [positionMicros], and keeps the
- * voiceover recorder in step with the screen; edits go to [dispatch] and the transition sheet moves the preview
+ * Shows whichever of the text, canvas, speed, transition, look, mixer, and caption sheets and mask and chroma key
+ * panels is open over [project] with clip [selectedClipId] selected and the playhead at [positionMicros], and keeps
+ * the voiceover recorder in step with the screen; edits go to [viewModel] and the transition sheet moves the preview
  * through [onSeek].
  */
 @Composable
@@ -177,9 +177,10 @@ private fun EditorSheets(
     project: Project,
     selectedClipId: String?,
     positionMicros: Long,
-    dispatch: (EditCommand) -> Unit,
+    viewModel: EditorViewModel,
     onSeek: (Long) -> Unit,
 ) {
+    val dispatch: (EditCommand) -> Unit = { viewModel.dispatch(it) }
     TextEditHost(pickers.text, project)
     CanvasSheetHost(canvas, project, dispatch)
     SpeedSheetHost(pickers.speed, project, positionMicros, dispatch)
@@ -188,6 +189,7 @@ private fun EditorSheets(
     MaskPanelHost(pickers.picture.mask, project, selectedClipId, positionMicros, dispatch)
     ChromaPanelHost(pickers.picture.chroma, project, selectedClipId, dispatch)
     MixerSheetHost(pickers.mixer, project, dispatch)
+    CaptionSheetHost(viewModel.captions, project, selectedClipId)
     VoiceoverHost(pickers.voiceover)
 }
 

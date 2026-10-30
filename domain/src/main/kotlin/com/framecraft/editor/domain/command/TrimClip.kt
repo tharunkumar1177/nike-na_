@@ -16,7 +16,8 @@ import kotlinx.serialization.Serializable
  * [fadeInMicros] and [fadeOutMicros] set the fades when given; otherwise fades shrink to fit the new duration,
  * fade-in first. A text clip's animations take [animationInMicros] and [animationOutMicros] when given; otherwise each
  * shrinks to fit the new duration. A sped clip reads [sourceDurationMicros] of source, which it requires; a clip at
- * normal speed must not carry one.
+ * normal speed must not carry one. Captions of the clip left with no words to show are removed, and
+ * [restoredCaptions] are put back on their lanes. A caption itself cannot be trimmed.
  */
 @Serializable
 @SerialName("trimClip")
@@ -30,15 +31,17 @@ data class TrimClip(
     val animationInMicros: Long? = null,
     val animationOutMicros: Long? = null,
     val sourceDurationMicros: Long? = null,
+    val restoredCaptions: List<LaneClip> = emptyList(),
 ) : EditCommand {
-    /** The inverse restores the clip's previous start, source offset, duration, fades, and animations. */
+    /** The inverse restores the clip's previous start, source offset, duration, fades, animations, and captions. */
     override fun applyTo(project: Project): CommandOutcome {
         val location = project.locate(clipId) ?: return clipNotFound(clipId)
         val minimum = project.frameRate.startOfFrame(1)
-        return if (durationMicros < minimum) {
-            CommandOutcome.Rejected(CommandRejection.ClipTooShort(minimum))
-        } else {
-            trim(project, location)
+        val lock = captionLock(location.clip)
+        return when {
+            lock != null -> lock
+            durationMicros < minimum -> CommandOutcome.Rejected(CommandRejection.ClipTooShort(minimum))
+            else -> trim(project, location)
         }
     }
 
@@ -48,6 +51,7 @@ data class TrimClip(
         location: ClipLocation,
     ): CommandOutcome {
         val (track, clip) = location
+        val silenced = project.captionsSilencedBy(clipId, trimStartMicros, sourceDurationMicros ?: durationMicros)
         val inverse =
             TrimClip(
                 clipId,
@@ -59,8 +63,9 @@ data class TrimClip(
                 clip.text?.animationIn?.durationMicros,
                 clip.text?.animationOut?.durationMicros,
                 clip.sourceDurationMicros,
+                silenced,
             )
-        return project.replacingTrack(inverse) {
+        return project.replacingTracks(inverse) {
             require(project.assetOf(clip).isTimed || trimStartMicros == clip.trimStartMicros) {
                 "Clip $clipId has no source offset to trim"
             }
@@ -83,7 +88,10 @@ data class TrimClip(
             val others = track.clips.filter { it.id != clipId }
             val delta = trimmed.endMicros - clip.endMicros
             val placed = if (track.magnetic) others.shiftedFrom(clip.endMicros, delta) else others
-            track.copy(clips = (placed + trimmed).sortedBy { it.startMicros })
+            val trimmedTrack = track.copy(clips = (placed + trimmed).sortedBy { it.startMicros })
+            project.tracks
+                .map { if (it.id == track.id) trimmedTrack else it }
+                .swappingClips(silenced.map { it.clip.id }.toSet(), restoredCaptions)
         }
     }
 }

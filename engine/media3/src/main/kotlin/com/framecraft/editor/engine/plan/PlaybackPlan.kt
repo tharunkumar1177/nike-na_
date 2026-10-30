@@ -66,12 +66,16 @@ data class OverlaySpan(
     val transform: OverlayTransform,
 )
 
-/** A text clip drawn over the picture with [content] at [transform] from [startMicros] until [endMicros]. */
+/**
+ * A text clip drawn over the picture with [content] at [transform] from [startMicros] until [endMicros]. A caption
+ * lists when each of its words starts on the timeline in [wordStartsMicros], to highlight the word being spoken.
+ */
 data class TextSpan(
     val startMicros: Long,
     val endMicros: Long,
     val transform: OverlayTransform,
     val content: TextContent,
+    val wordStartsMicros: List<Long> = emptyList(),
 )
 
 /**
@@ -196,7 +200,7 @@ object PlaybackPlanner {
             planned
                 .filter { it.kind == TrackKind.TEXT }
                 .asReversed()
-                .flatMap(::textSpansOf)
+                .flatMap { textSpansOf(project, it) }
         val placed = planned.any { track -> track.clips.any { it.canvasPlacement != null } }
         val transitions = base.any { it.role != SequenceRole.TRACK }
         val keyed = planned.any { track -> track.clips.any { it.mask != null || it.chromaKey != null } }
@@ -289,10 +293,17 @@ object PlaybackPlanner {
             OverlaySpan(clip.startMicros, clip.endMicros, clip.overlayTransform ?: OverlayTransform())
         }
 
-    /** Returns the text of every clip on [track], centered at natural size when it has no placement. */
-    private fun textSpansOf(track: Track): List<TextSpan> =
+    /**
+     * Returns the text of every clip on [track] of [project], centered at natural size when it has no placement, with
+     * the word timing of highlighting captions.
+     */
+    private fun textSpansOf(
+        project: Project,
+        track: Track,
+    ): List<TextSpan> =
         track.clips.mapNotNull { clip ->
             val content = clip.text ?: return@mapNotNull null
-            TextSpan(clip.startMicros, clip.endMicros, clip.overlayTransform ?: OverlayTransform(), content)
+            val words = if (content.style.highlightArgb != null) Karaoke.wordStarts(project, clip) else emptyList()
+            TextSpan(clip.startMicros, clip.endMicros, clip.overlayTransform ?: OverlayTransform(), content, words)
         }
 }

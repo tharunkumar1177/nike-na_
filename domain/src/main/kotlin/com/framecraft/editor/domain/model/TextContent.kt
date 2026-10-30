@@ -55,13 +55,17 @@ data class TextAnimation(
     }
 }
 
-/** The [text] a clip shows in [style], entering with [animationIn] and leaving with [animationOut]. */
+/**
+ * The [text] a clip shows in [style], entering with [animationIn] and leaving with [animationOut]. An auto-caption
+ * also carries the timed speech it transcribes as [caption]; its text is then the words its clip can still play.
+ */
 @Serializable
 data class TextContent(
     val text: String,
     val style: TextStyle = TextStyle(),
     val animationIn: TextAnimation? = null,
     val animationOut: TextAnimation? = null,
+    val caption: CaptionContent? = null,
 ) {
     init {
         require(text.isNotBlank()) { "Text must not be blank" }

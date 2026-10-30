@@ -4,9 +4,14 @@
 package com.framecraft.editor.di
 
 import android.content.Context
+import com.framecraft.editor.captions.CaptionTranscriber
+import com.framecraft.editor.captions.ClipSoundDecoder
+import com.framecraft.editor.captions.SpeechModelStore
+import com.framecraft.editor.captions.VoskSpeechEngine
 import com.framecraft.editor.data.project.ProjectStore
 import com.framecraft.editor.domain.model.IdGenerator
 import com.framecraft.editor.domain.model.UuidIdGenerator
+import com.framecraft.editor.editor.CaptionServices
 import com.framecraft.editor.editor.TimelineMedia
 import com.framecraft.editor.engine.AudioWaveforms
 import com.framecraft.editor.engine.ClipThumbnails
@@ -49,6 +54,13 @@ class AppContainer(
     /** The single app-wide export, shared by the editor and the export service. */
     val exportCoordinator: ExportCoordinator = ExportCoordinator(appContext)
 
+    /** On-device speech recognition for auto-captions; the speech engine loads only when captions are made. */
+    val captionServices: CaptionServices by lazy {
+        val modelStore = SpeechModelStore(File(appContext.filesDir, SPEECH_DIRECTORY))
+        val transcriber = CaptionTranscriber(ClipSoundDecoder(appContext)) { VoskSpeechEngine(modelStore.modelDir) }
+        CaptionServices(modelStore, transcriber)
+    }
+
     /** Creates a new preview player; the caller owns and must release it. */
     fun createPreview(): ProjectPreview = ProjectPreview(appContext)
 
@@ -70,5 +82,8 @@ class AppContainer(
 
         /** Height in pixels of the frames the eyedropper reads. */
         const val KEY_PROBE_HEIGHT_PX = 540
+
+        /** Directory under the app's files that holds the speech model. */
+        const val SPEECH_DIRECTORY = "speech"
     }
 }

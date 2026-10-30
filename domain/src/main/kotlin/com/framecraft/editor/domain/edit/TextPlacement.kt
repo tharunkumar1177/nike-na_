@@ -77,7 +77,10 @@ object TextPlacement {
         val start = project.frameRate.snapToNearestFrame(playheadMicros).coerceIn(parent.startMicros, latestStart)
         val end = start + minOf(DEFAULT_TEXT_DURATION_MICROS, parent.endMicros - start)
         val lanes = project.tracks.filter { it.kind == TrackKind.TEXT }
-        val free = lanes.firstOrNull { lane -> lane.clips.none { it.startMicros < end && start < it.endMicros } }
+        val free =
+            lanes
+                .filter { lane -> lane.clips.none { it.text?.caption != null } }
+                .firstOrNull { lane -> lane.clips.none { it.startMicros < end && start < it.endMicros } }
         return if (free == null && lanes.size >= MAX_TEXT_LANES) null else TextSlot(parent, start, end, free)
     }
 }

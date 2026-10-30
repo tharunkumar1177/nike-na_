@@ -115,8 +115,8 @@ internal suspend fun PointerInputScope.timelineGestures(
 }
 
 /**
- * Handles a touch that is not on a trim handle: a touch on an overlay or text selects or drags it; otherwise waits
- * to see whether the touch is a hold, a tap, or a scrub.
+ * Handles a touch that is not on a trim handle: a touch on an overlay or text selects or drags it, though captions
+ * keep to their speech and are only selected; otherwise waits to see whether the touch is a hold, a tap, or a scrub.
  */
 private suspend fun AwaitPointerEventScope.holdOrScrub(
     context: TimelineGestureContext,
@@ -127,8 +127,9 @@ private suspend fun AwaitPointerEventScope.holdOrScrub(
     val cut = cutAt(context, down.position)
     val target = hit?.takeIf { it.track.magnetic && cut == null }
     val hold = if (target == null) Hold.MOVED else awaitHold(down)
+    val draggable = hit != null && hit.track.kind.isPlaced && hit.clip.text?.caption == null
     when {
-        hit != null && hit.track.kind.isPlaced -> {
+        hit != null && draggable -> {
             overlayDrag(context, hit, down)
         }
 
@@ -313,7 +314,7 @@ private fun AwaitPointerEventScope.trimHandleAt(
     val state = context.state
     val pxPerSecond = state.dpPerSecond.dp.toPx()
     val width = size.width.toFloat()
-    return context.selectedTarget()?.takeIf { it.trackIndex == row }?.let { target ->
+    return context.selectedTarget()?.takeIf { it.trackIndex == row && it.clip.text?.caption == null }?.let { target ->
         val left = TimelineGeometry.timeToX(target.clip.startMicros, state.centerMicros, pxPerSecond, width)
         val right = TimelineGeometry.timeToX(target.clip.endMicros, state.centerMicros, pxPerSecond, width)
         TimelineGeometry.trimEdgeAt(position.x, left, right, metrics.handleZone)?.let { edge -> target to edge }
