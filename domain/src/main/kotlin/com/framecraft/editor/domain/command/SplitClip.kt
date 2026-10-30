@@ -98,8 +98,8 @@ data class SplitClip(
         rightSourceStart: Long,
     ): Clip {
         val anchor = child.anchor
-        val words = child.text?.caption?.words.orEmpty()
-        val firstWord = words.firstOrNull { it.sourceStartMicros >= trimStart }
+        val caption = child.text?.caption
+        val firstWord = caption?.words?.firstOrNull { it.sourceStartMicros >= trimStart }
         val afterCut = firstWord?.let { it.sourceStartMicros >= rightSourceStart } ?: (child.startMicros >= atMicros)
         return if (anchor?.parentClipId == clipId && afterCut) {
             child.copy(anchor = ClipAnchor(rightClipId, child.startMicros - atMicros))
