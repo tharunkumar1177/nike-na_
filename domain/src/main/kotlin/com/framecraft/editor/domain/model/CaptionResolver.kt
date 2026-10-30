@@ -84,9 +84,8 @@ object CaptionResolver {
             val asset = assetsById[parent.assetId]
             require(asset != null && asset.isTimed && asset.hasAudio) { "Caption ${clip.id} transcribes a silent clip" }
             val text = requireNotNull(clip.text)
-            val span = requireNotNull(text.caption?.let { spanOf(it, parent, frameRate) }) {
-                "Caption ${clip.id} shows no played words"
-            }
+            val derived = text.caption?.let { spanOf(it, parent, frameRate) }
+            val span = requireNotNull(derived) { "Caption ${clip.id} shows no played words" }
             require(span == CaptionSpan(clip.startMicros, clip.durationMicros, text.text)) {
                 "Caption ${clip.id} is out of step with its speech: expected $span"
             }

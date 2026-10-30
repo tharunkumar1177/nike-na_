@@ -82,7 +82,8 @@ class KaraokeTest {
     fun wordStartsFollowTheClip() {
         assertEquals(listOf(0L, 500_000L), Karaoke.wordStarts(project, caption))
         assertEquals(emptyList<Long>(), Karaoke.wordStarts(project, caption.copy(anchor = null)))
-        assertEquals(listOf(0L, 500_000L), PlaybackPlanner.plan(project).textSpans.single().wordStartsMicros)
+        val span = PlaybackPlanner.plan(project).textSpans.single()
+        assertEquals(listOf(0L, 500_000L), span.wordStartsMicros)
     }
 
     /** The spoken word is the last to have started, and its characters are found between the spaces. */
