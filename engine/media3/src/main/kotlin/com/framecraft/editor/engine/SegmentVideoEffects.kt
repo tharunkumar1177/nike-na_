@@ -3,10 +3,13 @@
  */
 package com.framecraft.editor.engine
 
+import androidx.annotation.OptIn
 import androidx.media3.common.Effect
+import androidx.media3.common.util.UnstableApi
 import com.framecraft.editor.engine.plan.PlanSegment
 
 /** Builds the video effects of a picture segment. */
+@OptIn(markerClass = [UnstableApi::class])
 internal object SegmentVideoEffects {
     /**
      * Returns the effects that draw [segment]'s picture, in order: the chroma key, which must see the source's own
