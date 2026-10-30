@@ -11,6 +11,7 @@ lifecycle = "2.11.0"
 coroutines = "1.11.0"
 serialization = "1.12.0"
 media3 = "1.11.1"
+vosk = "0.3.75"
 junit5 = "6.1.3"
 junit4 = "4.13.2"
 robolectric = "4.17"
@@ -40,6 +41,7 @@ media3-common = { module = "androidx.media3:media3-common", version.ref = "media
 media3-exoplayer = { module = "androidx.media3:media3-exoplayer", version.ref = "media3" }
 media3-inspector-frame = { module = "androidx.media3:media3-inspector-frame", version.ref = "media3" }
 media3-ui-compose = { module = "androidx.media3:media3-ui-compose", version.ref = "media3" }
+vosk-android = { module = "com.alphacephei:vosk-android", version.ref = "vosk" }
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit5" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
