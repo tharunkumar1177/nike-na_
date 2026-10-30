@@ -6,9 +6,9 @@ package com.framecraft.editor.captions
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import kotlin.math.roundToLong
 
 /** Microseconds in one second. */
@@ -33,14 +33,17 @@ object VoskResultParser {
         entry: JsonObject?,
         offsetMicros: Long,
     ): HeardWord? {
-        val text = entry?.get("word")?.jsonPrimitive?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }
-        val start = entry?.get("start")?.jsonPrimitive?.doubleOrNull?.takeIf { it >= 0.0 }
-        val end = entry?.get("end")?.jsonPrimitive?.doubleOrNull?.takeIf { start != null && it >= start }
-        if (text == null || start == null || end == null) return null
+        val text = entry.field("word")?.contentOrNull?.trim()
+        val start = entry.field("start")?.doubleOrNull?.takeIf { it >= 0.0 }
+        val end = entry.field("end")?.doubleOrNull?.takeIf { start != null && it >= start }
+        if (text.isNullOrEmpty() || start == null || end == null) return null
         return HeardWord(
             text = text,
             startMicros = offsetMicros + (start * MICROS_PER_SECOND).roundToLong(),
             endMicros = offsetMicros + (end * MICROS_PER_SECOND).roundToLong(),
         )
     }
+
+    /** Returns the primitive value of field [name] of this entry, or null when it is missing or not a primitive. */
+    private fun JsonObject?.field(name: String): JsonPrimitive? = this?.get(name) as? JsonPrimitive
 }
