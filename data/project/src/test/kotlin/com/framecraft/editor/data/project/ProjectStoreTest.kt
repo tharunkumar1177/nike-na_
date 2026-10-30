@@ -189,7 +189,7 @@ class ProjectStoreTest {
         runBlocking {
             store().create(project).close()
             val snapshot = File(dir(), "snapshot.json")
-            val newer = snapshot.readText().replace("\"schemaVersion\":10", "\"schemaVersion\":99")
+            val newer = snapshot.readText().replace("\"schemaVersion\":11", "\"schemaVersion\":99")
             snapshot.writeText(newer)
             assertEquals(OpenProjectResult.TooNew(99), store().open(project.id))
             assertEquals(newer, snapshot.readText())
@@ -204,7 +204,7 @@ class ProjectStoreTest {
             snapshot.writeText(
                 snapshot
                     .readText()
-                    .replace("\"schemaVersion\":10", "\"schemaVersion\":0")
+                    .replace("\"schemaVersion\":11", "\"schemaVersion\":0")
                     .replace("\"name\":\"Trip\"", "\"title\":\"Trip\""),
             )
             val renameTitle =
@@ -229,11 +229,12 @@ class ProjectStoreTest {
                     Migration7To8,
                     Migration8To9,
                     Migration9To10,
+                    Migration10To11,
                 )
             val migrations = SchemaMigrations(listOf(renameTitle) + shipped)
             val opened = store(migrations).opened()
             assertEquals("Trip", opened.session.state.project.name)
-            assertTrue(snapshot.readText().contains("\"schemaVersion\":10"))
+            assertTrue(snapshot.readText().contains("\"schemaVersion\":11"))
         }
 
     /** A project and journal written verbatim in schema 1 open through the shipped chain and are saved as schema 4. */
@@ -254,7 +255,7 @@ class ProjectStoreTest {
                     .anchor,
             )
             opened.session.close()
-            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":10"))
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":11"))
         }
 
     /** A schema 2 project with an overlay and its journal open, replay, undo, and are saved as schema 4. */
@@ -275,7 +276,7 @@ class ProjectStoreTest {
             assertEquals("a", overlay.anchor?.parentClipId)
             assertTrue(overlay.hasDefaultAudio)
             opened.session.close()
-            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":10"))
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":11"))
         }
 
     /** A schema 3 project with extracted sound and its journal open, replay, undo, and are saved as schema 4. */
@@ -296,7 +297,7 @@ class ProjectStoreTest {
             assertEquals(500_000L, sound.fadeInMicros)
             assertNull(sound.text)
             opened.session.close()
-            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":10"))
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":11"))
         }
 
     /** A schema 4 project with a title and its journal open, replay, undo, and are saved as schema 5. */
@@ -325,7 +326,7 @@ class ProjectStoreTest {
                     .single()
             assertNull(base.canvasPlacement)
             opened.session.close()
-            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":10"))
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":11"))
         }
 
     /** A schema 5 project on a portrait canvas and its journal open, replay, undo, and are saved as schema 6. */
@@ -351,7 +352,7 @@ class ProjectStoreTest {
             assertNull(base.sourceDurationMicros)
             assertTrue(base.maintainPitch)
             opened.session.close()
-            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":10"))
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":11"))
         }
 
     /** A schema 6 project with a sped clip and its journal open, replay, undo, and are saved as schema 7. */
@@ -372,7 +373,7 @@ class ProjectStoreTest {
             assertEquals(listOf("a", "b"), back.map { it.id })
             assertEquals(500_000L, back.last().durationMicros)
             opened.session.close()
-            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":10"))
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":11"))
         }
 
     /** A schema 8 project with a look and a sound lane opens with unity track volume and no ducking, and saves as 9. */
@@ -395,7 +396,7 @@ class ProjectStoreTest {
             val look = video.clips.single().look
             assertEquals("noir", look?.filterId)
             opened.session.close()
-            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":10"))
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":11"))
         }
 
     /** A schema 9 project with a ducked lane and a voiceover opens with no mask or key anywhere, and saves as 10. */
@@ -416,7 +417,7 @@ class ProjectStoreTest {
             val restoredMusic = restored.tracks.flatMap { it.clips }.single { it.id == "m" }
             assertEquals(60, restoredMusic.autoDuckPercent)
             opened.session.close()
-            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":10"))
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":11"))
         }
 
     /** A schema 7 project with a transition and its journal open, replay, undo, and are saved as the current schema. */
@@ -438,7 +439,7 @@ class ProjectStoreTest {
             assertEquals(listOf("a", "b"), back.map { it.id })
             assertEquals(ClipTransition(TransitionKind.DISSOLVE, 1_000_000L), back.first().outTransition)
             opened.session.close()
-            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":10"))
+            assertTrue(File(dir(), "snapshot.json").readText().contains("\"schemaVersion\":11"))
         }
 
     /** A missing list summary is rebuilt; an unreadable project is listed as unreadable and refused. */

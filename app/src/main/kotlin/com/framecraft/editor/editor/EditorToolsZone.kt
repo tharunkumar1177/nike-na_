@@ -188,6 +188,7 @@ private fun ToolRow(
     }
     if (availability.showAddText) {
         ToolButton(Tool.TEXT, tools.onAddText, availability.canAddText)
+        ToolButton(Tool.CAPTIONS, tools.onOpenCaptions, availability.canCaption)
     }
     if (!availability.hasSelection) {
         ToolButton(Tool.AUDIO, tools.onAddAudio, availability.canAddAudio)
@@ -420,6 +421,14 @@ private enum class Tool(
 
     /** Adds text at the playhead. */
     TEXT(R.drawable.ic_text, R.string.editor_tool_text, R.string.editor_tool_text_description, TOOL_TEXT_TAG),
+
+    /** Opens the auto captions sheet. */
+    CAPTIONS(
+        R.drawable.ic_closed_caption,
+        R.string.editor_tool_captions,
+        R.string.editor_tool_captions_description,
+        TOOL_CAPTIONS_TAG,
+    ),
 
     /** Opens the text sheet on the style tab. */
     EDIT_TEXT(

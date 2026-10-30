@@ -4,6 +4,7 @@
 package com.framecraft.editor.domain.command
 
 import com.framecraft.editor.domain.model.AnchorResolver
+import com.framecraft.editor.domain.model.CaptionResolver
 import com.framecraft.editor.domain.model.Clip
 import com.framecraft.editor.domain.model.ClipAnchor
 import com.framecraft.editor.domain.model.MediaAsset
@@ -104,7 +105,16 @@ sealed interface CommandRejection {
     data class ChromaKeyNotSupported(
         val clipId: String,
     ) : CommandRejection
+
+    /** Clip [clipId] is a caption, whose timing follows the speech it shows and cannot be edited by hand. */
+    data class CaptionLocked(
+        val clipId: String,
+    ) : CommandRejection
 }
+
+/** Returns the rejection for retiming [clip] by hand when it is a caption, or null when it is free to edit. */
+internal fun captionLock(clip: Clip): CommandOutcome? =
+    if (clip.text?.caption != null) CommandOutcome.Rejected(CommandRejection.CaptionLocked(clip.id)) else null
 
 /** A clip together with the track that holds it. */
 internal data class ClipLocation(
@@ -160,14 +170,19 @@ internal fun Project.replacingTrack(
 
 /**
  * Replaces all tracks with those [build] returns, and the assets with [assets], pairing the result with [inverse].
- * Anchored clips follow their parents; model validation failures become [CommandRejection.ModelInvariant].
+ * Anchored clips follow their parents and captions their speech; model validation failures become
+ * [CommandRejection.ModelInvariant].
  */
 internal fun Project.replacingTracks(
     inverse: EditCommand,
     assets: List<MediaAsset> = this.assets,
     build: () -> List<Track>,
 ): CommandOutcome {
-    val result = runCatching { copy(assets = assets, tracks = AnchorResolver.materialize(build())) }
+    val result =
+        runCatching {
+            val anchored = AnchorResolver.materialize(build())
+            copy(assets = assets, tracks = CaptionResolver.materialize(anchored, frameRate))
+        }
     return result.fold(
         onSuccess = { CommandOutcome.Applied(it, inverse) },
         onFailure = { CommandOutcome.Rejected(CommandRejection.ModelInvariant(it.message.orEmpty())) },

@@ -81,14 +81,15 @@ sealed interface EditorState {
 
 /**
  * What the editor creates for each open project through [createPreview] and [createMedia], the microphone it
- * records voiceovers with through [voiceoverCapture], and the frame reader of the chroma key's eyedropper,
- * [keyColorProbe].
+ * records voiceovers with through [voiceoverCapture], the frame reader of the chroma key's eyedropper,
+ * [keyColorProbe], and the speech recognition behind auto-captions, [captions].
  */
 class EditorResources(
     val createPreview: () -> ProjectPreview,
     val createMedia: () -> TimelineMedia,
     val voiceoverCapture: VoiceoverCapture,
     val keyColorProbe: KeyColorProbe,
+    val captions: CaptionServices,
 )
 
 /**
@@ -130,6 +131,16 @@ class EditorViewModel(
 
     /** Reads source frames for the chroma key's eyedropper. */
     val keyColorProbe: KeyColorProbe = resources.keyColorProbe
+
+    /** Makes auto-captions for the open project from the speech of its clips. */
+    val captions: Captioning =
+        Captioning(
+            scope = viewModelScope,
+            services = resources.captions,
+            idGenerator = idGenerator,
+            currentProject = { (mutableState.value as? EditorState.Ready)?.project },
+            dispatch = { dispatch(it) },
+        )
 
     /** Timeline thumbnails and waveforms of the open project; non-null while the state is [EditorState.Ready]. */
     val media: TimelineMedia?
@@ -232,6 +243,7 @@ class EditorViewModel(
     /** Closes the open project, already saved, and returns to the home screen; a running take is discarded. */
     fun close() {
         voiceover.release()
+        captions.closeSheet()
         open?.let { closing ->
             closing.release()
             viewModelScope.launch { closing.closeSession() }
@@ -305,6 +317,7 @@ class EditorViewModel(
                                 createMedia = container::createTimelineMedia,
                                 voiceoverCapture = container.voiceoverCapture,
                                 keyColorProbe = container.keyColorProbe,
+                                captions = container.captionServices,
                             ),
                     )
                 }

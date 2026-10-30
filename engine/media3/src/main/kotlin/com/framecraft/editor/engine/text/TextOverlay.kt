@@ -10,6 +10,7 @@ import androidx.media3.common.util.Size
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.BitmapOverlay
 import com.framecraft.editor.engine.placementSettings
+import com.framecraft.editor.engine.plan.Karaoke
 import com.framecraft.editor.engine.plan.TextSpan
 
 /** Canvas side assumed until Media3 reports the real size, so a bitmap can always be produced. */
@@ -27,6 +28,7 @@ internal class TextOverlay(
     private var canvas = Size(UNKNOWN_CANVAS_SIDE, UNKNOWN_CANVAS_SIDE)
     private var bitmap: Bitmap? = null
     private var drawnCount = -1
+    private var drawnWord = -1
 
     /** Records the canvas size and drops any bitmap drawn for another size. */
     override fun configure(videoSize: Size) {
@@ -36,16 +38,21 @@ internal class TextOverlay(
         }
     }
 
-    /** Returns the text bitmap at [presentationTimeUs], redrawing it when more or fewer characters show. */
+    /**
+     * Returns the text bitmap at [presentationTimeUs], redrawing it when more or fewer characters show or a caption
+     * moves on to another spoken word.
+     */
     override fun getBitmap(presentationTimeUs: Long): Bitmap {
         val count = frameAt(presentationTimeUs).revealed
+        val word = Karaoke.wordAt(span.wordStartsMicros, presentationTimeUs)
         val current = bitmap
-        return if (current != null && count == drawnCount) {
+        return if (current != null && count == drawnCount && word == drawnWord) {
             current
         } else {
-            TextLayouter.render(span.content, canvas.width, canvas.height, count).also {
+            TextLayouter.render(span.content, canvas.width, canvas.height, count, word).also {
                 bitmap = it
                 drawnCount = count
+                drawnWord = word
             }
         }
     }

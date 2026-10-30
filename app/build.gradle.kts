@@ -21,6 +21,11 @@ android {
         targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
+
+        ndk {
+            // The speech recognizer's x86_64 native library is not 16 KB aligned; phones need only ARM.
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     buildTypes {
@@ -66,6 +71,7 @@ dependencies {
     implementation(project(":domain"))
     implementation(project(":data:project"))
     implementation(project(":engine:media3"))
+    implementation(project(":engine:captions"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

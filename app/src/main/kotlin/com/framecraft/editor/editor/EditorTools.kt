@@ -24,6 +24,8 @@ import com.framecraft.editor.domain.command.SetClipAudio
 import com.framecraft.editor.domain.command.SetOverlayTransform
 import com.framecraft.editor.domain.command.SplitClip
 import com.framecraft.editor.domain.edit.AudioPlacement
+import com.framecraft.editor.domain.edit.CaptionPlanner
+import com.framecraft.editor.domain.edit.CaptionScope
 import com.framecraft.editor.domain.edit.OverlayPlacement
 import com.framecraft.editor.domain.edit.TextPlacement
 import com.framecraft.editor.domain.model.Clip
@@ -118,8 +120,9 @@ internal fun rememberMediaPickers(
 
 /**
  * Returns which tools apply to [selected], which sits on a track of [selectedKind], at [positionMicros]. Overlays
- * can be added when the project has a base clip, text when a text lane is free at the playhead too, and a
- * voiceover when an audio lane is; the picker and recorder tools wait while a pick is still [importing].
+ * can be added when the project has a base clip, text when a text lane is free at the playhead too, a voiceover
+ * when an audio lane is, and captions when a clip has sound or captions exist; the picker, recorder, and caption
+ * tools wait while a pick is still [importing].
  */
 internal fun toolAvailability(
     project: Project,
@@ -131,9 +134,11 @@ internal fun toolAvailability(
     val asset = selected?.let(project::assetOf)
     val placed = selected?.takeIf { selectedKind?.isPlaced == true }
     val isVideo = asset?.kind == MediaKind.VIDEO && selectedKind != TrackKind.AUDIO
+    val captionable = CaptionPlanner.sources(project, CaptionScope.ALL, null, includeMuted = true).isNotEmpty()
+    val splittable = selected != null && SplitClip.isSplittable(selected, positionMicros, project.frameRate)
     return ToolAvailability(
         hasSelection = selected != null,
-        canSplit = selected != null && SplitClip.isSplittable(selected, positionMicros, project.frameRate),
+        canSplit = splittable && selected?.text?.caption == null,
         canAddOverlay = !importing && OverlayPlacement.baseTrack(project) != null,
         overlayOpacity = placed?.let { (it.overlayTransform ?: OverlayTransform()).opacity },
         selectedClipId = selected?.id,
@@ -150,6 +155,7 @@ internal fun toolAvailability(
         canExtract = isVideo && selected != null && AudioPlacement.canExtract(project, selected),
         audio = selected?.takeIf { asset?.hasAudio == true }?.let(::clipAudioOf),
         canRecord = !importing && AudioPlacement.canRecord(project, positionMicros),
+        canCaption = !importing && (CaptionPlanner.hasCaptions(project) || captionable),
     )
 }
 
@@ -221,6 +227,7 @@ internal fun toolActions(
         onOpenChromaKey = { pickers.picture.openChromaKey(selected?.id) },
         onOpenMixer = pickers.mixer::open,
         onRecordVoiceover = { pickers.voiceover.start() },
+        onOpenCaptions = viewModel.captions::openSheet,
     )
 
 /** Returns the command that removes clip [clipId] from a track of [kind]. */

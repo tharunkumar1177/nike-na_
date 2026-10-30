@@ -313,7 +313,35 @@
     <item quantity="one">Applied to %1$d clip</item>
     <item quantity="other">Applied to %1$d clips</item>
   </plurals>
-  <string name="timeline_nudge_earlier">Move one frame earlier</string>
+  <string name="editor_tool_captions">Captions</string>
+  <string name="editor_tool_captions_description">Make captions from speech</string>
+  <string name="editor_captions_title">Auto captions</string>
+  <string name="editor_captions_source">Caption</string>
+  <string name="editor_captions_source_all">All clips with sound</string>
+  <string name="editor_captions_source_voiceovers">Voiceovers only</string>
+  <string name="editor_captions_source_selected">Selected clip</string>
+  <string name="editor_captions_include_muted">Include muted clips</string>
+  <string name="editor_captions_language">Language: English. Speech is recognized on this phone and never uploaded.</string>
+  <string name="editor_captions_download_note">Captions need a one-time %1$s speech download.</string>
+  <string name="editor_captions_generate">Generate captions</string>
+  <string name="editor_captions_regenerate">Regenerate captions</string>
+  <string name="editor_captions_replace_note">Regenerating replaces every caption in the project.</string>
+  <string name="editor_captions_remove_all">Remove all captions</string>
+  <string name="editor_captions_downloading">Downloading speech model… %1$d%%</string>
+  <string name="editor_captions_generating">Making captions… %1$d%%</string>
+  <string name="editor_captions_wait_note">Captions are added when this finishes.</string>
+  <string name="editor_captions_cancel">Cancel</string>
+  <plurals name="editor_captions_added">
+    <item quantity="one">%1$d caption added</item>
+    <item quantity="other">%1$d captions added</item>
+  </plurals>
+  <string name="editor_captions_no_speech">No speech was found in the selected clips.</string>
+  <string name="editor_captions_failed_space">Not enough storage for the speech model. Free up some space and try again.</string>
+  <string name="editor_captions_failed_network">Couldn\'t download the speech model. Check your connection and try again.</string>
+  <string name="editor_captions_failed_corrupt">The speech model download was damaged. Try again.</string>
+  <string name="editor_captions_failed_engine">Speech recognition isn\'t available on this phone.</string>
+  <string name="editor_captions_retry">Try again</string>
+  <string name="editor_captions_done">Done</string>  <string name="timeline_nudge_earlier">Move one frame earlier</string>
   <string name="timeline_nudge_later">Move one frame later</string>
   <plurals name="editor_recovered_edits">
     <item quantity="one">Recovered project. %d unsaved edit couldn\'t be restored.</item>

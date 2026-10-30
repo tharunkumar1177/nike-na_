@@ -24,7 +24,10 @@ data class MoveOverlay(
     override fun applyTo(project: Project): CommandOutcome {
         val (track, clip) = project.locate(clipId) ?: return clipNotFound(clipId)
         val parentStart = anchor?.let { project.locate(it.parentClipId)?.clip?.startMicros }
-        return if (anchor != null && parentStart == null) {
+        val lock = captionLock(clip)
+        return if (lock != null) {
+            lock
+        } else if (anchor != null && parentStart == null) {
             clipNotFound(anchor.parentClipId)
         } else {
             project.replacingTrack(MoveOverlay(clipId, clip.anchor, clip.startMicros)) {

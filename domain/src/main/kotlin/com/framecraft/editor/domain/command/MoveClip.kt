@@ -22,7 +22,7 @@ data class MoveClip(
     /** The inverse moves the clip back to where it started. */
     override fun applyTo(project: Project): CommandOutcome {
         val (track, clip) = project.locate(clipId) ?: return clipNotFound(clipId)
-        return project.replacingTrack(MoveClip(clipId, clip.startMicros)) {
+        return captionLock(clip) ?: project.replacingTrack(MoveClip(clipId, clip.startMicros)) {
             val others = track.clips.filter { it.id != clipId }
             val placed =
                 if (track.magnetic) {

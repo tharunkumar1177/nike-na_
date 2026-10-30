@@ -22,7 +22,10 @@ data class ReanchorOverlay(
     override fun applyTo(project: Project): CommandOutcome {
         val (track, clip) = project.locate(clipId) ?: return clipNotFound(clipId)
         val parent = parentClipId?.let { project.locate(it)?.clip }
-        return if (parentClipId != null && parent == null) {
+        val lock = captionLock(clip)
+        return if (lock != null) {
+            lock
+        } else if (parentClipId != null && parent == null) {
             clipNotFound(parentClipId)
         } else {
             project.replacingTrack(ReanchorOverlay(clipId, clip.anchor?.parentClipId)) {

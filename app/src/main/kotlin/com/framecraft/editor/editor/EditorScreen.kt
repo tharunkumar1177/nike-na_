@@ -93,6 +93,9 @@ const val TOOL_MASK_TAG = "editor_tool_mask"
 /** Test tag of the chroma key tool. */
 const val TOOL_CHROMA_TAG = "editor_tool_chroma"
 
+/** Test tag of the auto captions tool. */
+const val TOOL_CAPTIONS_TAG = "editor_tool_captions"
+
 /** Test tag of the previous frame action. */
 const val FRAME_BACK_TAG = "editor_frame_back"
 
@@ -176,7 +179,7 @@ class PlaybackActions(
  * What the tools do: split and delete the selection, add an overlay, text, or music, save the selected overlay's or
  * text's opacity, edit or animate the selected text, extract the selected clip's audio, save its volume and fades,
  * open the canvas sheet, toggle the selected base clip's fit and its placement handles, open the speed and look
- * sheets and the mask and chroma key panels, open the mixer, and record a voiceover.
+ * sheets and the mask and chroma key panels, open the mixer, record a voiceover, and open the caption sheet.
  */
 data class ToolActions(
     val onSplitClip: () -> Unit,
@@ -198,6 +201,7 @@ data class ToolActions(
     val onOpenChromaKey: () -> Unit = {},
     val onOpenMixer: () -> Unit = {},
     val onRecordVoiceover: () -> Unit = {},
+    val onOpenCaptions: () -> Unit = {},
 )
 
 /**
@@ -220,7 +224,8 @@ data class CanvasToolState(
  * now, [showExtract] when the selection is a video whose sound could be lifted and [canExtract] when that is possible
  * now, [showSpeed] when the selection is a video whose speed can change, [showLook] when the selection is a picture
  * that can take a look, mask, and chroma key, [maskActive] and [chromaKeyActive] when it has them, [audio] when the
- * selection plays sound, [canRecord] when a voiceover can start at the playhead, and the [canvas] tools.
+ * selection plays sound, [canRecord] when a voiceover can start at the playhead, [canCaption] when the project has
+ * sound to caption or captions to change, and the [canvas] tools.
  */
 data class ToolAvailability(
     val hasSelection: Boolean = false,
@@ -241,6 +246,7 @@ data class ToolAvailability(
     val chromaKeyActive: Boolean = false,
     val audio: ClipAudio? = null,
     val canRecord: Boolean = false,
+    val canCaption: Boolean = false,
     val canvas: CanvasToolState = CanvasToolState(),
 )
 

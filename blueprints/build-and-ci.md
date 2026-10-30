@@ -28,7 +28,7 @@ The scaffold creates the modules listed in the architecture as they are needed, 
 
 ### Verification boundaries
 
-The workflow runs ktlint, detekt, Android Lint, unit tests, and `assembleDebug`. Each runs as a distinct step so failures are attributable. Gradle runs on JDK 21 (Robolectric's SDK 36 sandbox requires it) while bytecode targets Java 17. Robolectric JVM tests need `--add-opens` for `java.base` internals, configured in `app/build.gradle.kts`. `:domain` uses JUnit 5; Robolectric tests in `:app` use JUnit 4.
+The workflow runs ktlint, detekt, Android Lint, unit tests, and `assembleDebug`. Each runs as a distinct step so failures are attributable. Gradle runs on JDK 21 (Robolectric's SDK 36 sandbox requires it) while bytecode targets Java 17. Robolectric JVM tests need `--add-opens` for `java.base` internals, configured in `app/build.gradle.kts`. `:domain` uses JUnit 5; Robolectric tests in `:app` and the unit tests in `:engine:media3` and `:engine:captions` use JUnit 4. The app packages only the `arm64-v8a` and `armeabi-v7a` ABIs because the speech recognizer's x86_64 library is not 16 KB aligned.
 
 ## Related blueprints
 

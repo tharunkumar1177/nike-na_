@@ -51,6 +51,7 @@ Timeline drawing reads derived state so scrubbing does not recompose the whole s
 - Each cut between touching clips on a video track shows a badge (`TimelineCuts`) whose touch zone opens the transition sheet (`TransitionSheet`) per `assets/wireframes/transitions-slice12.md`; TalkBack has one action per cut (`TimelineCutsTest`, `TransitionSheetTest`). Details belong to [transitions](transitions.md).
 - The Look tool follows Speed for any clip on a video or overlay track and opens the look sheet (`LookSheet`, `LookTabs`) per `assets/wireframes/look-slice13.md`, with Filters and Adjust tabs, Apply to all, and Reset all (`LookSheetTest`, `EditorScreenTest`). Details belong to [look](look.md).
 - Mask and Chroma key follow Look for the same clips, highlighted while the clip has one, and open docked panels (`DockedPanel`) that leave the preview touchable per `assets/wireframes/masks-slice15.md`. The overlay layer chain puts the eyedropper or mask handles (`pictureEffectLayer`) after the voiceover bar and before the selection handles (`MaskPanelTest`, `ChromaPanelTest`, `PictureGeometryTest`, `EditorScreenTest`). Details belong to [masks](masks.md).
+- Captions follows Text and opens the caption sheet (`CaptionSheetHost`, driven by `Captioning` on the view model) per `assets/wireframes/captions-slice16.md`. Captions select on the timeline but get no drag, trim handles, nudges, or split. The sheet and these guards have no UI test yet. Details belong to [captions](captions.md).
 
 ## Related blueprints
 

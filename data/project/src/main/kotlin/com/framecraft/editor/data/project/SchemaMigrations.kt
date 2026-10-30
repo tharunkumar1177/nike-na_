@@ -68,6 +68,7 @@ class SchemaMigrations(
                     Migration7To8,
                     Migration8To9,
                     Migration9To10,
+                    Migration10To11,
                 ),
             )
     }

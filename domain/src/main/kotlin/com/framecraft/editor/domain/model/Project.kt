@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
 import kotlin.math.abs
 
 /** Schema version written by this build. */
-const val CURRENT_SCHEMA_VERSION: Int = 10
+const val CURRENT_SCHEMA_VERSION: Int = 11
 
 /** An immutable project snapshot. Construction fails if any cross-object invariant is broken. */
 @Serializable
@@ -41,6 +41,7 @@ data class Project(
             }
         }
         AnchorResolver.validate(tracks)
+        CaptionResolver.validate(tracks, assets, frameRate)
     }
 
     /**

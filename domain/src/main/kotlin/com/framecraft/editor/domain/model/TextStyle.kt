@@ -101,7 +101,8 @@ data class TextShadow(
 
 /**
  * The look of a text clip. [sizeFraction] is the text height as a fraction of the canvas height, so text keeps its
- * proportions at any output resolution. A [backgroundArgb] draws a box behind each line.
+ * proportions at any output resolution. A [backgroundArgb] draws a box behind each line. On a caption, a
+ * [highlightArgb] colors the word being spoken.
  */
 @Serializable
 data class TextStyle(
@@ -112,6 +113,7 @@ data class TextStyle(
     val shadow: TextShadow? = null,
     val backgroundArgb: Int? = null,
     val alignment: TextAlignment = TextAlignment.CENTER,
+    val highlightArgb: Int? = null,
 ) {
     init {
         require(sizeFraction in MIN_TEXT_SIZE_FRACTION..MAX_TEXT_SIZE_FRACTION) { "Text size out of range" }

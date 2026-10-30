@@ -10,7 +10,8 @@ import kotlinx.serialization.Serializable
 
 /**
  * Sets text clip [clipId] to show [content]. Animations longer than the clip are shortened to fit it. Clips that
- * are not text are rejected.
+ * are not text are rejected. Retyping a caption's words while keeping its speech turns it into plain text, which
+ * no longer follows the speech or highlights words.
  */
 @Serializable
 @SerialName("setTextContent")
@@ -26,7 +27,9 @@ data class SetTextContent(
             modelInvariant("Clip $clipId is not a text clip")
         } else {
             project.replacingTrack(SetTextContent(clipId, previous)) {
-                val changed = clip.copy(text = content.fitted(clip.durationMicros))
+                val sameSpeech = content.caption != null && content.caption == previous.caption
+                val kept = if (sameSpeech && content.text != previous.text) content.copy(caption = null) else content
+                val changed = clip.copy(text = kept.fitted(clip.durationMicros))
                 track.copy(clips = track.clips.map { if (it.id == clipId) changed else it })
             }
         }
