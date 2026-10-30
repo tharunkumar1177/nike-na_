@@ -48,6 +48,7 @@ The commands `RenameProject`, `DeleteClip`, `AddClip`, `TrimClip`, `SplitClip`, 
 - `SetTransition` and `ApplyTransitionToAll` invert through `SetTransitions`, which restores each clip's previous transition verbatim. `SplitClip` hands a transition to the right part and `MergeClips` keeps the right part's, so splits and merges undo exactly; no other command touches transitions (`TransitionCommandsTest`). Details belong to [transitions](transitions.md).
 - `SetClipLook` and `ApplyLookToAll` invert through `SetLooks`, which restores each clip's previous look verbatim. `SplitClip` gives both parts the look and `MergeClips` requires both parts to share it, and extracted sound carries none (`LookCommandsTest`). Details belong to [look](look.md).
 - `SetClipMask` and `SetClipChromaKey` are their own inverses, writing the previous value back verbatim. `SplitClip` gives both parts the mask and key, `MergeClips` requires both parts to share them, and extracted sound carries none (`MaskKeyCommandsTest`). Details belong to [masks](masks.md).
+- `ReplaceCaptions` inverts through the reverse list of reverse lane changes. Moving, trimming, or splitting a caption is refused with `CaptionLocked`; a trim that silences captions carries them in its inverse as `restoredCaptions`, and every command re-derives bound captions after it edits tracks (`CaptionCommandsTest`). Details belong to [captions](captions.md).
 
 ## Related blueprints
 

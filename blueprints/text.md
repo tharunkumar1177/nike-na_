@@ -89,4 +89,4 @@ The text model rules, the commands `AddTextClip`, `RemoveTextClip`, and `SetText
 - Text is drawn by Media3 composition effects in preview, which Media3 marks as still settling; preview and export have not been compared on a device.
 - Right-to-left text, emoji, and very long words have no automated rendering test; `TextLayouter` needs a device or screenshot tests.
 - Only system fonts are offered; custom fonts, per-character styling, and text templates are not planned yet.
-- Captions generated from speech arrive in slice 12.
+- Captions generated from speech are text clips with word timing; their binding, commands, and recognition belong to [captions](captions.md).

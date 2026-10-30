@@ -37,6 +37,7 @@ Versions are declared in `gradle/libs.versions.toml` and resolved in CI; the tab
 | Dependency injection | Manual app container (Hilt deferred until the graph needs it) |
 | Serialization | kotlinx.serialization (JSON) |
 | Unit tests | JUnit Jupiter (JUnit 6 BOM) for pure Kotlin modules; Robolectric 4.17 with JUnit 4 for Android JVM tests |
+| Speech recognition | Vosk for Android 0.3.75 with the small English model, downloaded once on demand (ARM ABIs only) |
 | Static analysis | ktlint (kotlinter 5.7.0), detekt 2.0.0-alpha.6, Android Lint |
 | SDK levels | minSdk 29, targetSdk 37 |
 
@@ -50,6 +51,7 @@ Dependencies point inward toward `:domain`. `:domain` has zero Android dependenc
 |---|---|---|
 | `:domain` | Project model, time math, anchoring and ripple rules, edit commands | Kotlin stdlib, kotlinx.serialization |
 | `:engine:media3` | Translating a project snapshot into a Media3 `Composition`; preview player; export | `:domain`, Media3 |
+| `:engine:captions` | On-device speech recognition, the speech model download, and decoding clip sound for it | `:domain`, Vosk, Android media codecs |
 | `:data:project` | Project document files, command journal, autosave, recovery (pure JVM) | `:domain`, kotlinx.serialization, kotlinx.coroutines |
 | `:feature:*` | Compose screens and ViewModels (for example `:feature:timeline`, `:feature:import`) | `:domain`, engine and data interfaces |
 | `:app` | Application, Hilt graph, navigation, foreground services | All modules |
@@ -92,7 +94,8 @@ Feature modules never import Media3 types directly; they talk to engine interfac
 - A clip on a video track may carry an outgoing transition (kind and length) into the next clip. It plays only while the two clips touch and both have enough hidden source, centered on the cut without changing the timeline's length; otherwise it is kept unplayed, so edits around it and their undo never rewrite it.
 - A clip on a video or overlay track may carry a look: one catalog filter, stored by a stable id, at an intensity from 0 to 100 percent, and six color adjustments (brightness, contrast, saturation, exposure, temperature, tint) from -100 to 100 where 0 changes nothing. A look that changes nothing is stored as none. A filter id the app does not know is kept and draws as no filter.
 - A clip on a video or overlay track may also carry a mask (one of six shapes, placed in picture coordinates with feather, rounding, and inversion) and a chroma key (one opaque key color with strength, softness, and spill removal from 0 to 100). A key with no strength is stored as none.
-- The document carries an integer `schemaVersion` (currently 10). Readers migrate older versions forward; they refuse newer versions with a visible error.
+- A text clip may be a caption: besides its words it stores 1 to 12 recognized words, each with its source start and end in the parent clip's media, and the source time its hold ends. A caption may also set a highlight color for the word being spoken.
+- The document carries an integer `schemaVersion` (currently 11). Readers migrate older versions forward; they refuse newer versions with a visible error.
 
 ### Anchoring and ripple
 
@@ -102,6 +105,7 @@ Feature modules never import Media3 types directly; they talk to engine interfac
 - When a parent clip moves or ripples, anchored children move with it. When a parent is deleted, children become unanchored at their current absolute position, and undoing the delete restores their anchors.
 - Splitting a parent hands the children that start at or after the cut to the right part; merging hands the right part's children to the merged clip.
 - Ripple on a magnetic track shifts following clips on that track and, through anchors, their children on other tracks. An edit whose ripple would make clips overlap is rejected as a whole.
+- A caption anchored to a clip of a timed asset with sound is bound to it: its start, length, and text are derived from the words the parent's source span plays (through `SpeedMap`), and every command re-derives them, so trims and speed changes keep captions on their speech. A trim that leaves a caption no words removes it, and undo restores it. A caption whose parent is deleted keeps its last placement unanchored. Captions are never moved, trimmed, or split directly, and editing a caption's words turns it into plain anchored text.
 
 ### Edit commands and history
 
@@ -124,7 +128,7 @@ Feature modules never import Media3 types directly; they talk to engine interfac
 - The adapter maps each track to a Media3 `EditedMediaItemSequence` and pads implicit gaps with generated silent or transparent segments at preview and export time.
 - Media3 draws the first picture sequence on top and times every composed frame by it, so overlay sequences come first (top lane first), base video sequences after them, then the background sequence (a solid still, or the first base track reduced and blurred), and audio sequences last. The picture is composited when there are overlays, a fixed canvas shape, a background other than black, or any base placement; otherwise the base plays alone, as before. When composited, a hidden transparent clock sequence at the project frame rate goes before all of them, so frames keep that rate through gaps, and the multi-input composition tone-maps HDR to SDR in OpenGL because the compositor draws only SDR. Every picture sequence is padded to the end of the latest track, because the compositor waits for a frame from every picture input and sound beyond the pictures must still play. Audio sequences carry only audio; a muted picture clip carries no audio, and every other clip's sound passes through per-clip processing (to 16-bit PCM, mixed to stereo, then the clip's gain with clamping). A compositor setting sizes the canvas and places each overlay and base frame from the clip covering its time, stretches a solid background, fills the canvas with the blur, and hides any input no clip covers (Media3 fills sequence gaps with opaque black); the output takes the canvas shape around the first base sequence's short side. Preview builds its player with a multiple-input video graph so the same composition renders on screen.
 - A sped clip's item is clipped to its source span and given a Media3 speed provider built from its `SpeedMap` steps, with pitch kept when the clip asks; a sped-up picture is capped at the project frame rate. Gaps, stills, and the clock and background sequences never carry speed.
-- Text tracks add no sequence. Each text clip becomes a bitmap overlay in one overlay effect applied to the composed picture, before any export resizing, so preview and export draw it the same way; upper text lanes draw on top. Text tracks still count toward the padded end. A project with only text has nothing to export.
+- Text tracks add no sequence. Each text clip becomes a bitmap overlay in one overlay effect applied to the composed picture, before any export resizing, so preview and export draw it the same way; upper text lanes draw on top. Text tracks still count toward the padded end. A project with only text has nothing to export. A caption with a highlight color redraws when the spoken word changes, coloring that word's fill from the word starts mapped onto the timeline.
 - Transitions consume clip handles (overlapping source media); they never freeze frames. Through each window the base sequence keeps playing the outgoing clip's hidden source, an incoming sequence placed just before it plays the next clip's hidden lead-in, and fades add a solid backdrop sequence just after it; the compositor moves and fades each side.
 - A look becomes per-clip video effects on the clip's item, in a fixed order: the filter as a 33-point color table blended at its intensity, then one color matrix for brightness, contrast, exposure, temperature, and tint, then saturation. Every lane that draws the clip (base, transition, blurred background) carries its look. Color tables draw only SDR, so a project with any filter tone-maps HDR to SDR in OpenGL even when not composited.
 - A clip's chroma key, then its mask, run before its look as effects that write alpha. Base, transition, and overlay lanes carry them; the blurred background carries only the look. Any masked or keyed clip forces the composited path, which blends straight alpha over the lanes below.
@@ -135,6 +139,7 @@ Feature modules never import Media3 types directly; they talk to engine interfac
 
 - Video and photo import uses Android photo picker and media store APIs and handles partial access (`READ_MEDIA_VISUAL_USER_SELECTED`) on Android 14 and later. Music is picked through the system document picker (`audio/*`), which needs no permission; the importer keeps a persistable read grant where the provider offers one.
 - Voiceover takes are recorded with `RECORD_AUDIO`, asked for when first recording, into the project directory's `recordings/` folder; the project owns them, and opening a project deletes takes nothing references.
+- Auto-captions read clip sound on the device; speech never leaves it. The only network use is the one-time speech model download (`INTERNET`), pinned by size and SHA-256, unpacked into app-private storage, and asked for only when the user starts captions without the model.
 - Loss of access to a referenced source is a recoverable state (offline clip with relink), never a crash or silent removal.
 - Exports are published to the shared `Movies/Framecraft` collection through `MediaStore` with `IS_PENDING`, so other apps never see a partial file and no storage permission is needed. Exported files are shared by content URI with a read grant.
 
@@ -154,6 +159,7 @@ Feature modules never import Media3 types directly; they talk to engine interfac
 - `:domain`: JUnit 5 unit tests for time math, commands, anchoring, ripple, and migrations.
 - `:data:project`: JUnit unit tests for journal append, compaction, torn-write recovery, and schema migration.
 - `:engine:media3`: unit tests for snapshot-to-composition mapping; instrumented tests where a device is required.
+- `:engine:captions`: JUnit 4 unit tests for result parsing and transcription over fake sound and engines; recognition quality and decoding need a device.
 - UI: Compose UI tests for screen state and interactions.
 - GitHub Actions CI is the only build authority: ktlint, detekt, Android Lint, unit tests, and assemble must pass on every push.
 

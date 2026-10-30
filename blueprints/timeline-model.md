@@ -46,6 +46,7 @@ Clips on one track must not overlap. Magnetic tracks are kept gap-free by the co
 - A clip may carry `outTransition` (`ClipTransition`: kind and a positive length) into the next clip. Whether it plays is computed from the track by `TransitionGeometry`, never stored, so the field survives edits that separate the clips. The rules and commands belong to [transitions](transitions.md).
 - A clip on a video or overlay track may carry `look` (`ClipLook`: an optional catalog filter at an intensity and six color adjustments); the project refuses a look on any other track. The rules and commands belong to [look](look.md).
 - The same tracks may carry `mask` (`ClipMask`) and `chromaKey` (`ChromaKey`); the project refuses either on any other track. The rules and commands belong to [masks](masks.md).
+- A text clip's content may carry `caption` (`CaptionContent`: source-timed words). Anchored to a sound clip, it is re-derived from that parent by `CaptionResolver` after every command, and the project refuses captions that are out of step with their speech. The rules and commands belong to [captions](captions.md).
 
 ## Related blueprints
 

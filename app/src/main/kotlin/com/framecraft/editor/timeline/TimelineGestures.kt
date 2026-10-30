@@ -127,10 +127,10 @@ private suspend fun AwaitPointerEventScope.holdOrScrub(
     val cut = cutAt(context, down.position)
     val target = hit?.takeIf { it.track.magnetic && cut == null }
     val hold = if (target == null) Hold.MOVED else awaitHold(down)
-    val draggable = hit != null && hit.track.kind.isPlaced && hit.clip.text?.caption == null
+    val dragged = hit?.takeIf { it.track.kind.isPlaced && it.clip.text?.caption == null }
     when {
-        hit != null && draggable -> {
-            overlayDrag(context, hit, down)
+        dragged != null -> {
+            overlayDrag(context, dragged, down)
         }
 
         hold == Hold.LONG_PRESS && target != null -> {
