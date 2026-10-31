@@ -1,6 +1,12 @@
 {
   "version": 1,
   "hooks": {
+    "beforeSubmitPrompt": [
+      {
+        "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .cursor/hooks/prompts-log.ps1",
+        "timeout": 10
+      }
+    ],
     "beforeReadFile": [
       {
         "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .cursor/hooks/guard-files.ps1",
