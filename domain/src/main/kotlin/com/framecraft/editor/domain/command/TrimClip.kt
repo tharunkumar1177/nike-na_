@@ -109,5 +109,4 @@ data class TrimClip(
         tracks: List<Track>,
         frameRate: FrameRate,
     ): List<Track> = CaptionResolver.materialize(AnchorResolver.materialize(tracks), frameRate)
-    }
 }
