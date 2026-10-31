@@ -17,6 +17,22 @@ data class HistoryStep(
     val project: Project,
 )
 
+/** Result of [EditHistory.undo] and [EditHistory.redo]. */
+sealed interface HistoryOutcome {
+    /** The entry was undone or redone, giving [step]. */
+    data class Moved(
+        val step: HistoryStep,
+    ) : HistoryOutcome
+
+    /** There was no entry to undo or redo. */
+    data object Empty : HistoryOutcome
+
+    /** The entry's command or inverse was rejected for [reason]; history and project are unchanged. */
+    data class Rejected(
+        val reason: CommandRejection,
+    ) : HistoryOutcome
+}
+
 /**
  * Linear history: entries before [cursor] are applied and can be undone; entries at or after it
  * were undone and can be redone. Pushing a new entry discards the redo entries.
@@ -36,19 +52,31 @@ class EditHistory private constructor(
     /** Returns the history with [entry] applied after the cursor, discarding redo entries. */
     fun pushed(entry: HistoryEntry): EditHistory = EditHistory(entries.take(cursor) + entry, cursor + 1)
 
-    /** Undoes the entry before the cursor on [project]; null when there is none or its inverse is rejected. */
-    fun undo(project: Project): HistoryStep? =
-        entries
-            .getOrNull(cursor - 1)
-            ?.let { it.inverse.applyTo(project) as? CommandOutcome.Applied }
-            ?.let { HistoryStep(EditHistory(entries, cursor - 1), it.project) }
+    /** Undoes the entry before the cursor on [project]. */
+    fun undo(project: Project): HistoryOutcome = step(entries.getOrNull(cursor - 1)?.inverse, project, cursor - 1)
 
-    /** Redoes the entry at the cursor on [project]; null when there is none or its command is rejected. */
-    fun redo(project: Project): HistoryStep? =
-        entries
-            .getOrNull(cursor)
-            ?.let { it.command.applyTo(project) as? CommandOutcome.Applied }
-            ?.let { HistoryStep(EditHistory(entries, cursor + 1), it.project) }
+    /** Redoes the entry at the cursor on [project]. */
+    fun redo(project: Project): HistoryOutcome = step(entries.getOrNull(cursor)?.command, project, cursor + 1)
+
+    /** Applies [command] to [project] and moves the cursor to [nextCursor]; [HistoryOutcome.Empty] when null. */
+    private fun step(
+        command: EditCommand?,
+        project: Project,
+        nextCursor: Int,
+    ): HistoryOutcome =
+        when (val outcome = command?.applyTo(project)) {
+            null -> {
+                HistoryOutcome.Empty
+            }
+
+            is CommandOutcome.Rejected -> {
+                HistoryOutcome.Rejected(outcome.reason)
+            }
+
+            is CommandOutcome.Applied -> {
+                HistoryOutcome.Moved(HistoryStep(EditHistory(entries, nextCursor), outcome.project))
+            }
+        }
 
     /** Factories. */
     companion object {

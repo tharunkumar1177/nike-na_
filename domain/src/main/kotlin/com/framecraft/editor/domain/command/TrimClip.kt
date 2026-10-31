@@ -3,7 +3,11 @@
  */
 package com.framecraft.editor.domain.command
 
+import com.framecraft.editor.domain.model.AnchorResolver
+import com.framecraft.editor.domain.model.CaptionResolver
 import com.framecraft.editor.domain.model.Project
+import com.framecraft.editor.domain.model.Track
+import com.framecraft.editor.domain.time.FrameRate
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -89,9 +93,20 @@ data class TrimClip(
             val delta = trimmed.endMicros - clip.endMicros
             val placed = if (track.magnetic) others.shiftedFrom(clip.endMicros, delta) else others
             val trimmedTrack = track.copy(clips = (placed + trimmed).sortedBy { it.startMicros })
-            project.tracks
-                .map { if (it.id == track.id) trimmedTrack else it }
-                .swappingClips(silenced.map { it.clip.id }.toSet(), restoredCaptions)
+            val trimmedTracks =
+                project.tracks
+                    .map { if (it.id == track.id) trimmedTrack else it }
+                    .swappingClips(silenced.map { it.clip.id }.toSet(), emptyList())
+            settled(trimmedTracks, project.frameRate).swappingClips(emptySet(), restoredCaptions)
         }
     }
+
+    /**
+     * Returns [tracks] with anchored clips and captions moved to follow their parents at [frameRate]. Restored
+     * captions go back only after this, because until the others have moved back they would overlap them.
+     */
+    private fun settled(
+        tracks: List<Track>,
+        frameRate: FrameRate,
+    ): List<Track> = CaptionResolver.materialize(AnchorResolver.materialize(tracks), frameRate)
 }

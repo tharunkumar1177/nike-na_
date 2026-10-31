@@ -9,12 +9,11 @@ import com.framecraft.editor.domain.model.TrackKind
 import com.framecraft.editor.domain.time.FrameRate
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 
-/** Verifies undo, redo, branch truncation, and restoration. */
+/** Verifies undo, redo, branch truncation, rejection, and restoration. */
 class EditHistoryTest {
     private val start =
         Project(
@@ -35,18 +34,24 @@ class EditHistoryTest {
         return HistoryStep(history.pushed(HistoryEntry(command, outcome.inverse)), outcome.project)
     }
 
+    /** Returns the step [outcome] moved to, failing when it did not move. */
+    private fun moved(outcome: HistoryOutcome): HistoryStep {
+        assertTrue(outcome is HistoryOutcome.Moved, "Expected a move, got $outcome")
+        return (outcome as HistoryOutcome.Moved).step
+    }
+
     /** Undo and redo walk the history and stop at its ends. */
     @Test
     fun undoAndRedoWalkTheHistory() {
         val first = record(EditHistory.empty(), start, RenameProject("B"))
         val second = record(first.history, first.project, RenameProject("C"))
-        val undone = requireNotNull(second.history.undo(second.project))
+        val undone = moved(second.history.undo(second.project))
         assertEquals("B", undone.project.name)
-        val undoneTwice = requireNotNull(undone.history.undo(undone.project))
+        val undoneTwice = moved(undone.history.undo(undone.project))
         assertEquals(start, undoneTwice.project)
         assertFalse(undoneTwice.history.canUndo)
-        assertNull(undoneTwice.history.undo(undoneTwice.project))
-        val redone = requireNotNull(undoneTwice.history.redo(undoneTwice.project))
+        assertEquals(HistoryOutcome.Empty, undoneTwice.history.undo(undoneTwice.project))
+        val redone = moved(undoneTwice.history.redo(undoneTwice.project))
         assertEquals("B", redone.project.name)
         assertTrue(redone.history.canRedo)
     }
@@ -56,11 +61,23 @@ class EditHistoryTest {
     fun pushAfterUndoTruncatesRedo() {
         val first = record(EditHistory.empty(), start, RenameProject("B"))
         val second = record(first.history, first.project, RenameProject("C"))
-        val undone = requireNotNull(second.history.undo(second.project))
+        val undone = moved(second.history.undo(second.project))
         val branched = record(undone.history, undone.project, RenameProject("D"))
         assertEquals(2, branched.history.entries.size)
         assertFalse(branched.history.canRedo)
-        assertNull(branched.history.redo(branched.project))
+        assertEquals(HistoryOutcome.Empty, branched.history.redo(branched.project))
+    }
+
+    /** A rejected inverse or command is reported as rejected, not as an empty history. */
+    @Test
+    fun rejectedStepsAreReported() {
+        val broken = HistoryEntry(TrimClip("gone", 0L, 0L, 1_000_000L), TrimClip("gone", 0L, 0L, 1_000_000L))
+        val undoable = EditHistory.restored(listOf(broken), 1)
+        assertTrue(undoable.undo(start) is HistoryOutcome.Rejected)
+        assertTrue(undoable.canUndo)
+        val redoable = EditHistory.restored(listOf(broken), 0)
+        assertTrue(redoable.redo(start) is HistoryOutcome.Rejected)
+        assertTrue(redoable.canRedo)
     }
 
     /** Restored histories validate their cursor. */

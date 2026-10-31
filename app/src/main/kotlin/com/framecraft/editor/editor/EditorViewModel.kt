@@ -57,7 +57,8 @@ sealed interface EditorState {
     /**
      * [project] is open. The counters and flags are one-shot notices not yet shown: [skippedCount] picked
      * files could not be read, [droppedEditCount] edits were lost in a crash, [saveFailed] an edit
-     * could not be saved, and [editRejected] an edit would have broken the project.
+     * could not be saved, [editRejected] an edit would have broken the project, and [historyRejected] an undo or
+     * redo no longer applied.
      */
     data class Ready(
         val project: Project,
@@ -68,6 +69,7 @@ sealed interface EditorState {
         val droppedEditCount: Int = 0,
         val saveFailed: Boolean = false,
         val editRejected: Boolean = false,
+        val historyRejected: Boolean = false,
     ) : EditorState
 
     /** None of the picked files could be read. */
@@ -212,14 +214,14 @@ class EditorViewModel(
         }
     }
 
-    /** Undoes the last edit. */
+    /** Undoes the last edit; one that no longer applies changes nothing and raises the history notice. */
     fun undo() {
-        edit { it.undo() }
+        edit { mutableState.historyStep(it.undo()) }
     }
 
-    /** Redoes the last undone edit. */
+    /** Redoes the last undone edit; one that no longer applies changes nothing and raises the history notice. */
     fun redo() {
-        edit { it.redo() }
+        edit { mutableState.historyStep(it.redo()) }
     }
 
     /** Selects the clip [clipId], or clears the selection when null. */
@@ -235,6 +237,7 @@ class EditorViewModel(
                 EditorNotice.DROPPED_EDITS -> ready.copy(droppedEditCount = 0)
                 EditorNotice.SAVE_FAILED -> ready.copy(saveFailed = false)
                 EditorNotice.EDIT_REJECTED -> ready.copy(editRejected = false)
+                EditorNotice.HISTORY_REJECTED -> ready.copy(historyRejected = false)
                 EditorNotice.VOICEOVER -> ready.also { voiceover.acknowledge() }
             }
         }
@@ -329,6 +332,23 @@ class EditorViewModel(
 internal fun MutableStateFlow<EditorState>.updateReady(transform: (EditorState.Ready) -> EditorState.Ready) {
     update { state -> if (state is EditorState.Ready) transform(state) else state }
 }
+
+/** Returns the state an undo or redo [result] moved to; a rejected one raises the history notice. */
+private fun MutableStateFlow<EditorState>.historyStep(result: DispatchResult?): SessionState? =
+    when (result) {
+        is DispatchResult.Applied -> {
+            result.state
+        }
+
+        is DispatchResult.Rejected -> {
+            updateReady { it.copy(historyRejected = true) }
+            null
+        }
+
+        null -> {
+            null
+        }
+    }
 
 /** Returns this state showing [next], dropping a selection whose clip no longer exists. */
 private fun EditorState.Ready.showing(next: SessionState): EditorState.Ready {

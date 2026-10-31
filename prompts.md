@@ -487,3 +487,9 @@ ship the whole app at once, build the slices back to back and verify each in CI,
 Subagents didn't load AGENTS.md at all. Then line 3 would be pointless, but the Guardrails wouldn't reach subagents either.
 Each subagent file said "ignore the Orchestrator section of AGENTS.md." That moves the same sentence into six files instead of keeping it in one.
 
+
+
+crashing while export (Doesn't supports more than 30 fps)
+The bottom nav bar covers most of the spaces, make it slightly small
+
+

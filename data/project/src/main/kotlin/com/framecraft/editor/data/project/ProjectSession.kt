@@ -8,6 +8,7 @@ import com.framecraft.editor.domain.command.CommandRejection
 import com.framecraft.editor.domain.command.EditCommand
 import com.framecraft.editor.domain.command.EditHistory
 import com.framecraft.editor.domain.command.HistoryEntry
+import com.framecraft.editor.domain.command.HistoryOutcome
 import com.framecraft.editor.domain.command.HistoryStep
 import com.framecraft.editor.domain.model.Project
 import kotlinx.coroutines.CoroutineDispatcher
@@ -80,11 +81,11 @@ class ProjectSession internal constructor(
             }
         }
 
-    /** Undoes the last applied edit; null when there is nothing to undo. */
-    suspend fun undo(): SessionState? = withContext(ioDispatcher) { history.undo(project)?.let(::moveTo) }
+    /** Undoes the last applied edit; null when there is nothing to undo, rejected when its inverse fails. */
+    suspend fun undo(): DispatchResult? = withContext(ioDispatcher) { moveBy(history.undo(project)) }
 
-    /** Redoes the last undone edit; null when there is nothing to redo. */
-    suspend fun redo(): SessionState? = withContext(ioDispatcher) { history.redo(project)?.let(::moveTo) }
+    /** Redoes the last undone edit; null when there is nothing to redo, rejected when it no longer applies. */
+    suspend fun redo(): DispatchResult? = withContext(ioDispatcher) { moveBy(history.redo(project)) }
 
     /** Compacts the journal when it allows and refreshes the list summary; the session stays usable. */
     suspend fun close() {
@@ -119,6 +120,22 @@ class ProjectSession internal constructor(
             compactQuietly()
         }
     }
+
+    /** Moves to the step of [outcome]; a rejected or empty outcome saves and changes nothing. */
+    private fun moveBy(outcome: HistoryOutcome): DispatchResult? =
+        when (outcome) {
+            is HistoryOutcome.Moved -> {
+                DispatchResult.Applied(moveTo(outcome.step))
+            }
+
+            is HistoryOutcome.Rejected -> {
+                DispatchResult.Rejected(outcome.reason)
+            }
+
+            HistoryOutcome.Empty -> {
+                null
+            }
+        }
 
     /** Saves the cursor of [step], then publishes it in memory. */
     private fun moveTo(step: HistoryStep): SessionState {

@@ -143,6 +143,22 @@ class CaptionCommandsTest {
         assertEquals(2_050 * MS, clipOf(trimmed, "C2")?.startMicros)
     }
 
+    /** A trim that leaves a caption no words removes it, and the undo puts it back exactly. */
+    @Test
+    fun trimRemovesSilencedCaptions() {
+        val start = fixture(captionOne, captionTwo)
+        val trim = TrimClip("A", 0L, 2 * SECOND, 4 * SECOND)
+        val trimmed = applied(trim, start)
+        assertNull(clipOf(trimmed, "C1"))
+        assertEquals(SECOND, clipOf(trimmed, "C2")?.startMicros)
+        val forward = trim.applyTo(start) as CommandOutcome.Applied
+        val history = EditHistory.empty().pushed(HistoryEntry(trim, forward.inverse))
+        val undone = history.undo(forward.project) as HistoryOutcome.Moved
+        assertEquals(start, undone.step.project)
+        val redone = undone.step.history.redo(undone.step.project) as HistoryOutcome.Moved
+        assertEquals(trimmed, redone.step.project)
+    }
+
     /** Splitting the clip hands each caption to the part that plays its first word. */
     @Test
     fun splitHandsCaptionsToTheirPart() {
