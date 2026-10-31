@@ -80,7 +80,7 @@ The commands `RenameProject`, `DeleteClip`, `AddClip`, `TrimClip`, `SplitClip`, 
 - [x] Trimming, moving, splitting, merging, and deleting a base clip carry its anchored overlays, and every overlay command's inverse restores the project.
 - [x] An edit whose ripple would make overlays collide is rejected and changes nothing.
 - [x] Canvas aspect, background, and base placement changes undo to the previous value and round-trip through JSON; merging needs matching placements (`CanvasCommandsTest`).
-- [ ] An undo or redo whose command is rejected reports the rejection, distinct from an empty history, and leaves the history unchanged (`EditHistoryTest`).
+- [x] An undo or redo whose command is rejected reports the rejection, distinct from an empty history, and leaves the history unchanged (`EditHistoryTest`).
 
 ## Remaining gaps and unknowns
 

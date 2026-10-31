@@ -94,7 +94,7 @@ Caption content, its binding to the parent clip, the timing locks, and how trim,
 - [x] Recognizer results become source-timed words, bad results give none, and sound is resampled to 16 kHz (`VoskResultParserTest`, `CaptionTranscriberTest`).
 - [x] Word starts follow the clip and the spoken word and its characters are found (`KaraokeTest`).
 - [x] Projects from schema 10 open and save as schema 11 (`ProjectStoreTest`).
-- [ ] A trim that leaves a caption no words removes it, its undo puts it back exactly, and redo removes it again (`CaptionCommandsTest`).
+- [x] A trim that leaves a caption no words removes it, its undo puts it back exactly, and redo removes it again (`CaptionCommandsTest`).
 - [ ] The model downloads and installs, real clip sound is recognized, and the highlight renders and exports as previewed (needs a device).
 
 ## Remaining gaps and unknowns
