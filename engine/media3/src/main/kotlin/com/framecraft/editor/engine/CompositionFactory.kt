@@ -27,6 +27,7 @@ import com.framecraft.editor.engine.plan.CanvasLayout
 import com.framecraft.editor.engine.plan.PlanSegment
 import com.framecraft.editor.engine.plan.PlaybackPlan
 import com.framecraft.editor.engine.plan.SequencePlan
+import com.framecraft.editor.engine.plan.SequenceRole
 import com.framecraft.editor.engine.text.TextOverlay
 import kotlin.math.roundToInt
 
@@ -73,9 +74,16 @@ internal object CompositionFactory {
         val frameRate = plan.frameRate
         val (sound, pictures) = plan.sequences.partition { it.kind == TrackKind.AUDIO }
         val durationMicros = plan.sequences.maxOfOrNull { sequence -> sequence.segments.sumOf { it.durationMicros } }
-        val picture = pictures.map { sequenceOf(it, frameRate) }
+        val composited = plan.composited && durationMicros != null
+        val canvasSequence =
+            pictures.indexOfFirst(::isBase).takeIf { it >= 0 }
+                ?: if (plan.background == null) pictures.lastIndex else -1
+        val picture =
+            pictures.mapIndexed { index, sequence ->
+                sequenceOf(sequence, frameRate, stillGaps = composited && index != canvasSequence)
+            }
         val pictureSequences =
-            if (plan.composited && durationMicros != null) {
+            if (composited && durationMicros != null) {
                 val clockRate = framesPerSecond(frameRate)
                 val clock = stillSequence(SolidPng.dataUri(TRANSPARENT_ARGB), durationMicros, clockRate)
                 val background = plan.background?.let { backgroundSequence(it, durationMicros, frameRate) }
@@ -83,11 +91,10 @@ internal object CompositionFactory {
             } else {
                 picture
             }
-        val sequences = pictureSequences + sound.map { sequenceOf(it, frameRate) }
+        val sequences = pictureSequences + sound.map { sequenceOf(it, frameRate, stillGaps = false) }
         val text: List<Effect> =
             if (plan.textSpans.isEmpty()) emptyList() else listOf(OverlayEffect(plan.textSpans.map(::TextOverlay)))
         val builder = Composition.Builder(sequences).setEffects(Effects(emptyList(), text + videoEffects))
-        val composited = plan.composited && durationMicros != null
         if (composited) {
             builder.setVideoCompositorSettings(CanvasCompositorSettings(CanvasLayout.inputsOf(plan), plan.aspectRatio))
         }
@@ -96,6 +103,12 @@ internal object CompositionFactory {
         }
         return builder.build()
     }
+
+    /** True when [sequence] is a base picture lane, as [CanvasLayout.inputsOf] registers it. */
+    private fun isBase(sequence: SequencePlan): Boolean =
+        sequence.role != SequenceRole.INCOMING &&
+            sequence.role != SequenceRole.BACKDROP &&
+            sequence.kind != TrackKind.OVERLAY
 
     /** Returns [frameRate] rounded to whole frames per second, as Media3 items take it. */
     private fun framesPerSecond(frameRate: FrameRate): Int =
@@ -116,7 +129,7 @@ internal object CompositionFactory {
                 val builder = EditedMediaItemSequence.Builder(AUDIO_VIDEO_TRACKS)
                 background.segments.forEach { segment ->
                     when (segment) {
-                        is PlanSegment.Gap -> builder.addGap(segment.durationMicros)
+                        is PlanSegment.Gap -> addGap(builder, segment.durationMicros, frameRate, still = true)
                         is PlanSegment.Media -> builder.addItem(blurredItem(segment, frameRate))
                     }
                 }
@@ -143,20 +156,43 @@ internal object CompositionFactory {
             .build()
     }
 
-    /** Maps [sequence] to a Media3 sequence for a project at [frameRate]. */
+    /**
+     * Maps [sequence] to a Media3 sequence for a project at [frameRate]. With [stillGaps], gaps in a picture sequence
+     * play as transparent stills, because the compositor stalls when a Media3 gap hands over to a clip. The base lane
+     * that sizes the canvas keeps Media3 gaps, since a one-pixel still would resize the canvas.
+     */
     private fun sequenceOf(
         sequence: SequencePlan,
         frameRate: FrameRate,
+        stillGaps: Boolean,
     ): EditedMediaItemSequence {
         val audioOnly = sequence.kind == TrackKind.AUDIO
         val builder = EditedMediaItemSequence.Builder(if (audioOnly) AUDIO_TRACKS else AUDIO_VIDEO_TRACKS)
+        val still = stillGaps && !audioOnly
         sequence.segments.forEach { segment ->
             when (segment) {
-                is PlanSegment.Gap -> builder.addGap(segment.durationMicros)
+                is PlanSegment.Gap -> addGap(builder, segment.durationMicros, frameRate, still)
                 is PlanSegment.Media -> builder.addItem(editedItem(segment, frameRate, audioOnly))
             }
         }
         return builder.build()
+    }
+
+    /**
+     * Adds a gap of [durationMicros] to [builder]: a silent transparent still at [frameRate] when [still], otherwise
+     * a Media3 gap. A gap shorter than a millisecond, which a still cannot last, stays a Media3 gap.
+     */
+    private fun addGap(
+        builder: EditedMediaItemSequence.Builder,
+        durationMicros: Long,
+        frameRate: FrameRate,
+        still: Boolean,
+    ) {
+        if (!still || durationMicros < MICROS_PER_MILLI) {
+            builder.addGap(durationMicros)
+            return
+        }
+        builder.addItem(stillItem(SolidPng.dataUri(TRANSPARENT_ARGB), durationMicros, framesPerSecond(frameRate)))
     }
 
     /** Returns a sequence of one PNG still at [uri] shown for [durationMicros] at [framesPerSecond]. */
@@ -164,7 +200,18 @@ internal object CompositionFactory {
         uri: String,
         durationMicros: Long,
         framesPerSecond: Int,
-    ): EditedMediaItemSequence {
+    ): EditedMediaItemSequence =
+        EditedMediaItemSequence
+            .Builder(AUDIO_VIDEO_TRACKS)
+            .addItem(stillItem(uri, durationMicros, framesPerSecond))
+            .build()
+
+    /** Returns the PNG still at [uri] shown for [durationMicros] at [framesPerSecond]. */
+    private fun stillItem(
+        uri: String,
+        durationMicros: Long,
+        framesPerSecond: Int,
+    ): EditedMediaItem {
         val item =
             MediaItem
                 .Builder()
@@ -172,13 +219,11 @@ internal object CompositionFactory {
                 .setMimeType(MimeTypes.IMAGE_PNG)
                 .setImageDurationMs(durationMicros / MICROS_PER_MILLI)
                 .build()
-        val still =
-            EditedMediaItem
-                .Builder(item)
-                .setDurationUs(durationMicros)
-                .setFrameRate(framesPerSecond)
-                .build()
-        return EditedMediaItemSequence.Builder(AUDIO_VIDEO_TRACKS).addItem(still).build()
+        return EditedMediaItem
+            .Builder(item)
+            .setDurationUs(durationMicros)
+            .setFrameRate(framesPerSecond)
+            .build()
     }
 
     /** Maps a media segment to an edited item in a project at [frameRate]; [audioOnly] items keep only their sound. */

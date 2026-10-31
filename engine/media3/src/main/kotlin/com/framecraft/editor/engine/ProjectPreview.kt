@@ -11,8 +11,10 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.ExperimentalApi
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.MultipleInputVideoGraph
+import androidx.media3.transformer.Composition
 import androidx.media3.transformer.CompositionPlayer
 import com.framecraft.editor.domain.model.Project
+import com.framecraft.editor.domain.time.FrameRate
 import com.framecraft.editor.engine.plan.PlaybackPlanner
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -57,6 +59,8 @@ class ProjectPreview(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val mutableState = MutableStateFlow(PreviewState())
     private var progressJob: Job? = null
+    private var composition: Composition? = null
+    private var frameRate: FrameRate = FrameRate.FPS_30
 
     /** Current playback state. */
     val state: StateFlow<PreviewState> = mutableState.asStateFlow()
@@ -94,22 +98,28 @@ class ProjectPreview(
         mutableState.update {
             it.copy(durationMicros = project.durationMicros, positionMicros = position, errorCode = null)
         }
+        frameRate = plan.frameRate
         if (plan.sequences.isEmpty()) {
+            composition = null
             player.stop()
             return
         }
-        player.setComposition(CompositionFactory.create(plan), position / MICROS_PER_MILLI)
-        player.prepare()
+        load(CompositionFactory.create(plan), position)
     }
 
-    /** Pauses if playing; otherwise plays, restarting from zero when at the end. */
+    /**
+     * Pauses if playing; otherwise plays, restarting from zero when at the end. A restart reloads the composition, the
+     * one way Media3 reliably replays several picture inputs from the top.
+     */
     fun togglePlayPause() {
         if (player.isPlaying) {
             player.pause()
             return
         }
-        if (player.playbackState == Player.STATE_ENDED) {
-            seekTo(0L)
+        val current = composition
+        if (current != null && (player.playbackState == Player.STATE_ENDED || isAtEnd())) {
+            load(current, 0L)
+            mutableState.update { it.copy(positionMicros = 0L) }
         }
         player.play()
     }
@@ -131,10 +141,18 @@ class ProjectPreview(
         syncPosition()
     }
 
-    /** Moves the playhead to [positionMicros]. */
+    /**
+     * Moves the playhead to [positionMicros]. A seek out of the ended state reloads the composition, because Media3
+     * never restarts a multi-input video graph that has ended.
+     */
     fun seekTo(positionMicros: Long) {
         val clamped = positionMicros.coerceIn(0L, mutableState.value.durationMicros)
-        player.seekTo(clamped / MICROS_PER_MILLI)
+        val current = composition
+        if (player.playbackState == Player.STATE_ENDED && current != null) {
+            load(current, clamped)
+        } else {
+            player.seekTo(playablePosition(clamped) / MICROS_PER_MILLI)
+        }
         mutableState.update { it.copy(positionMicros = clamped) }
     }
 
@@ -143,6 +161,31 @@ class ProjectPreview(
         scope.cancel()
         player.removeListener(listener)
         player.release()
+    }
+
+    /** Hands [next] to the player, ready to play from [positionMicros]. */
+    private fun load(
+        next: Composition,
+        positionMicros: Long,
+    ) {
+        composition = next
+        player.setComposition(next, playablePosition(positionMicros) / MICROS_PER_MILLI)
+        player.prepare()
+    }
+
+    /**
+     * Returns [positionMicros] held at least one frame before the end, because Media3 stalls when it seeks to the
+     * very end of its inputs.
+     */
+    private fun playablePosition(positionMicros: Long): Long {
+        val lastFrame = (mutableState.value.durationMicros - frameRate.startOfFrame(1)).coerceAtLeast(0L)
+        return positionMicros.coerceIn(0L, lastFrame)
+    }
+
+    /** True when the playhead sits on the last frame or past it, where playing would end at once. */
+    private fun isAtEnd(): Boolean {
+        val duration = mutableState.value.durationMicros
+        return duration > 0L && mutableState.value.positionMicros >= playablePosition(duration)
     }
 
     /** Samples the player position until playback stops. */
