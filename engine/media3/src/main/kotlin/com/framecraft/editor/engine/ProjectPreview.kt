@@ -35,6 +35,16 @@ private const val PROGRESS_INTERVAL_MS = 50L
 /** Microseconds in a millisecond. */
 private const val MICROS_PER_MILLI = 1_000L
 
+/**
+ * Returns [positionMicros] held at least one [frameRate] frame before [durationMicros], because Media3 stalls when it
+ * seeks to the very end of its inputs.
+ */
+private fun playableMicros(
+    positionMicros: Long,
+    durationMicros: Long,
+    frameRate: FrameRate,
+): Long = positionMicros.coerceIn(0L, (durationMicros - frameRate.startOfFrame(1)).coerceAtLeast(0L))
+
 /** Playback state of the preview, in project time. */
 data class PreviewState(
     val isPlaying: Boolean = false,
@@ -117,7 +127,9 @@ class ProjectPreview(
             return
         }
         val current = composition
-        if (current != null && (player.playbackState == Player.STATE_ENDED || isAtEnd())) {
+        val duration = mutableState.value.durationMicros
+        val atEnd = duration > 0L && mutableState.value.positionMicros >= playableMicros(duration, duration, frameRate)
+        if (current != null && (player.playbackState == Player.STATE_ENDED || atEnd)) {
             load(current, 0L)
             mutableState.update { it.copy(positionMicros = 0L) }
         }
@@ -151,7 +163,7 @@ class ProjectPreview(
         if (player.playbackState == Player.STATE_ENDED && current != null) {
             load(current, clamped)
         } else {
-            player.seekTo(playablePosition(clamped) / MICROS_PER_MILLI)
+            player.seekTo(playableMicros(clamped, mutableState.value.durationMicros, frameRate) / MICROS_PER_MILLI)
         }
         mutableState.update { it.copy(positionMicros = clamped) }
     }
@@ -169,23 +181,9 @@ class ProjectPreview(
         positionMicros: Long,
     ) {
         composition = next
-        player.setComposition(next, playablePosition(positionMicros) / MICROS_PER_MILLI)
+        val start = playableMicros(positionMicros, mutableState.value.durationMicros, frameRate)
+        player.setComposition(next, start / MICROS_PER_MILLI)
         player.prepare()
-    }
-
-    /**
-     * Returns [positionMicros] held at least one frame before the end, because Media3 stalls when it seeks to the
-     * very end of its inputs.
-     */
-    private fun playablePosition(positionMicros: Long): Long {
-        val lastFrame = (mutableState.value.durationMicros - frameRate.startOfFrame(1)).coerceAtLeast(0L)
-        return positionMicros.coerceIn(0L, lastFrame)
-    }
-
-    /** True when the playhead sits on the last frame or past it, where playing would end at once. */
-    private fun isAtEnd(): Boolean {
-        val duration = mutableState.value.durationMicros
-        return duration > 0L && mutableState.value.positionMicros >= playablePosition(duration)
     }
 
     /** Samples the player position until playback stops. */

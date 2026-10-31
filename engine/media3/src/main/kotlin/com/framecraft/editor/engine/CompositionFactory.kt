@@ -52,6 +52,12 @@ private const val BLUR_SIGMA = 12f
 /** Scheme prefix of a URI that carries its own bytes, as generated stills do. */
 private const val DATA_URI_PREFIX = "data:"
 
+/** True when [sequence] is a base picture lane, as [CanvasLayout.inputsOf] registers it. */
+private fun isBase(sequence: SequencePlan): Boolean =
+    sequence.role != SequenceRole.INCOMING &&
+        sequence.role != SequenceRole.BACKDROP &&
+        sequence.kind != TrackKind.OVERLAY
+
 /** Creates Media3 compositions. */
 @OptIn(markerClass = [UnstableApi::class, ExperimentalApi::class])
 internal object CompositionFactory {
@@ -103,12 +109,6 @@ internal object CompositionFactory {
         }
         return builder.build()
     }
-
-    /** True when [sequence] is a base picture lane, as [CanvasLayout.inputsOf] registers it. */
-    private fun isBase(sequence: SequencePlan): Boolean =
-        sequence.role != SequenceRole.INCOMING &&
-            sequence.role != SequenceRole.BACKDROP &&
-            sequence.kind != TrackKind.OVERLAY
 
     /** Returns [frameRate] rounded to whole frames per second, as Media3 items take it. */
     private fun framesPerSecond(frameRate: FrameRate): Int =
