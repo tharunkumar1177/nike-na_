@@ -54,6 +54,7 @@
   <string name="editor_next_frame">Next frame</string>
   <string name="editor_save_failed">Couldn\'t save changes.</string>
   <string name="editor_edit_rejected">That edit would overlap or break another clip, so it wasn\'t made.</string>
+  <string name="editor_history_rejected">Couldn\'t undo or redo that change. Your project is unchanged.</string>
   <string name="editor_tool_overlay">Overlay</string>
   <string name="editor_tool_overlay_description">Add overlay at playhead</string>
   <string name="editor_tool_opacity">Overlay opacity</string>

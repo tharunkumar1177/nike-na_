@@ -33,6 +33,7 @@ The commands `RenameProject`, `DeleteClip`, `AddClip`, `TrimClip`, `SplitClip`, 
 - A drag produces exactly one command when the finger lifts; `TrimController` turns a drag delta into a frame-aligned, clamped, optionally snapped `TrimClip`, `ReorderSlots` lists where a lifted clip can land, and `OverlayPlacement.drag` turns an overlay drag into a snapped `MoveOverlay` attached to the base clip under its new start.
 - `TrimClip` and `MergeClips` carry optional fade lengths, so the inverses of trims and splits restore the exact fades; records without them, including older journals, use the default rule (a trim shortens fades to fit, a merge takes the left fade-in and the right fade-out).
 - A new command after undo discards the redo branch.
+- `EditHistory.undo` and `redo` return a `HistoryOutcome`: `Moved`, `Empty`, or `Rejected` with the command's rejection. `ProjectSession` maps them to `DispatchResult.Applied`, null, and `DispatchResult.Rejected`, writing the cursor only on a move; the editor shows the history notice for a rejection.
 
 ### Project persistence and recovery
 
@@ -79,6 +80,7 @@ The commands `RenameProject`, `DeleteClip`, `AddClip`, `TrimClip`, `SplitClip`, 
 - [x] Trimming, moving, splitting, merging, and deleting a base clip carry its anchored overlays, and every overlay command's inverse restores the project.
 - [x] An edit whose ripple would make overlays collide is rejected and changes nothing.
 - [x] Canvas aspect, background, and base placement changes undo to the previous value and round-trip through JSON; merging needs matching placements (`CanvasCommandsTest`).
+- [ ] An undo or redo whose command is rejected reports the rejection, distinct from an empty history, and leaves the history unchanged (`EditHistoryTest`).
 
 ## Remaining gaps and unknowns
 

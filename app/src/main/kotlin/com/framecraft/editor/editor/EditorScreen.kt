@@ -137,19 +137,23 @@ enum class EditorNotice {
     /** An edit was refused because it would have broken the project. */
     EDIT_REJECTED,
 
+    /** An undo or redo was refused because it no longer applies; history and project are unchanged. */
+    HISTORY_REJECTED,
+
     /** A voiceover take finished with an outcome worth reporting. */
     VOICEOVER,
 }
 
 /**
  * Notices waiting to be shown: [skippedCount] unreadable files, [droppedEditCount] lost edits, [saveFailed],
- * [editRejected], and the [voiceover] take outcome.
+ * [editRejected], [historyRejected], and the [voiceover] take outcome.
  */
 data class EditorNotices(
     val skippedCount: Int = 0,
     val droppedEditCount: Int = 0,
     val saveFailed: Boolean = false,
     val editRejected: Boolean = false,
+    val historyRejected: Boolean = false,
     val voiceover: VoiceoverNotice? = null,
 )
 
@@ -382,6 +386,12 @@ private fun EditorSnackbars(
         if (notices.editRejected) {
             snackbarHostState.showSnackbar(resources.getString(R.string.editor_edit_rejected))
             onShown(EditorNotice.EDIT_REJECTED)
+        }
+    }
+    LaunchedEffect(notices.historyRejected) {
+        if (notices.historyRejected) {
+            snackbarHostState.showSnackbar(resources.getString(R.string.editor_history_rejected))
+            onShown(EditorNotice.HISTORY_REJECTED)
         }
     }
     LaunchedEffect(notices.voiceover) {

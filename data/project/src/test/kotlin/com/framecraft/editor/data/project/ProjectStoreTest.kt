@@ -87,6 +87,18 @@ class ProjectStoreTest {
         return result as OpenProjectResult.Opened
     }
 
+    /** Undoes the last edit, failing the test unless it applies, and returns the project after it. */
+    private suspend fun ProjectSession.undone(): Project = appliedProject(undo())
+
+    /** Redoes the last undone edit, failing the test unless it applies, and returns the project after it. */
+    private suspend fun ProjectSession.redone(): Project = appliedProject(redo())
+
+    /** Returns the project [result] moved to, failing the test unless it applied. */
+    private fun appliedProject(result: DispatchResult?): Project {
+        assertTrue(result is DispatchResult.Applied, "Expected the step to apply, got $result")
+        return (result as DispatchResult.Applied).state.project
+    }
+
     /** Returns the project's directory. */
     private fun dir() = File(root, project.id)
 
@@ -116,13 +128,13 @@ class ProjectStoreTest {
             val session = store().create(project)
             session.dispatch(RenameProject("B"))
             session.dispatch(RenameProject("C"))
-            assertEquals("B", session.undo()?.project?.name)
+            assertEquals("B", session.undone().name)
             val reopened = store().opened().session
             assertEquals("B", reopened.state.project.name)
             assertTrue(reopened.state.canRedo)
-            assertEquals("C", reopened.redo()?.project?.name)
+            assertEquals("C", reopened.redone().name)
             reopened.undo()
-            assertEquals("Trip", reopened.undo()?.project?.name)
+            assertEquals("Trip", reopened.undone().name)
         }
 
     /** A new edit after undo discards the redo tail on disk. */
@@ -268,7 +280,7 @@ class ProjectStoreTest {
             val opened = store().opened()
             val reopened = opened.session.state.project
             assertEquals(listOf("track"), reopened.tracks.map { it.id })
-            val restored = requireNotNull(opened.session.undo()).project
+            val restored = opened.session.undone()
             assertEquals(listOf("lane", "track"), restored.tracks.map { it.id })
             val overlayLane = restored.tracks.first()
             val overlay = overlayLane.clips.single()
@@ -289,7 +301,7 @@ class ProjectStoreTest {
             val opened = store().opened()
             val reopened = opened.session.state.project
             assertEquals(listOf("track"), reopened.tracks.map { it.id })
-            val restored = requireNotNull(opened.session.undo()).project
+            val restored = opened.session.undone()
             assertEquals(listOf("track", "sound"), restored.tracks.map { it.id })
             val soundLane = restored.tracks.last()
             val sound = soundLane.clips.single()
@@ -311,7 +323,7 @@ class ProjectStoreTest {
             val reopened = opened.session.state.project
             assertEquals(listOf("track"), reopened.tracks.map { it.id })
             assertEquals(CanvasSettings(), reopened.canvas)
-            val restored = requireNotNull(opened.session.undo()).project
+            val restored = opened.session.undone()
             val title =
                 restored.tracks
                     .first()
@@ -339,7 +351,7 @@ class ProjectStoreTest {
             val opened = store().opened()
             val reopened = opened.session.state.project
             assertEquals(CanvasAspect.LANDSCAPE_16_9, reopened.canvas.aspect)
-            val restored = requireNotNull(opened.session.undo()).project
+            val restored = opened.session.undone()
             assertEquals(CanvasAspect.PORTRAIT_9_16, restored.canvas.aspect)
             val base =
                 restored.tracks
@@ -368,7 +380,7 @@ class ProjectStoreTest {
             assertEquals(listOf("a", "a2", "b"), clips.map { it.id })
             assertEquals(ClipSpeed.Constant(4_000), clips.last().speed)
             assertTrue(clips.all { it.outTransition == null })
-            val restored = requireNotNull(opened.session.undo()).project
+            val restored = opened.session.undone()
             val back = restored.tracks.single().clips
             assertEquals(listOf("a", "b"), back.map { it.id })
             assertEquals(500_000L, back.last().durationMicros)
@@ -391,7 +403,7 @@ class ProjectStoreTest {
             val sound = clips.first { it.id == "s" }
             assertEquals(80, sound.volumePercent)
             assertTrue(clips.none { it.voiceover || it.autoDuckPercent != 0 })
-            val restored = requireNotNull(opened.session.undo()).project
+            val restored = opened.session.undone()
             val video = restored.tracks.first { it.kind == TrackKind.VIDEO }
             val look = video.clips.single().look
             assertEquals("noir", look?.filterId)
@@ -413,7 +425,7 @@ class ProjectStoreTest {
             assertEquals(50, project.tracks.first { it.id == "music" }.volumePercent)
             assertEquals(70, clips.first { it.id == "m" }.autoDuckPercent)
             assertTrue(clips.first { it.id == "v" }.voiceover)
-            val restored = requireNotNull(opened.session.undo()).project
+            val restored = opened.session.undone()
             val restoredMusic = restored.tracks.flatMap { it.clips }.single { it.id == "m" }
             assertEquals(60, restoredMusic.autoDuckPercent)
             opened.session.close()
@@ -434,7 +446,7 @@ class ProjectStoreTest {
             assertNull(clips.first().outTransition)
             assertEquals(ClipTransition(TransitionKind.DISSOLVE, 1_000_000L), clips[1].outTransition)
             assertTrue(clips.all { it.look == null })
-            val restored = requireNotNull(opened.session.undo()).project
+            val restored = opened.session.undone()
             val back = restored.tracks.single().clips
             assertEquals(listOf("a", "b"), back.map { it.id })
             assertEquals(ClipTransition(TransitionKind.DISSOLVE, 1_000_000L), back.first().outTransition)

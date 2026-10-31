@@ -112,6 +112,7 @@ Feature modules never import Media3 types directly; they talk to engine interfac
 - Every project mutation is an `EditCommand` that is pure: `applyTo(Project)` returns the new project plus an inverse command. UI code never mutates the project directly.
 - Commands validate before applying and return a typed failure instead of throwing.
 - Undo/redo is a linear history over commands. Gesture-driven edits (a drag) coalesce into one command on gesture end.
+- Undo and redo report one of three outcomes: moved, nothing to move, or rejected. A rejected step leaves the history, the project, and the saved cursor unchanged and is always surfaced to the user, never treated as nothing to undo.
 - History is persisted (see below), so undo works after a restart.
 
 ### Project persistence and recovery

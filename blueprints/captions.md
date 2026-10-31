@@ -8,7 +8,7 @@ Own auto-captions: recognizing speech in clip sound on the device, the one-time 
 
 **Status:** Partial
 
-Caption content, its binding to the parent clip, the timing locks, and how trim, split, delete, retyping, and `ReplaceCaptions` treat captions are verified by `CaptionCommandsTest`, except undoing a trim that removed a caption, which is a known bug. Chunking, source selection, and planning are verified by `CaptionPlanningTest`; result parsing by `VoskResultParserTest`; resampling and the transcription timeline by `CaptionTranscriberTest`; the spoken-word timing and highlight range by `KaraokeTest`. The schema 11 upgrade is verified by `ProjectStoreTest`. The model download, decoding real clip sound, recognition quality, and how the sheet and highlight look need a device and are unverified; the caption sheet has no UI test yet.
+Caption content, its binding to the parent clip, the timing locks, and how trim, split, delete, retyping, and `ReplaceCaptions` treat captions are verified by `CaptionCommandsTest`, including undoing a trim that removed a caption. Chunking, source selection, and planning are verified by `CaptionPlanningTest`; result parsing by `VoskResultParserTest`; resampling and the transcription timeline by `CaptionTranscriberTest`; the spoken-word timing and highlight range by `KaraokeTest`. The schema 11 upgrade is verified by `ProjectStoreTest`. The model download, decoding real clip sound, recognition quality, and how the sheet and highlight look need a device and are unverified; the caption sheet has no UI test yet.
 
 ## Architecture dependencies
 
@@ -32,7 +32,7 @@ Caption content, its binding to the parent clip, the timing locks, and how trim,
 
 - Generated captions are added by `ReplaceCaptions`, a list of `CaptionLaneChange`s (lane id and index, removed caption ids, added captions). A lane is created at its index when missing and removed when emptied, and the shared text asset is added or removed with the first or last text clip. Only captions may be removed or added. Its inverse is the reverse list of reverse changes.
 - `MoveClip`, `MoveOverlay`, `ReanchorOverlay`, `TrimClip`, and `SplitClip` refuse a caption with `CaptionLocked`, including one whose parent was deleted.
-- Trimming a parent removes the captions it no longer plays any word of and carries them in its inverse (`restoredCaptions`) so undo can put them back; that undo is currently rejected (see the criteria below).
+- Trimming a parent removes the captions it no longer plays any word of and carries them in its inverse (`restoredCaptions`) so undo can put them back. `TrimClip` re-places the surviving captions before it puts the restored ones back, because until then they would overlap.
 - Splitting a parent hands each caption to the part that plays its first word; words past the cut stay stored but hidden, and undo shows them again.
 - `SetTextContent` that changes a caption's words removes its caption content, leaving plain text anchored where it was. Style changes keep it a caption.
 - `TextPlacement` never places typed text on a lane that holds captions.
@@ -94,7 +94,7 @@ Caption content, its binding to the parent clip, the timing locks, and how trim,
 - [x] Recognizer results become source-timed words, bad results give none, and sound is resampled to 16 kHz (`VoskResultParserTest`, `CaptionTranscriberTest`).
 - [x] Word starts follow the clip and the spoken word and its characters are found (`KaraokeTest`).
 - [x] Projects from schema 10 open and save as schema 11 (`ProjectStoreTest`).
-- [ ] A trim that leaves a caption no words removes it and its undo puts it back exactly. Known bug: the undo is rejected, likely because the restored caption overlaps surviving captions before they are re-placed; the test for it was removed.
+- [ ] A trim that leaves a caption no words removes it, its undo puts it back exactly, and redo removes it again (`CaptionCommandsTest`).
 - [ ] The model downloads and installs, real clip sound is recognized, and the highlight renders and exports as previewed (needs a device).
 
 ## Remaining gaps and unknowns

@@ -111,6 +111,7 @@ private fun ReadyEditor(
                 state.droppedEditCount,
                 state.saveFailed,
                 state.editRejected,
+                state.historyRejected,
                 voiceoverNotice,
             ),
         actions = editorActions(viewModel, export.open),
