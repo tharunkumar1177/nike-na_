@@ -1,0 +1,69 @@
+<!--
+  Framecraft wireframe: editor, mask panel docked under the preview with a circle mask.
+  390x844 dp, dark theme; rules in assets/wireframes/style.md.
+  Spec: assets/wireframes/masks-slice15.md.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844">
+  <style>
+    text{font-family:Roboto,'Segoe UI',Arial,sans-serif;font-size:14px;fill:#E2E2E9}
+    .tl{font-size:22px;font-weight:500}.bl{font-size:16px}.ll{font-weight:500}
+    .bm{fill:#C4C6D0}.p{fill:#AEC6FF}.sc{fill:#E8DEF8}.m{text-anchor:middle}.e{text-anchor:end}
+  </style>
+  <defs>
+    <g id="i-back"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"/></g>
+    <g id="i-undo"><path fill="currentColor" d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></g>
+    <g id="i-redo"><path fill="currentColor" d="M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7z"/></g>
+    <g id="i-export"><path fill="currentColor" d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></g>
+    <g id="i-prev"><path fill="currentColor" d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></g>
+    <g id="i-play"><path fill="currentColor" d="M8 5v14l11-7z"/></g>
+    <g id="i-next"><path fill="currentColor" d="M6 18l8.5-6L6 6zM16 6v12h2V6z"/></g>
+  </defs>
+
+  <rect width="390" height="844" fill="#111318"/>
+  <text x="16" y="17" class="ll">9:41</text>
+  <path fill="#E2E2E9" d="M330 9h10v8h-10zM346 17h12V7zM362 7h7v11h-7z"/>
+  <g color="#E2E2E9"><use href="#i-back" x="16" y="44"/><use href="#i-undo" x="262" y="44"/><use href="#i-redo" x="302" y="44" opacity=".38"/><use href="#i-export" x="350" y="44"/></g>
+  <text x="56" y="63" class="tl">Summer Vacation</text>
+
+  <!-- Preview: picture outside the circle is masked away; outline is draggable -->
+  <rect y="88" width="390" height="300" fill="#000"/>
+  <rect y="129" width="390" height="219" fill="#2A2D34"/>
+  <circle cx="300" cy="180" r="18" fill="#3A3E46"/>
+  <path d="M0 348 100 236l70 64 60-50 160 98z" fill="#3A3E46"/>
+  <path fill="#000" fill-opacity=".75" fill-rule="evenodd" d="M0 129h390v219H0zM125 238a70 70 0 1 0 140 0a70 70 0 1 0-140 0z"/>
+  <circle cx="195" cy="238" r="70" fill="none" stroke="#AEC6FF" stroke-width="2"/>
+  <path d="M189 238h12M195 232v12" stroke="#AEC6FF" stroke-width="2"/>
+
+  <g color="#E2E2E9"><use href="#i-prev" x="16" y="400"/><use href="#i-play" x="64" y="400"/><use href="#i-next" x="112" y="400"/></g>
+  <text x="374" y="417" class="bm e">0:05 / 1:23</text>
+
+  <!-- Docked mask panel -->
+  <rect y="436" width="390" height="408" fill="#1D1B20"/>
+  <text x="16" y="478" class="tl">Mask</text>
+  <text x="362" y="478" class="ll p e">Done</text>
+
+  <rect x="16.5" y="496.5" width="59" height="31" rx="8" fill="none" stroke="#938F99"/>
+  <text x="46" y="517" class="ll bm m">None</text>
+  <rect x="84.5" y="496.5" width="67" height="31" rx="8" fill="none" stroke="#938F99"/>
+  <text x="118" y="517" class="ll bm m">Linear</text>
+  <rect x="160.5" y="496.5" width="67" height="31" rx="8" fill="none" stroke="#938F99"/>
+  <text x="194" y="517" class="ll bm m">Mirror</text>
+  <rect x="236" y="496" width="66" height="32" rx="8" fill="#4A4458"/>
+  <text x="269" y="517" class="ll sc m">Circle</text>
+  <rect x="310.5" y="496.5" width="91" height="31" rx="8" fill="none" stroke="#938F99"/>
+  <text x="356" y="517" class="ll bm m">Rectangle</text>
+
+  <text x="16" y="574" class="bl">Invert</text>
+  <rect x="323" y="553" width="50" height="30" rx="15" fill="#44474E" stroke="#938F99" stroke-width="2"/>
+  <circle cx="338" cy="568" r="8" fill="#938F99"/>
+
+  <text x="16" y="616" class="bm">Feather 20</text>
+  <rect x="16" y="634" width="358" height="4" rx="2" fill="#44474E"/>
+  <rect x="16" y="634" width="72" height="4" rx="2" fill="#AEC6FF"/>
+  <circle cx="88" cy="636" r="10" fill="#AEC6FF"/>
+
+  <text x="16" y="678" class="bm">Drag the mask on the preview to move it,</text>
+  <text x="16" y="698" class="bm">pinch to resize, twist to rotate.</text>
+
+  <rect x="141" y="832" width="108" height="4" rx="2" fill="#E2E2E9"/>
+</svg>

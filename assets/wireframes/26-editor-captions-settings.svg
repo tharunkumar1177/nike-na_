@@ -1,0 +1,59 @@
+<!--
+  Framecraft wireframe: editor, auto-caption sheet before the first run, speech model missing.
+  390x844 dp, dark theme; rules in assets/wireframes/style.md.
+  Spec: assets/wireframes/captions-slice16.md.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844">
+  <style>
+    text{font-family:Roboto,'Segoe UI',Arial,sans-serif;font-size:14px;fill:#E2E2E9}
+    .tl{font-size:22px;font-weight:500}.bl{font-size:16px}.ll{font-weight:500}.ls{font-size:11px;fill:#C4C6D0}
+    .bm{fill:#C4C6D0}.op{fill:#002E69}.m{text-anchor:middle}.e{text-anchor:end}
+  </style>
+  <defs>
+    <g id="i-back"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"/></g>
+    <g id="i-undo"><path fill="currentColor" d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></g>
+    <g id="i-redo"><path fill="currentColor" d="M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7z"/></g>
+    <g id="i-export"><path fill="currentColor" d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></g>
+    <g id="i-prev"><path fill="currentColor" d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></g>
+    <g id="i-play"><path fill="currentColor" d="M8 5v14l11-7z"/></g>
+    <g id="i-next"><path fill="currentColor" d="M6 18l8.5-6L6 6zM16 6v12h2V6z"/></g>
+  </defs>
+
+  <rect width="390" height="844" fill="#111318"/>
+  <text x="16" y="17" class="ll">9:41</text>
+  <path fill="#E2E2E9" d="M330 9h10v8h-10zM346 17h12V7zM362 7h7v11h-7z"/>
+  <g color="#E2E2E9"><use href="#i-back" x="16" y="44"/><use href="#i-undo" x="262" y="44"/><use href="#i-redo" x="302" y="44" opacity=".38"/><use href="#i-export" x="350" y="44"/></g>
+  <text x="56" y="63" class="tl">Summer Vacation</text>
+  <rect y="88" width="390" height="300" fill="#000"/>
+  <rect y="129" width="390" height="219" fill="#2A2D34"/>
+  <circle cx="300" cy="180" r="18" fill="#3A3E46"/>
+  <path d="M0 348 100 236l70 64 60-50 160 98z" fill="#3A3E46"/>
+  <g color="#E2E2E9"><use href="#i-prev" x="16" y="400"/><use href="#i-play" x="64" y="400"/><use href="#i-next" x="112" y="400"/></g>
+  <text x="374" y="417" class="bm e">0:05 / 1:23</text>
+
+  <rect width="390" height="844" fill="#000" opacity=".32"/>
+  <rect y="420" width="390" height="452" rx="28" fill="#1D1B20"/>
+  <rect x="179" y="442" width="32" height="4" rx="2" fill="#C4C6D0" opacity=".4"/>
+  <text x="16" y="484" class="tl">Auto captions</text>
+
+  <!-- Which clips to caption; Selected clip shows only with a selection -->
+  <text x="16" y="518" class="ll bm">Caption</text>
+  <circle cx="28" cy="548" r="9" fill="none" stroke="#AEC6FF" stroke-width="2"/>
+  <circle cx="28" cy="548" r="5" fill="#AEC6FF"/>
+  <text x="52" y="554" class="bl">All clips with sound</text>
+  <circle cx="28" cy="592" r="9" fill="none" stroke="#C4C6D0" stroke-width="2"/>
+  <text x="52" y="598" class="bl">Voiceovers only</text>
+
+  <text x="16" y="648" class="bl">Include muted clips</text>
+  <rect x="323" y="627" width="50" height="30" rx="15" fill="#44474E" stroke="#938F99" stroke-width="2"/>
+  <circle cx="338" cy="642" r="8" fill="#938F99"/>
+
+  <text x="16" y="690" class="bm">Language: English. Speech is recognized on this</text>
+  <text x="16" y="710" class="bm">phone and never uploaded.</text>
+  <text x="16" y="742" class="bm">Captions need a one-time 41 MB speech download.</text>
+
+  <rect x="206" y="764" width="168" height="40" rx="20" fill="#AEC6FF"/>
+  <text x="290" y="789" class="ll op m">Generate captions</text>
+
+  <rect x="141" y="832" width="108" height="4" rx="2" fill="#E2E2E9"/>
+</svg>

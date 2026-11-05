@@ -1,0 +1,67 @@
+<!--
+  Framecraft wireframe: editor, microphone permission refused.
+  390x844 dp, dark theme; rules in assets/wireframes/style.md.
+  Spec: assets/wireframes/voiceover-slice14.md.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844">
+  <style>
+    text{font-family:Roboto,'Segoe UI',Arial,sans-serif;font-size:14px;fill:#E2E2E9}
+    .tl{font-size:22px;font-weight:500}.hs{font-size:24px;font-weight:700}.ll{font-weight:500}
+    .lm{font-size:12px;font-weight:500;fill:#C4C6D0}.ls{font-size:11px;fill:#C4C6D0}
+    .bm{fill:#C4C6D0}.p{fill:#AEC6FF}.m{text-anchor:middle}.e{text-anchor:end}
+  </style>
+  <defs>
+    <g id="i-back"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"/></g>
+    <g id="i-undo"><path fill="currentColor" d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></g>
+    <g id="i-redo"><path fill="currentColor" d="M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7z"/></g>
+    <g id="i-export"><path fill="currentColor" d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></g>
+    <g id="i-prev"><path fill="currentColor" d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></g>
+    <g id="i-play"><path fill="currentColor" d="M8 5v14l11-7z"/></g>
+    <g id="i-next"><path fill="currentColor" d="M6 18l8.5-6L6 6zM16 6v12h2V6z"/></g>
+    <g id="i-overlay" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="12" y="11" width="6" height="5" fill="currentColor" stroke="none"/></g>
+    <g id="i-text"><path fill="currentColor" d="M5 4v3h5.5v12h3V7H19V4z"/></g>
+    <g id="i-captions" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 12h3M13 12h4M7 15h7"/></g>
+    <g id="i-audio"><path fill="currentColor" d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3z"/></g>
+    <g id="i-mic"><path fill="currentColor" d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72z"/></g>
+    <g id="i-mixer" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></g>
+    <pattern id="ta" x="-45" y="472" width="114" height="64" patternUnits="userSpaceOnUse"><rect width="114" height="64" fill="#3B3F47"/><path d="M0 64 38 30l26 18 20-12 30 28z" fill="#4D525B"/><circle cx="92" cy="16" r="7" fill="#4D525B"/><rect x="113" width="1" height="64" fill="#111318"/></pattern>
+    <pattern id="tb" x="100" y="472" width="114" height="64" patternUnits="userSpaceOnUse"><rect width="114" height="64" fill="#33404F"/><path d="M0 64 30 36l30 20 24-16 30 24z" fill="#465669"/><circle cx="24" cy="18" r="7" fill="#465669"/><rect x="113" width="1" height="64" fill="#111318"/></pattern>
+  </defs>
+
+  <rect width="390" height="844" fill="#111318"/>
+  <text x="16" y="17" class="ll">9:41</text>
+  <path fill="#E2E2E9" d="M330 9h10v8h-10zM346 17h12V7zM362 7h7v11h-7z"/>
+  <g color="#E2E2E9"><use href="#i-back" x="16" y="44"/><use href="#i-undo" x="262" y="44"/><use href="#i-redo" x="302" y="44" opacity=".38"/><use href="#i-export" x="350" y="44"/></g>
+  <text x="56" y="63" class="tl">Summer Vacation</text>
+  <rect y="88" width="390" height="300" fill="#000"/>
+  <rect y="129" width="390" height="219" fill="#2A2D34"/>
+  <circle cx="300" cy="180" r="18" fill="#3A3E46"/>
+  <path d="M0 348 100 236l70 64 60-50 160 98z" fill="#3A3E46"/>
+  <g color="#E2E2E9"><use href="#i-prev" x="16" y="400"/><use href="#i-play" x="64" y="400"/><use href="#i-next" x="112" y="400"/></g>
+  <text x="374" y="417" class="bm e">0:05 / 1:23</text>
+  <path stroke="#938F99" d="M3 460v8M51 460v8M99 460v8M147 460v8M195 460v8M243 460v8M291 460v8M339 460v8M387 460v8"/>
+  <rect x="-45" y="472" width="143" height="64" rx="4" fill="url(#ta)"/>
+  <rect x="100" y="472" width="300" height="64" rx="4" fill="url(#tb)"/>
+  <path d="M188 452h14l-7 9z" fill="#AEC6FF"/>
+  <rect x="194" y="458" width="2" height="146" fill="#AEC6FF"/>
+  <rect y="736" width="390" height="108" fill="#44474E"/>
+  <g color="#E2E2E9">
+    <use href="#i-overlay" x="28" y="752"/><use href="#i-text" x="92" y="752"/><use href="#i-captions" x="156" y="752"/>
+    <use href="#i-audio" x="220" y="752"/><use href="#i-mic" x="284" y="752"/><use href="#i-mixer" x="348" y="752"/>
+  </g>
+  <text x="40" y="798" class="lm m">Overlay</text><text x="104" y="798" class="lm m">Text</text><text x="168" y="798" class="lm m">Captions</text>
+  <text x="232" y="798" class="lm m">Audio</text><text x="296" y="798" class="lm m">Voiceover</text><text x="360" y="798" class="lm m">Mixer</text>
+
+  <!-- Scrim and dialog -->
+  <rect width="390" height="844" fill="#000" opacity=".32"/>
+  <rect x="39" y="296" width="312" height="244" rx="28" fill="#2B2930"/>
+  <use href="#i-mic" x="183" y="320" color="#AEC6FF"/>
+  <text x="195" y="384" class="hs m">Microphone needed</text>
+  <text x="63" y="418" class="bm">Framecraft records voiceovers with</text>
+  <text x="63" y="440" class="bm">the microphone. Allow it in Settings</text>
+  <text x="63" y="462" class="bm">to record.</text>
+  <text x="247" y="510" class="ll p e">Not now</text>
+  <text x="327" y="510" class="ll p e">Settings</text>
+
+  <rect x="141" y="832" width="108" height="4" rx="2" fill="#E2E2E9"/>
+</svg>

@@ -1,0 +1,25 @@
+<!--
+  Framecraft wireframe: editor, preparing picked media.
+  390x844 dp, dark theme; rules in assets/wireframes/style.md.
+  Spec: assets/wireframes/editor-preview.md.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844">
+  <style>
+    text{font-family:Roboto,'Segoe UI',Arial,sans-serif;font-size:14px;fill:#E2E2E9}
+    .ll{font-weight:500}.bm{fill:#C4C6D0}.m{text-anchor:middle}
+  </style>
+  <defs>
+    <g id="i-back"><path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"/></g>
+  </defs>
+
+  <rect width="390" height="844" fill="#111318"/>
+  <text x="16" y="17" class="ll">9:41</text>
+  <path fill="#E2E2E9" d="M330 9h10v8h-10zM346 17h12V7zM362 7h7v11h-7z"/>
+  <use href="#i-back" x="16" y="44" color="#E2E2E9"/>
+
+  <!-- Indeterminate progress -->
+  <circle cx="195" cy="400" r="20" fill="none" stroke="#AEC6FF" stroke-width="4" stroke-linecap="round" stroke-dasharray="90 126" transform="rotate(-90 195 400)"/>
+  <text x="195" y="456" class="bm m">Preparing media&#8230;</text>
+
+  <rect x="141" y="832" width="108" height="4" rx="2" fill="#E2E2E9"/>
+</svg>

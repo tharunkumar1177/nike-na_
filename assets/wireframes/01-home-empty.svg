@@ -1,0 +1,39 @@
+<!--
+  Framecraft wireframe: home, no projects yet.
+  390x844 dp, dark theme; rules in assets/wireframes/style.md.
+  Spec: assets/wireframes/home-empty.md.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844">
+  <style>
+    text{font-family:Roboto,'Segoe UI',Arial,sans-serif;font-size:14px;fill:#E2E2E9}
+    .tl{font-size:22px;font-weight:500}.hs{font-size:24px;font-weight:700}.bl{font-size:16px}
+    .ll{font-weight:500}.bm{fill:#C4C6D0}.pc{fill:#D7E2FF}.m{text-anchor:middle}
+  </style>
+  <defs>
+    <g id="i-movie"><path fill="currentColor" d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></g>
+    <g id="i-add" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></g>
+  </defs>
+
+  <rect width="390" height="844" fill="#111318"/>
+
+  <!-- Status bar -->
+  <text x="16" y="17" class="ll">9:41</text>
+  <path fill="#E2E2E9" d="M330 9h10v8h-10zM346 17h12V7zM362 7h7v11h-7z"/>
+
+  <!-- Center-aligned top app bar -->
+  <text x="195" y="63" class="tl m">Framecraft</text>
+
+  <!-- Empty state -->
+  <use href="#i-movie" transform="translate(163 316) scale(2.6667)" color="#AEC6FF" opacity=".5"/>
+  <text x="195" y="420" class="hs m">No projects yet</text>
+  <text x="195" y="452" class="bl bm m">Create your first project to start</text>
+  <text x="195" y="476" class="bl bm m">editing.</text>
+
+  <!-- New project extended FAB -->
+  <rect x="111" y="748" width="168" height="56" rx="28" fill="#11448F"/>
+  <use href="#i-add" x="137" y="764" color="#D7E2FF"/>
+  <text x="173" y="781" class="ll pc">New project</text>
+
+  <!-- Gesture handle -->
+  <rect x="141" y="832" width="108" height="4" rx="2" fill="#E2E2E9"/>
+</svg>

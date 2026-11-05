@@ -1,35 +1,6 @@
-Recommended stack: native Kotlin. Playback while the app is in the background, the phone's music index (MediaStore, which tells the app which audio files are on the device), and the equalizer are all Android-native features. Flutter, React Native, or Kotlin Multiplatform would each need native plugins for exactly those parts. I checked these versions against the official registries myself, because the subagents' version numbers were partly stale or invented:
+# Project details
 
-Language and build: Kotlin 2.4.21, AGP 9.4.1, Gradle 9.8.2
-UI: Jetpack Compose BOM 2026.09.00 with Material 3
-Playback: Media3 1.11.1 (ExoPlayer plus a media session, for notification, lock-screen and Bluetooth controls)
-Local storage: Room 2.8.5 as a fast cache of the music index, and DataStore 1.3.0 for settings
-Other libraries: Koin 4.2.2 for dependency injection, Coil 3.6.3 for album art
-CI: GitHub Actions builds, lints and tests every push, then publishes a debug APK you can install
-What makes it nicer than the stock apps. This comes from three research briefs, including one on user complaints about current players:
-
-No ads and no internet permission at all.
-The app's colors adapt to the current song's album art.
-The mini player expands into the full player as you drag it, and swiping down only collapses it, never exits the app.
-Playback controls sit in the bottom third of the screen, where your thumb reaches.
-A visible "Up next" queue with separate "Play next" and "Add to queue" actions.
-Deletes and removals can be undone.
-Songs without artwork get a generated gradient tile instead of a grey icon.
-The library updates in the background without freezing, even with 50,000 songs.
-Build order. The architect and I split the work into thin slices, each built and checked in CI on its own:
-
-Project scaffold and CI pipeline
-Songs list from your device
-Background playback with notification controls
-Mini player and full now-playing screen
-Albums, artists and folders
-Queue
-Playlists and favorites
-Search and sort
-Share and delete
-Later slices cover lyrics, equalizer, sleep timer, widgets, genres, Android Auto and tag editing.
-
--------
+---
 What's in it:
 
 Library: your phone's songs, read from the system media index and cached locally. It has Songs, Albums, Artists and Folders tabs with detail pages, sorting, and a setting to hide short clips.
@@ -144,7 +115,7 @@ ssh -T git@github.com
 
 - [ ] .cursor/..
 - [ ] AGENTS.md
-- [ ] prompts.md
+- [ ] prompts.md, .cursorignore, .gitignore
 - [ ] Design files / Wireframes (Excalidraw)
 
 
@@ -162,7 +133,7 @@ ssh -T git@github.com
 - Canvas size:
   - Desktop: 1920x1080 (16:9, landscape).
   - Mobile: 390x844 (portrait, logical points).
-  
+
 
 ------------
 
@@ -499,3 +470,47 @@ The bottom nav bar covers most of the spaces, make it slightly small
 
 
 C:\Users\TMano1\.cursor\managed\team_27443805\hooks
+
+
+
+per-screen design notes in assets/wireframes/
+
+
+Yes, keep them, though they can be trimmed. They hold the parts an SVG can't show, and the blueprints link to them about 20 times, with 14 of those links in `editor-ui.md` alone.
+
+The SVGs show layout only; `style.md` says so. A note like `audio-slice8.md` also contains:
+
+- **Behavior:** where added music lands, the 8-lane cap, what Undo does after Extract, how fades shrink when a clip is trimmed, when a panel closes.
+- **Enable rules:** when Extract is disabled, and when Volume and Fade appear (not for photos).
+- **Exact copy and accessibility labels**, such as "Add audio at playhead" and "Mute audio" / "Unmute audio". The SVGs reuse this copy word for word, but they don't hold the labels or the rules behind them.
+
+If you deleted the notes, that information would only survive in the code, so the blueprints' acceptance criteria would have nothing to check against.
+
+What's now redundant is the ASCII layout sketch in each note. The SVGs replace those, and keeping both means two drawings of the same screen that can drift apart.
+
+Two ways to clean this up:
+
+1. **Trim the notes (my recommendation):** remove the ASCII sketches, link each note to its SVGs, and keep the behavior, copy and accessibility text. The blueprint links keep working.
+2. **Move the behavior into the blueprints and delete the notes:** this leaves one less place to look, but the blueprints get much longer and all those links have to be rewritten. That cuts against the blueprints skill's idea of keeping blueprints short and loading detail only when it's needed.
+
+---
+
+The code is the authority for behavior, and nothing asked for these notes. No instruction in `.cursor/` mentions them; the `/wireframe` command only asks for the image and `style.md`. Earlier agents wrote one note per slice and committed it with the feature, from the first commit through slice 16, probably as the designer's plan saved to disk.
+
+I overstated their value in my last answer. Everything in them already lives somewhere you maintain:
+
+- **Behavior** (lane caps, Undo after Extract, how fades shrink on trim) is in the code and its tests.
+- **Accessibility labels and copy** are in the Compose code and string resources.
+- **Acceptance criteria** belong in the blueprints, which the blueprints skill already manages.
+- **Layout** is now in the SVGs.
+
+So the notes are a third copy that can only drift out of sync. Removing them means:
+
+1. Deleting the 16 note files (every `.md` in `assets/wireframes/` except `style.md`).
+2. Pointing the roughly 20 blueprint links at the matching SVGs, mostly in `editor-ui.md`.
+3. Changing the header comment in each SVG, which currently names the note it draws, to name its blueprint instead.
+4. Removing the line in `style.md` that says behavior and copy live in a spec beside each screen.
+
+Before deleting, I'd check whether any blueprint acceptance criterion depends on a note's content rather than just linking to it. If one does, that rule moves into the blueprint. One practical issue: my earlier attempt to delete the old `home-projects-390x844.svg` was blocked, so deleting these may need your approval too.
+
+Should I go ahead?
