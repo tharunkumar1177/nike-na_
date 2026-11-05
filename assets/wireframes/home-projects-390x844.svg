@@ -1,0 +1,39 @@
+<!--
+  Home screen, project list (slice 4) on a 390x844 mobile canvas.
+  Canvas units equal dp/pt, so every measurement maps 1:1 to code.
+  Layout source: assets/wireframes/home-projects.md.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844" font-family="Roboto, Arial, sans-serif">
+  <rect width="390" height="844" fill="#FFFFFF"/>
+
+  <!-- System status bar, 24dp -->
+  <text x="16" y="17" font-size="14" font-weight="500" fill="#1C1B1F">9:41</text>
+  <rect x="330" y="8" width="10" height="9" rx="1" fill="#1C1B1F"/>
+  <path d="M346 17 L358 17 L358 7 Z" fill="#1C1B1F"/>
+  <rect x="362" y="7" width="7" height="11" rx="1.5" fill="#1C1B1F"/>
+
+  <!-- Center-aligned top app bar, 64dp -->
+  <text x="195" y="63" font-size="22" text-anchor="middle" fill="#1C1B1F">Framecraft</text>
+
+  <!-- Project row 1, 72dp -->
+  <text x="16" y="119" font-size="16" fill="#1C1B1F">Summer Vacation</text>
+  <text x="16" y="141" font-size="14" fill="#49454F">Edited 5 min ago " 1:23 " 4 clips</text>
+  <g fill="#49454F"><circle cx="362" cy="118" r="2"/><circle cx="362" cy="124" r="2"/><circle cx="362" cy="130" r="2"/></g>
+
+  <!-- Project row 2, 72dp -->
+  <text x="16" y="191" font-size="16" fill="#1C1B1F">Birthday Party</text>
+  <text x="16" y="213" font-size="14" fill="#49454F">Edited yesterday " 0:15 " 1 clip</text>
+  <g fill="#49454F"><circle cx="362" cy="190" r="2"/><circle cx="362" cy="196" r="2"/><circle cx="362" cy="202" r="2"/></g>
+
+  <!-- Project row 3, unreadable project, 72dp -->
+  <text x="16" y="263" font-size="16" fill="#1C1B1F">Unreadable project</text>
+  <text x="16" y="285" font-size="14" fill="#B3261E">Couldn't read project file</text>
+  <g fill="#49454F"><circle cx="362" cy="262" r="2"/><circle cx="362" cy="268" r="2"/><circle cx="362" cy="274" r="2"/></g>
+
+  <!-- New project extended FAB, 56dp, 16dp above the navigation bar -->
+  <rect x="111" y="748" width="168" height="56" rx="28" fill="#E6E6E6"/>
+  <text x="195" y="781" font-size="14" font-weight="500" text-anchor="middle" fill="#1C1B1F">+  New project</text>
+
+  <!-- System gesture navigation bar, 24dp -->
+  <rect x="141" y="834" width="108" height="4" rx="2" fill="#1C1B1F"/>
+</svg>

@@ -157,7 +157,12 @@ ssh -T git@github.com
 - Do not elaborate or exaggerate instruction for the AGENT; keep it clean and concise
 
 
-
+### wireframe
+- Borderless: the UI fills the canvas edge to edge. No device frame, bezel, outer border, drop shadow, or margin around the screen.
+- Canvas size:
+  - Desktop: 1920x1080 (16:9, landscape).
+  - Mobile: 390x844 (portrait, logical points).
+  
 
 ------------
 
@@ -493,3 +498,4 @@ crashing while export (Doesn't supports more than 30 fps)
 The bottom nav bar covers most of the spaces, make it slightly small
 
 
+C:\Users\TMano1\.cursor\managed\team_27443805\hooks
