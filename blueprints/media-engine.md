@@ -26,6 +26,10 @@ One mapper produces the composition for both preview and export: export calls `C
 
 Media3's compositor draws the first registered picture sequence on top and times each composed frame by it, waits for a frame from every picture input, and feeds sequence gaps as small opaque black frames. So the planner orders overlays (top lane first) before the base and pads every picture sequence to the timeline end. A plan is composited when it has overlays, a base clip with a placement, or a canvas other than the default; then `CompositionFactory` registers a transparent still at the project frame rate first as the timing clock, then the picture sequences, then a background sequence when the background is not black, then the sound sequences. `CanvasLayout.inputsOf` gives the same order as `CompositorInput` values, and `CanvasCompositorSettings` hides the clock and every frame that no clip covers, and sizes the canvas from the first base input. Projects with the default canvas and no overlays or placements keep the single-sequence path.
 
+In a composited plan, gaps on every picture lane except the one that sizes the canvas (the first base lane, or the last picture lane when there is no base and no background) play as transparent 1 x 1 stills at the project frame rate, not Media3 gaps, because the Media3 1.11.1 compositor stalls when a Media3 gap hands over to a clip ([androidx/media#2866](https://github.com/androidx/media/issues/2866), [#2742](https://github.com/androidx/media/issues/2742)). The canvas lane keeps Media3 gaps so a one-pixel still never resizes the canvas. Gaps shorter than a millisecond stay Media3 gaps.
+
+Media3 1.11.1 does not restart a multi-input video graph by seeking once playback has ended ([androidx/media#2439](https://github.com/androidx/media/issues/2439)). So `ProjectPreview` keeps its last composition and reloads it (`setComposition` then `prepare`) on any seek out of the ended state, and on play when the playhead is at the end, which restarts from zero. Player seeks and loads are held at least one frame before the end, because Media3 stalls when seeking to the very end.
+
 Backgrounds: a solid color is a still of a 1 x 1 PNG data URI built by `SolidPng` and stretched over the canvas. Blur is a silent copy of the base track's segments, each reduced to 360 pixels high by a `Presentation` and softened by `GaussianBlur` (sigma 12) so the blur strength does not depend on the source resolution, then drawn filling the canvas.
 
 Base clips are placed per frame from their `BaseSpan`s: fit or fill picks the min or max factor between canvas and input size (`CanvasLayout.fitFactor`), then the clip's own center, scale, and turn apply as for overlays. `placementSettings` in `CanvasCompositorSettings` holds that shared mapping and is also used by text.
@@ -72,7 +76,7 @@ The exporter writes `cache/exports/export.mp4`, then `GallerySaver` inserts a pe
 ## Relevant implementation and tests
 
 - `engine/media3/src/main/kotlin/com/framecraft/editor/engine/plan/PlaybackPlan.kt` — plan types and `PlaybackPlanner`.
-- `engine/media3/src/main/kotlin/com/framecraft/editor/engine/CompositionFactory.kt` — plan to `Composition` (clipping for video, image durations, `addGap` padding, optional video effects, the clock sequence, overlay compositor settings, HDR tone mapping when compositing).
+- `engine/media3/src/main/kotlin/com/framecraft/editor/engine/CompositionFactory.kt` — plan to `Composition` (clipping for video, image durations, gap padding as Media3 gaps or transparent stills, optional video effects, the clock sequence, overlay compositor settings, HDR tone mapping when compositing).
 - `engine/media3/src/main/kotlin/com/framecraft/editor/engine/CanvasCompositorSettings.kt` — per-frame overlay, base, and background placement and output size.
 - `engine/media3/src/main/kotlin/com/framecraft/editor/engine/plan/CanvasLayout.kt` — compositor input order, canvas size, and fit and fill factors.
 - `engine/media3/src/main/kotlin/com/framecraft/editor/engine/SolidPng.kt` — 1 x 1 PNG data URIs for solid backgrounds.
@@ -98,6 +102,7 @@ The exporter writes `cache/exports/export.mp4`, then `GallerySaver` inserts a pe
 - [x] Preview and export use the same mapper (`ProjectExporter` builds its composition with `CompositionFactory`; verified by code inspection).
 - [x] Export settings never offer a resolution above the largest source or a frame rate above the project rate; bitrate and size estimates match `ExportPlannerTest`.
 - [x] Media3 error codes and full-disk causes map to the documented failure causes (`ExportFailureMapperTest`).
+- [ ] Preview replays after reaching the end, from play or from scrubbing back, and overlays play through their gaps without freezing (needs a device).
 - [ ] Export continues with the screen off and reports completion or failure (implemented in `ExportService`; needs a device to verify).
 
 ## Remaining gaps and unknowns
@@ -106,5 +111,6 @@ The exporter writes `cache/exports/export.mp4`, then `GallerySaver` inserts a pe
 - Pending `MediaStore` rows left by a killed process are not swept; Android removes stale pending rows after about a week.
 - The frame-drop effect is always applied, so sources faster than the chosen rate are capped; HEVC and other codecs are not offered.
 - Overlay preview and export depend on `MultipleInputVideoGraph` and `VideoCompositorSettings`, which research flagged as still evolving. The fit factor assumes the compositor asks for the output size before placing each frame's inputs; if a Media3 update changes that, overlays fall back to Media3's pixel-relative size. The overlay order, the clock sequence (a data-URI PNG), and hidden gaps follow the Media3 1.11.1 compositor source; slices 7 and 8 drew overlays under the base, and the fix has not yet been seen on a device.
+- Seeking a composited preview mid-timeline is still a plain Media3 seek, which Media3 1.11.1 documents as unsupported for several video sequences; a gap in the middle of the canvas base lane can still stall at the handover. Both need a device to confirm and should be re-checked on each Media3 update.
 - The blurred background decodes the base media a second time, which costs decoder capacity on low-end phones; this has not been measured on a device.
 - Per-clip volume and fades are applied by audio processors inside Media3; whether preview and export sound identical needs a device to verify.
