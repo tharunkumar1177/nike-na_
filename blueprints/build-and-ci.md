@@ -30,6 +30,10 @@ The scaffold creates the modules listed in the architecture as they are needed, 
 
 The workflow runs ktlint, detekt, Android Lint, unit tests, and `assembleDebug`. Each runs as a distinct step so failures are attributable. Gradle runs on JDK 21 (Robolectric's SDK 36 sandbox requires it) while bytecode targets Java 17. Robolectric JVM tests need `--add-opens` for `java.base` internals, configured in `app/build.gradle.kts`. `:domain` uses JUnit 5; Robolectric tests in `:app` and the unit tests in `:engine:media3` and `:engine:captions` use JUnit 4. The app packages only the `arm64-v8a` and `armeabi-v7a` ABIs because the speech recognizer's x86_64 library is not 16 KB aligned.
 
+### Releases
+
+Pushing a `v*` tag runs `.github/workflows/release.yml`. It fails unless the tag equals `v` plus `versionName` in `app/build.gradle.kts`, then assembles the debug APK and publishes a GitHub release named `Framecraft <tag>` with generated notes and `framecraft-<tag>-debug.apk` attached. Tags below `v1` are published as pre-releases. Tag only a `main` commit whose CI is green, because the release workflow does not lint or test.
+
 ## Related blueprints
 
 ### Required
@@ -44,6 +48,7 @@ None
 
 - `settings.gradle.kts`, `build.gradle.kts`, `gradle/libs.versions.toml`, `gradle.properties`, `.editorconfig`, `config/detekt/detekt.yml` — build configuration
 - `.github/workflows/ci.yml` — CI workflow
+- `.github/workflows/release.yml` — tag-triggered release workflow
 - `app/src/test/kotlin/com/framecraft/editor/MainActivityTest.kt` — launch test
 
 ## Acceptance or verification criteria
@@ -52,8 +57,9 @@ None
 - [x] ktlint, detekt, Android Lint, unit tests, and `assembleDebug` each pass as separate steps.
 - [x] The debug APK is uploaded as a workflow artifact.
 - [x] The app launches to the empty home screen (verified by a Robolectric Compose UI test).
+- [ ] A version tag publishes a GitHub release with the debug APK attached.
 
 ## Remaining gaps and unknowns
 
 - Instrumented (emulator) tests in CI are not planned yet; decide when the engine slice needs them.
-- Release signing is out of scope until a release slice exists.
+- Releases ship the debug-signed APK; release signing is out of scope until a release slice exists.
