@@ -94,4 +94,5 @@ jobs:
           name: device-test-reports
           path: |
             engine/media3/build/reports/androidTests/
-            engine/media3/build/outputs/and
+            engine/media3/build/outputs/androidTest-results/
+          if-no-files-found: ignore
