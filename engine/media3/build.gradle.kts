@@ -17,6 +17,15 @@ android {
 
     defaultConfig {
         minSdk = 29
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    testOptions.managedDevices.localDevices {
+        create("atdApi34") {
+            device = "Pixel 7"
+            apiLevel = 34
+            systemImageSource = "aosp-atd"
+        }
     }
 
     compileOptions {
@@ -53,4 +62,9 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit4)
+
+    androidTestImplementation(libs.junit4)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.core)
+    androidTestImplementation(libs.androidx.test.ext.junit)
 }
